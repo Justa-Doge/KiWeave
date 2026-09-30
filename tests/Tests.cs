@@ -92,6 +92,17 @@ namespace FunctionRowRemapper
         }
         static void UnitTests()
         {
+            Test("Update checker chooses only a newer stable version tag", delegate {
+                string tags = "aaaa\trefs/tags/v0.1.0\n" +
+                    "bbbb\trefs/tags/v0.2.0\n" +
+                    "cccc\trefs/tags/v0.3.0-beta\n" +
+                    "dddd\trefs/tags/v0.2.0^{}\n" +
+                    "eeee\trefs/tags/v0.1.9\n";
+                Assert(UpdateChecker.NewestUpdate(tags, "0.1.0") == "v0.2.0", "newest stable tag");
+                Assert(UpdateChecker.NewestUpdate(tags, "0.2.0") == null, "current version is not an update");
+                Assert(UpdateChecker.NewestUpdate("", "0.1.0") == null, "empty response");
+                Assert(UpdateChecker.NewestUpdate(tags, "invalid") == null, "invalid installed version");
+            });
             Test("PowerToys shortcut scan includes live fields and skips defaults", delegate {
                 string root = Path.Combine(scratch, "PowerToysFixture"), module = Path.Combine(root, "ColorPicker"); Directory.CreateDirectory(module);
                 File.WriteAllText(Path.Combine(root, "settings.json"), "{\"enabled\":{\"ColorPicker\":true}}");

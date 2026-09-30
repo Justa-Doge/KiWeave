@@ -68,6 +68,7 @@ namespace FunctionRowRemapper
         readonly Label editorTitle = new DesignLabel(), hint = new DesignLabel(), status = new DesignLabel(), feedback = new DesignLabel(), targetLabel = new DesignLabel(), argumentsLabel = new DesignLabel(), workingLabel = new DesignLabel();
         readonly Button browse = new DesignButton(), folder = new DesignButton(), workBrowse = new DesignButton();
         readonly NotifyIcon tray = new NotifyIcon();
+        UpdateNotification updateNotice;
         readonly ToolStripMenuItem trayToggle = new ToolStripMenuItem("Enable remapping");
         readonly System.Windows.Forms.Timer statusTimer = new System.Windows.Forms.Timer { Interval = 1000 };
         readonly bool startInTray;
@@ -117,6 +118,7 @@ namespace FunctionRowRemapper
                 if (initialError != null) SetFeedback(initialError, true);
                 else CheckMissingTargets();
                 if (startInTray && preferences.UseTray && initialError == null) Hide();
+                UpdateChecker.CheckInBackground(tag => Ui(delegate { updateNotice = new UpdateNotification(tag); }));
             };
             FormClosing += OnClosing;
         }
@@ -494,6 +496,6 @@ namespace FunctionRowRemapper
             }
             foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose();
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
     }
 }

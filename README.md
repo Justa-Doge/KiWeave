@@ -1,6 +1,6 @@
 # KeyWeave
 
-A small, offline Windows tray app for giving F1 through F12 your own actions.
+A small Windows tray app for giving F1 through F12 your own actions. Remapping works offline; an optional background check looks for newer versions on GitHub.
 
 Previously called Function Row Remapper. The current executable and internal project names still use `FunctionRowRemapper` until the app rebrand is finished; this does not affect saved mappings.
 
@@ -25,6 +25,10 @@ PowerToys remains the owner of these shortcuts; KeyWeave does not register them 
 For modules supported by the installed `PowerToys.DSC.exe`, you can edit the key combination and optionally enable an off module using **Save in PowerToys**. KeyWeave first backs up the original PowerToys settings under `%LOCALAPPDATA%\KeyWeave\PowerToysBackups`, rejects a stale or conflicting edit, applies it through PowerToys' configuration tool, then checks the saved result. If PowerToys does not activate it immediately, restart PowerToys yourself; KeyWeave does not restart it. Modules without supported configuration, and Keyboard Manager's remap rules, appear read-only; use **Open PowerToys Settings** to edit those. This integration does not claim to control every PowerToys action or bypass Windows-reserved shortcuts.
 
 Run **bin/FunctionRowRemapper.exe**, or use the installed **Function Row Remapper** entry in Windows Search. See [INSTALLATION.md](INSTALLATION.md) for installation, the **Use system tray** setting, and removal instructions.
+
+## Update notifications
+
+On launch, KeyWeave quietly checks stable `vX.Y.Z` tags in its private GitHub repository. If a tag is newer than the installed version, it shows a Windows notification linking to that tag. It never downloads or installs an update. The check uses the PC's existing Git credential manager, with interaction disabled and an eight-second limit; no credential is stored in KeyWeave. If Git or private-repo access is unavailable, it skips the check without delaying startup. A release needs a matching version bump in `src/UpdateChecker.cs` and a pushed Git tag. Ordinary commits to `main` do not trigger notifications.
 
 DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.
 
