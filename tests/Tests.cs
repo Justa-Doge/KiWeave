@@ -126,6 +126,18 @@ namespace FunctionRowRemapper
         }
         static void UnitTests()
         {
+            Test("Dark numeric spinner keeps working up and down buttons", delegate {
+                using (var numeric = new DesignNumericUpDown { Minimum = 0, Maximum = 2, Value = 1, Increment = 0.25M, Width = 90 }) {
+                    var handle = numeric.Handle;
+                    var spinner = numeric.Controls.Cast<Control>().First(x => x.GetType().Name == "DarkSpinnerButtons");
+                    Assert(spinner.Visible && spinner.Width >= 16, "custom spinner is not visible");
+                    var mouseDown = spinner.GetType().GetMethod("OnMouseDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    mouseDown.Invoke(spinner, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 2, 0) });
+                    Assert(numeric.Value == 1.25M, "up button did not increment");
+                    mouseDown.Invoke(spinner, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, spinner.Height - 2, 0) });
+                    Assert(numeric.Value == 1M, "down button did not decrement");
+                }
+            });
             Test("Custom action menus begin with a non-executing choice", delegate {
                 Assert(MainForm.ChoicesFor(3, true)[0].Label == "Choose an action", "custom hotkey placeholder");
                 Assert(MainForm.ChoicesFor(6, false)[0].Label == "Choose an action", "function key placeholder");

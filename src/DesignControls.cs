@@ -194,6 +194,72 @@ namespace FunctionRowRemapper
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
 
+        sealed class DarkSpinnerButtons : Control
+        {
+            readonly DesignNumericUpDown owner;
+            int hover = -1;
+
+            internal DarkSpinnerButtons(DesignNumericUpDown owner)
+            {
+                this.owner = owner;
+                Cursor = Cursors.Hand;
+                TabStop = false;
+                AccessibleName = "Increase or decrease value";
+                AccessibleRole = AccessibleRole.SpinButton;
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                    ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+            }
+
+            protected override void OnMouseMove(MouseEventArgs e)
+            {
+                base.OnMouseMove(e);
+                int next = e.Y < Height / 2 ? 0 : 1;
+                if (next != hover) { hover = next; Invalidate(); }
+            }
+
+            protected override void OnMouseLeave(EventArgs e)
+            {
+                base.OnMouseLeave(e); hover = -1; Invalidate();
+            }
+
+            protected override void OnMouseDown(MouseEventArgs e)
+            {
+                base.OnMouseDown(e);
+                if (e.Button != MouseButtons.Left) return;
+                decimal next = owner.Value + (e.Y < Height / 2 ? owner.Increment : -owner.Increment);
+                owner.Value = Math.Max(owner.Minimum, Math.Min(owner.Maximum, next));
+                owner.Focus();
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                e.Graphics.Clear(UiStyle.Input);
+                int half = Height / 2;
+                if (hover >= 0)
+                    using (var brush = new SolidBrush(UiStyle.Soft))
+                        e.Graphics.FillRectangle(brush, 0, hover == 0 ? 0 : half, Width, hover == 0 ? half : Height - half);
+                using (var pen = new Pen(UiStyle.Border))
+                {
+                    e.Graphics.DrawLine(pen, 0, 0, 0, Height - 1);
+                    e.Graphics.DrawLine(pen, 0, half, Width - 1, half);
+                }
+                DrawArrow(e.Graphics, new Rectangle(0, 0, Width, half), true);
+                DrawArrow(e.Graphics, new Rectangle(0, half, Width, Height - half), false);
+            }
+
+            static void DrawArrow(Graphics graphics, Rectangle bounds, bool up)
+            {
+                int centerX = bounds.Left + bounds.Width / 2;
+                int centerY = bounds.Top + bounds.Height / 2;
+                Point[] points = up
+                    ? new[] { new Point(centerX, centerY - 2), new Point(centerX - 4, centerY + 2), new Point(centerX + 4, centerY + 2) }
+                    : new[] { new Point(centerX - 4, centerY - 2), new Point(centerX + 4, centerY - 2), new Point(centerX, centerY + 2) };
+                using (var brush = new SolidBrush(UiStyle.Ink)) graphics.FillPolygon(brush, points);
+            }
+        }
+
+        readonly DarkSpinnerButtons spinner;
+
         internal DesignNumericUpDown()
         {
             BackColor = UiStyle.Input;
@@ -201,6 +267,19 @@ namespace FunctionRowRemapper
             BorderStyle = BorderStyle.FixedSingle;
             TextAlign = HorizontalAlignment.Center;
             Width = 58;
+            spinner = new DarkSpinnerButtons(this);
+            Controls.Add(spinner);
+            LayoutSpinner();
+        }
+
+        void LayoutSpinner()
+        {
+            if (spinner != null) spinner.SetBounds(Math.Max(1, ClientSize.Width - 18), 1, 17, Math.Max(1, ClientSize.Height - 2));
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e); LayoutSpinner();
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -211,10 +290,10 @@ namespace FunctionRowRemapper
             {
                 child.BackColor = UiStyle.Input;
                 child.ForeColor = UiStyle.Ink;
+                if (child != spinner && child.GetType().Name == "UpDownButtons") child.Visible = false;
             }
-            // The native spinner buttons stay bright even under Windows' dark theme.
-            // Direct typing and arrow-key increments remain available without them.
-            if (Controls.Count > 0) Controls[0].Visible = false;
+            spinner.BringToFront();
+            LayoutSpinner();
         }
     }
 
