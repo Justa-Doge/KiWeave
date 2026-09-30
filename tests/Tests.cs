@@ -55,6 +55,14 @@ namespace FunctionRowRemapper
                             form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
                             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "powertoys-preview.png"); image.Save(path); Console.WriteLine(path);
                         }
+                        var powerView = (Panel)typeof(MainForm).GetField("powerToysView", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(form);
+                        var powerPanel = powerView.Controls.OfType<PowerToysPanel>().First();
+                        typeof(PowerToysPanel).GetMethod("BeginAdd", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(powerPanel, null);
+                        Application.DoEvents(); form.Refresh();
+                        using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                            form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
+                            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "powertoys-add-preview.png"); image.Save(path); Console.WriteLine(path);
+                        }
                         form.Close();
                     }
                     return 0;
@@ -78,6 +86,10 @@ namespace FunctionRowRemapper
                             form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
                             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "custom-preview.png"); image.Save(path); Console.WriteLine(path);
                         }
+                        var customGroup = (ComboBox)typeof(MainForm).GetField("customSimpleKind", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(form);
+                        var customChoice = (ComboBox)typeof(MainForm).GetField("customSpecificKind", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(form);
+                        customGroup.SelectedIndex = 0; customGroup.SelectedIndex = 3;
+                        Assert(customChoice.SelectedItem.ToString() == "Choose an action", "custom action did not start empty");
                         form.Close();
                     }
                     return 0;
@@ -92,6 +104,16 @@ namespace FunctionRowRemapper
         }
         static void UnitTests()
         {
+            Test("Custom action menus begin with a non-executing choice", delegate {
+                Assert(MainForm.ChoicesFor(3, true)[0].Label == "Choose an action", "custom hotkey placeholder");
+                Assert(MainForm.ChoicesFor(6, false)[0].Label == "Choose an action", "function key placeholder");
+                Assert(MainForm.ChoicesFor(3, true)[0].Mapping.Kind != ActionKind.LockThenSleep, "sleep cannot be the default");
+            });
+            Test("PowerToys active list excludes off and unassigned shortcuts", delegate {
+                Assert(PowerToysPanel.IsActive(new PowerToysShortcut { ModuleEnabled = true, Chord = "Shift+Win+C" }), "assigned enabled shortcut missing");
+                Assert(!PowerToysPanel.IsActive(new PowerToysShortcut { ModuleEnabled = false, Chord = "Shift+Win+C" }), "off module shown");
+                Assert(!PowerToysPanel.IsActive(new PowerToysShortcut { ModuleEnabled = true, Chord = "Unassigned" }), "unassigned shortcut shown");
+            });
             Test("Update checker chooses only a newer stable version tag", delegate {
                 string tags = "aaaa\trefs/tags/v0.1.0\n" +
                     "bbbb\trefs/tags/v0.2.0\n" +

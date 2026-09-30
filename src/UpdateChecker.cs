@@ -10,7 +10,7 @@ namespace FunctionRowRemapper
     internal static class UpdateChecker
     {
         // Bump this when publishing a matching vX.Y.Z tag for an installed build.
-        internal const string CurrentVersion = "0.1.0";
+        internal const string CurrentVersion = "0.1.1";
         internal const string Repository = "https://github.com/Justa-Doge/KeyWeave.git";
         static readonly Regex TagPattern = new Regex(@"^v(\d{1,5})\.(\d{1,5})\.(\d{1,5})$", RegexOptions.CultureInvariant);
 

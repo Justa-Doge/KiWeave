@@ -39,6 +39,7 @@ namespace FunctionRowRemapper
             public bool Matches(Mapping other) { return other != null && Mapping.Kind == other.Kind && Mapping.Target == other.Target && Mapping.Arguments == other.Arguments && Mapping.WorkingDirectory == other.WorkingDirectory; }
         }
         static SpecificChoice Choice(string label, ActionKind kind) { return new SpecificChoice(label, new Mapping { Kind = kind }); }
+        static readonly SpecificChoice ChooseAction = Choice("Choose an action", ActionKind.Unbound);
         static SpecificChoice Preset(string label, ActionKind kind, string target, string arguments) { return new SpecificChoice(label, new Mapping { Kind = kind, Target = target, Arguments = arguments }); }
         static SpecificChoice Shortcut(string label, string target) { return Preset(label, ActionKind.SendShortcut, target, ""); }
         static readonly string[] FunctionGroups = { "Normal behavior", "Disable this key", "Keyboard input", "Media and sound", "Open or run something", "Monitor controls", "Custom action" };
@@ -150,7 +151,8 @@ namespace FunctionRowRemapper
             if (normalized == 2) return new[] { Choice("Open an application", ActionKind.Application), Choice("Open a file or folder", ActionKind.FileOrFolder), Choice("Run a Windows shortcut", ActionKind.WindowsShortcut), Choice("Run a command or script", ActionKind.Command), Choice("Run a Python script", ActionKind.Python) };
             var presets = new List<SpecificChoice> { Choice("Lock Windows, then sleep", ActionKind.LockThenSleep), Shortcut("Lock Windows", "Win+L"), Shortcut("Open file explorer", "Win+E"), Shortcut("Open Windows settings", "Win+I"), Shortcut("Open task manager", "Ctrl+Shift+Escape"), Shortcut("Open clipboard history", "Win+V"), Shortcut("Open notification center", "Win+N"), Shortcut("Open quick settings", "Win+A"), Shortcut("Open emoji picker", "Win+OemPeriod"), Shortcut("Open task view", "Win+Tab"), Shortcut("Open run dialog", "Win+R"), Shortcut("Open power-user menu", "Win+X"), Shortcut("Take a screen snip", "Win+Shift+S"), Shortcut("Show desktop", "Win+D"), Shortcut("Switch apps", "Alt+Tab"), Shortcut("Snap window left", "Win+Left"), Shortcut("Snap window right", "Win+Right"), Shortcut("Maximize window", "Win+Up"), Shortcut("Minimize window", "Win+Down"), Shortcut("New virtual desktop", "Win+Ctrl+D"), Shortcut("Close virtual desktop", "Win+Ctrl+F4"), Shortcut("Next virtual desktop", "Win+Ctrl+Right"), Shortcut("Previous virtual desktop", "Win+Ctrl+Left"), Shortcut("Copy", "Ctrl+C"), Shortcut("Paste", "Ctrl+V"), Shortcut("Cut", "Ctrl+X"), Shortcut("Undo", "Ctrl+Z"), Shortcut("Redo", "Ctrl+Y"), Shortcut("Select all", "Ctrl+A"), Shortcut("Save", "Ctrl+S"), Shortcut("Open", "Ctrl+O"), Shortcut("New", "Ctrl+N"), Shortcut("Find", "Ctrl+F"), Shortcut("Print", "Ctrl+P"), Shortcut("Refresh", "F5"), Shortcut("Close current window", "Alt+F4"), Shortcut("Toggle full screen", "F11"), Preset("Open calculator", ActionKind.Application, Path.Combine(sys, "calc.exe"), ""), Preset("Open notepad", ActionKind.Application, Path.Combine(sys, "notepad.exe"), ""), Preset("Open paint", ActionKind.Application, Path.Combine(sys, "mspaint.exe"), ""), Preset("Open control panel", ActionKind.Application, Path.Combine(sys, "control.exe"), ""), Preset("Open device manager", ActionKind.Application, Path.Combine(sys, "mmc.exe"), "devmgmt.msc"), Preset("Sleep", ActionKind.Application, Path.Combine(sys, "rundll32.exe"), "powrprof.dll,SetSuspendState 0,1,0"), Preset("Sign out", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/l"), Preset("Restart", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/r /t 0"), Preset("Shut down", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/s /t 0") };
             presets.AddRange(ExpandedActions.All);
-            if (custom) presets.Insert(0, Choice("Build a step-by-step sequence...", ActionKind.Sequence)); return presets.ToArray();
+            presets.Insert(0, ChooseAction);
+            if (custom) presets.Insert(1, Choice("Build a step-by-step sequence...", ActionKind.Sequence)); return presets.ToArray();
         }
         void PopulateChoices(ComboBox box, int group, bool custom, Mapping selectedMapping)
         {
@@ -167,11 +169,13 @@ namespace FunctionRowRemapper
         void ApplyFunctionChoice()
         {
             if (loading || specificKind.SelectedItem == null) return; var choice = (SpecificChoice)specificKind.SelectedItem;
+            if (ReferenceEquals(choice, ChooseAction)) { SetFeedback("Choose an action before saving this function key.", false); return; }
             loading = true; kind.SelectedIndex = (int)choice.Mapping.Kind; target.Text = choice.Mapping.Target; arguments.Text = choice.Mapping.Arguments; working.Text = choice.Mapping.WorkingDirectory; media.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target); ConfigureFields(false); loading = false; Edited();
         }
         void ApplyCustomChoice()
         {
             if (loading || customSpecificKind.SelectedItem == null) return; var choice = (SpecificChoice)customSpecificKind.SelectedItem;
+            if (ReferenceEquals(choice, ChooseAction)) { SetFeedback("Choose an action before saving this custom hotkey.", false); return; }
             loading = true; customKind.SelectedIndex = (int)choice.Mapping.Kind; customTarget.Text = choice.Mapping.Target; customArguments.Text = choice.Mapping.Arguments; customWorking.Text = choice.Mapping.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target); ConfigureCustomFields(false); loading = false; if (choice.Mapping.Kind == ActionKind.Sequence) OpenSequenceBuilder(); else CustomEdited();
         }
         void PopulateCustomList()
@@ -370,6 +374,10 @@ namespace FunctionRowRemapper
         bool Save()
         {
             if (isPreview) { SetFeedback("Design preview only. Nothing was saved or activated.", false); return true; }
+            if ((functionPage.Visible && simpleKind.SelectedIndex == 6 && ReferenceEquals(specificKind.SelectedItem, ChooseAction)) ||
+                (customPage.Visible && customHotkeyView.Visible && customSimpleKind.SelectedIndex == 3 && ReferenceEquals(customSpecificKind.SelectedItem, ChooseAction))) {
+                SetFeedback("Choose an action first. Nothing was changed.", true); return false;
+            }
             try {
                 ConfigStore.Validate(draft, true); draft.Enabled = engine != null && engine.Enabled;
                 ConfigStore.Save(ConfigStore.DefaultPath, draft); saved = draft.Copy();

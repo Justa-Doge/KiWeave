@@ -247,7 +247,7 @@ namespace FunctionRowRemapper
             var viewHost = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             customHotkeyView.Dock = powerToysView.Dock = DockStyle.Fill;
             viewHost.Controls.Add(customHotkeyView); viewHost.Controls.Add(powerToysView); layout.Controls.Add(viewHost, 0, 1);
-            powerToysView.Controls.Add(new PowerToysPanel { Dock = DockStyle.Fill });
+            powerToysView.Controls.Add(new PowerToysPanel(PrepareList) { Dock = DockStyle.Fill });
             var columns = PageColumns(customHotkeyView); var left = Card(); left.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(left, 0, 0);
             var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
             rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));

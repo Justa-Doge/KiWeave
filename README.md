@@ -18,7 +18,7 @@ Both pages share **Shortcuts enabled**, **Start with Windows**, **Keep running i
 
 ## PowerToys shortcuts
 
-Choose **Custom hotkeys → PowerToys**, then select a module and a specific function from the dropdowns. The shortcut field shows its current PowerToys shortcut. **Refresh shortcuts** picks up changes made in PowerToys. Keyboard Manager's existing shortcut remaps are shown when its active profile exists.
+Choose **Custom hotkeys → PowerToys**. The left side shows only shortcuts that are assigned and whose PowerToys module is enabled; select one to edit its details on the right. Choose **Add shortcut** to browse off or unassigned PowerToys functions using module and specific-function dropdowns. After an editable function is enabled, assigned, and saved, it moves into the active list. **Refresh** picks up changes made directly in PowerToys. Keyboard Manager's existing shortcut remaps are shown when its active profile exists.
 
 PowerToys remains the owner of these shortcuts; KeyWeave does not register them a second time. PowerToys must be running for its actions to work. KeyWeave's **Save changes** button applies only to KeyWeave's own hotkeys, while **Save in PowerToys** applies a supported PowerToys shortcut edit.
 
