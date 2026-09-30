@@ -62,7 +62,8 @@ namespace FunctionRowRemapper
 
     public sealed partial class MainForm
     {
-        readonly Panel functionPage = new Panel(), customPage = new Panel();
+        readonly Panel functionPage = new Panel(), customPage = new Panel(), customHotkeyView = new Panel(), powerToysView = new Panel();
+        DesignButton hotkeysTab, powerToysTab;
         readonly Label pageTitle = UiStyle.Text("Function keys", 26, true), pageSubtitle = UiStyle.Text("", 10, false);
         DesignButton functionNav, customNav;
         readonly Label customTitle = UiStyle.Text("Edit shortcut", 19, true);
@@ -96,7 +97,6 @@ namespace FunctionRowRemapper
             functionNav = Nav("Function keys", "\uE765", delegate { SelectPage(0); });
             customNav = Nav("Custom hotkeys", "\uE713", delegate { SelectPage(1); });
             sideTop.Controls.Add(functionNav); sideTop.Controls.Add(customNav);
-            sideTop.Controls.Add(Nav("PowerToys shortcuts", "\uE8D4", delegate { OpenPowerToys(); }));
             var safety = UiStyle.Stack(); safety.Dock = DockStyle.Bottom;
             var safeTitle = UiStyle.Text("Always in control", 10, true); safeTitle.ForeColor = Color.FromArgb(214, 210, 237); safety.Controls.Add(safeTitle);
             var safeText = UiStyle.Text("Hold Ctrl + Alt + Shift\nfor 1.5s to pause shortcuts.", 9, false); safeText.ForeColor = Color.FromArgb(156, 155, 180); safety.Controls.Add(safeText); sidebar.Controls.Add(safety);
@@ -144,7 +144,8 @@ namespace FunctionRowRemapper
             functionPage.Visible = index == 0; customPage.Visible = index == 1;
             functionNav.Active = index == 0; customNav.Active = index == 1; functionNav.Invalidate(); customNav.Invalidate();
             pageTitle.Text = index == 0 ? "Function keys" : "Custom hotkeys";
-            pageSubtitle.Text = index == 0 ? "Small keys. Big possibilities." : "Your favorite actions, one shortcut away.";
+            pageSubtitle.Text = index == 0 ? "Small keys. Big possibilities." :
+                powerToysView.Visible ? "PowerToys shortcuts, right where your hotkeys live." : "Your favorite actions, one shortcut away.";
         }
         TableLayoutPanel PageColumns(Control page)
         {
@@ -234,7 +235,20 @@ namespace FunctionRowRemapper
         }
         void BuildCustomPage(Control page)
         {
-            var columns = PageColumns(page); var left = Card(); left.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(left, 0, 0);
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            page.Controls.Add(layout);
+            var tabs = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty };
+            hotkeysTab = new DesignButton { Text = "My hotkeys", Width = 146, Height = 42, Margin = new Padding(0, 0, 10, 0) };
+            powerToysTab = new DesignButton { Text = "PowerToys", Width = 146, Height = 42, Margin = Padding.Empty };
+            hotkeysTab.Click += delegate { SelectCustomSection(false); };
+            powerToysTab.Click += delegate { SelectCustomSection(true); };
+            tabs.Controls.Add(hotkeysTab); tabs.Controls.Add(powerToysTab); layout.Controls.Add(tabs, 0, 0);
+            var viewHost = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+            customHotkeyView.Dock = powerToysView.Dock = DockStyle.Fill;
+            viewHost.Controls.Add(customHotkeyView); viewHost.Controls.Add(powerToysView); layout.Controls.Add(viewHost, 0, 1);
+            powerToysView.Controls.Add(new PowerToysPanel { Dock = DockStyle.Fill });
+            var columns = PageColumns(customHotkeyView); var left = Card(); left.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(left, 0, 0);
             var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
             rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
             rows.Controls.Add(UiStyle.Text("Saved hotkeys", 9, true), 0, 0); PrepareList(customList, "HOTKEY"); rows.Controls.Add(customList, 0, 1);
@@ -263,6 +277,14 @@ namespace FunctionRowRemapper
             sequenceField = UiStyle.Field("Sequence", sequenceSummary); customStack.Controls.Add(sequenceField);
             customHelp.Margin = new Padding(0, 12, 0, 0); customStack.Controls.Add(customHelp);
             customShortcut.TextChanged += delegate { CustomEdited(); }; customTarget.TextChanged += delegate { CustomEdited(); }; customArguments.TextChanged += delegate { CustomEdited(); }; customWorking.TextChanged += delegate { CustomEdited(); }; customMedia.SelectedIndexChanged += delegate { CustomEdited(); };
+            SelectCustomSection(false);
+        }
+        void SelectCustomSection(bool powerToys)
+        {
+            customHotkeyView.Visible = !powerToys; powerToysView.Visible = powerToys;
+            hotkeysTab.Primary = !powerToys; powerToysTab.Primary = powerToys;
+            hotkeysTab.Invalidate(); powerToysTab.Invalidate();
+            pageSubtitle.Text = powerToys ? "PowerToys shortcuts, right where your hotkeys live." : "Your favorite actions, one shortcut away.";
         }
         void SetCustomEditorState(bool hasSelection)
         {
@@ -277,15 +299,6 @@ namespace FunctionRowRemapper
                 if (custom) {
                     var h = draft.CustomHotkeys[customSelected]; h.Action = chosen.Copy(); LoadCustomEditor(customSelected); CustomEdited();
                 } else { draft.Mappings[selected] = chosen.Copy(); LoadEditor(selected); Edited(); }
-            }
-        }
-        void OpenPowerToys()
-        {
-            using (var dialog = new PowerToysForm(selected)) {
-                if (dialog.ShowDialog(this) != DialogResult.OK || String.IsNullOrEmpty(dialog.SelectedChord)) return;
-                draft.Mappings[selected] = new Mapping { Kind = ActionKind.SendShortcut, Target = dialog.SelectedChord };
-                PopulateList(); LoadEditor(selected); MarkDirty(); SelectPage(0);
-                SetFeedback("PowerToys shortcut staged for F" + (selected + 1) + ". Save changes to activate it.", false);
             }
         }
     }

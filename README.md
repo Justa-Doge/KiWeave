@@ -18,9 +18,9 @@ Both pages share **Shortcuts enabled**, **Start with Windows**, **Keep running i
 
 ## PowerToys shortcuts
 
-Choose **PowerToys shortcuts** in the sidebar to browse shortcut settings from the installed PowerToys modules. Search by module, action, or key combination. The list shows whether each module is enabled, and Refresh picks up changes made in PowerToys. Keyboard Manager's existing shortcut remaps are shown when its active profile exists.
+Choose **Custom hotkeys → PowerToys**, then select a module and a specific function from the dropdowns. The shortcut field shows its current PowerToys shortcut. **Refresh shortcuts** picks up changes made in PowerToys. Keyboard Manager's existing shortcut remaps are shown when its active profile exists.
 
-Select an assigned, enabled PowerToys shortcut and choose **Use on selected F key** to stage a KeyWeave mapping that sends that combination. KeyWeave's **Save changes** then applies the F-key mapping; PowerToys remains the owner of its own shortcut. PowerToys must be running for its actions to work. As with other injected shortcuts, some PowerToys actions may not react to synthetic input; test the physical F key before relying on it.
+PowerToys remains the owner of these shortcuts; KeyWeave does not register them a second time. PowerToys must be running for its actions to work. KeyWeave's **Save changes** button applies only to KeyWeave's own hotkeys, while **Save in PowerToys** applies a supported PowerToys shortcut edit.
 
 For modules supported by the installed `PowerToys.DSC.exe`, you can edit the key combination and optionally enable an off module using **Save in PowerToys**. KeyWeave first backs up the original PowerToys settings under `%LOCALAPPDATA%\KeyWeave\PowerToysBackups`, rejects a stale or conflicting edit, applies it through PowerToys' configuration tool, then checks the saved result. If PowerToys does not activate it immediately, restart PowerToys yourself; KeyWeave does not restart it. Modules without supported configuration, and Keyboard Manager's remap rules, appear read-only; use **Open PowerToys Settings** to edit those. This integration does not claim to control every PowerToys action or bypass Windows-reserved shortcuts.
 

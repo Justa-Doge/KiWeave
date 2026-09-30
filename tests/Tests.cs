@@ -45,9 +45,12 @@ namespace FunctionRowRemapper
                 }
                 if (args.Contains("--powertoys-preview")) {
                     Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-                    using (var form = new PowerToysForm(0)) {
+                    using (var form = new MainForm(false, true)) {
                         form.StartPosition = FormStartPosition.Manual; form.Location = new System.Drawing.Point(-20000, -20000);
                         form.Show(); Application.DoEvents();
+                        typeof(MainForm).GetMethod("SelectPage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, new object[] { 1 });
+                        typeof(MainForm).GetMethod("SelectCustomSection", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, new object[] { true });
+                        Application.DoEvents(); form.Refresh();
                         using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
                             form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
                             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "powertoys-preview.png"); image.Save(path); Console.WriteLine(path);
