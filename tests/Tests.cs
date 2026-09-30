@@ -29,6 +29,33 @@ namespace FunctionRowRemapper
             if (args.Length == 2 && args[0] == "--probe") { File.AppendAllText(args[1], "launched\r\n"); return 0; }
             scratch = Path.Combine(Path.GetTempPath(), "FunctionRowRemapper-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(scratch);
             try {
+                if (args.Contains("--powertoys-detect")) {
+                    foreach (var item in PowerToysIntegration.Load()) Console.WriteLine(item.Module + " | " + item.Action + " | " + item.Chord + " | " + (item.ModuleEnabled ? "enabled" : "off") + " | " + (item.CanEdit ? "editable" : "view only"));
+                    return 0;
+                }
+                if (args.Contains("--powertoys-dsc-test")) {
+                    Console.WriteLine(PowerToysIntegration.TestCurrentDscInput("ColorPicker", Path.Combine(PowerToysIntegration.Root, "ColorPicker", "settings.json")));
+                    return 0;
+                }
+                if (args.Contains("--powertoys-save-noop")) {
+                    var item = PowerToysIntegration.Load().First(x => x.Module == "ColorPicker" && x.Action == "Activation");
+                    string original = item.Chord; Console.WriteLine("Backup: " + PowerToysIntegration.Save(item, original, false));
+                    Assert(PowerToysIntegration.Load().First(x => x.Module == "ColorPicker" && x.Action == "Activation").Chord == original, "PowerToys shortcut changed");
+                    Console.WriteLine("PowerToys no-op save verified; shortcut unchanged."); return 0;
+                }
+                if (args.Contains("--powertoys-preview")) {
+                    Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                    using (var form = new PowerToysForm(0)) {
+                        form.StartPosition = FormStartPosition.Manual; form.Location = new System.Drawing.Point(-20000, -20000);
+                        form.Show(); Application.DoEvents();
+                        using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                            form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
+                            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "powertoys-preview.png"); image.Save(path); Console.WriteLine(path);
+                        }
+                        form.Close();
+                    }
+                    return 0;
+                }
                 if (args.Contains("--ddc-detect") || args.Contains("--ddc-hardware")) {
                     foreach (var m in DdcService.Shared.Scan()) Console.WriteLine(m.Name + ": " + m.Status);
                     if (args.Contains("--ddc-hardware")) foreach (byte code in new byte[] {0x10,0x12,0x62}) Test("Hardware monitor control " + code.ToString("X2"), () => Console.WriteLine(DdcService.Shared.VerifyHardwareRoundTrip(code)));
@@ -39,6 +66,15 @@ namespace FunctionRowRemapper
         }
         static void UnitTests()
         {
+            Test("PowerToys shortcut scan includes live fields and skips defaults", delegate {
+                string root = Path.Combine(scratch, "PowerToysFixture"), module = Path.Combine(root, "ColorPicker"); Directory.CreateDirectory(module);
+                File.WriteAllText(Path.Combine(root, "settings.json"), "{\"enabled\":{\"ColorPicker\":true}}");
+                File.WriteAllText(Path.Combine(module, "settings.json"), "{\"properties\":{\"DefaultActivationShortcut\":{\"win\":true,\"ctrl\":false,\"alt\":false,\"shift\":true,\"code\":67},\"ActivationShortcut\":{\"win\":true,\"ctrl\":false,\"alt\":false,\"shift\":true,\"code\":67},\"unused_hotkey\":{\"win\":false,\"ctrl\":true,\"alt\":false,\"shift\":false,\"code\":0}}}");
+                var found = PowerToysIntegration.Load(root);
+                Assert(found.Count == 2, "shortcut count " + found.Count);
+                Assert(found.Any(x => x.Chord == "Shift+Win+C" && x.ModuleEnabled && x.Action == "Activation"), "active shortcut");
+                Assert(found.Any(x => x.Chord == "Unassigned"), "unassigned shortcut");
+            });
             Test("Expanded catalog has unique labels and over 300 actions", delegate {
                 var all = ActionPickerForm.Catalog(true);
                 Assert(all.Length > 300, "catalog size: " + all.Length);

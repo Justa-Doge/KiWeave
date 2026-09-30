@@ -16,6 +16,14 @@ For a Custom hotkey, choose **Build sequence...** to open the separate sequence 
 
 Both pages share **Shortcuts enabled**, **Start with Windows**, **Keep running in tray**, and **Save changes**. **More** contains import/export, function-key reset/disable, and **Exit app**. The editor panels scroll when needed at smaller window sizes.
 
+## PowerToys shortcuts
+
+Choose **PowerToys shortcuts** in the sidebar to browse shortcut settings from the installed PowerToys modules. Search by module, action, or key combination. The list shows whether each module is enabled, and Refresh picks up changes made in PowerToys. Keyboard Manager's existing shortcut remaps are shown when its active profile exists.
+
+Select an assigned, enabled PowerToys shortcut and choose **Use on selected F key** to stage a KeyWeave mapping that sends that combination. KeyWeave's **Save changes** then applies the F-key mapping; PowerToys remains the owner of its own shortcut. PowerToys must be running for its actions to work. As with other injected shortcuts, some PowerToys actions may not react to synthetic input; test the physical F key before relying on it.
+
+For modules supported by the installed `PowerToys.DSC.exe`, you can edit the key combination and optionally enable an off module using **Save in PowerToys**. KeyWeave first backs up the original PowerToys settings under `%LOCALAPPDATA%\KeyWeave\PowerToysBackups`, rejects a stale or conflicting edit, applies it through PowerToys' configuration tool, then checks the saved result. If PowerToys does not activate it immediately, restart PowerToys yourself; KeyWeave does not restart it. Modules without supported configuration, and Keyboard Manager's remap rules, appear read-only; use **Open PowerToys Settings** to edit those. This integration does not claim to control every PowerToys action or bypass Windows-reserved shortcuts.
+
 Run **bin/FunctionRowRemapper.exe**, or use the installed **Function Row Remapper** entry in Windows Search. See [INSTALLATION.md](INSTALLATION.md) for installation, the **Use system tray** setting, and removal instructions.
 
 DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.

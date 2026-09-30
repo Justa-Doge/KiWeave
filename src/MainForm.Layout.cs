@@ -96,6 +96,7 @@ namespace FunctionRowRemapper
             functionNav = Nav("Function keys", "\uE765", delegate { SelectPage(0); });
             customNav = Nav("Custom hotkeys", "\uE713", delegate { SelectPage(1); });
             sideTop.Controls.Add(functionNav); sideTop.Controls.Add(customNav);
+            sideTop.Controls.Add(Nav("PowerToys shortcuts", "\uE8D4", delegate { OpenPowerToys(); }));
             var safety = UiStyle.Stack(); safety.Dock = DockStyle.Bottom;
             var safeTitle = UiStyle.Text("Always in control", 10, true); safeTitle.ForeColor = Color.FromArgb(214, 210, 237); safety.Controls.Add(safeTitle);
             var safeText = UiStyle.Text("Hold Ctrl + Alt + Shift\nfor 1.5s to pause shortcuts.", 9, false); safeText.ForeColor = Color.FromArgb(156, 155, 180); safety.Controls.Add(safeText); sidebar.Controls.Add(safety);
@@ -274,6 +275,15 @@ namespace FunctionRowRemapper
                 if (custom) {
                     var h = draft.CustomHotkeys[customSelected]; h.Action = chosen.Copy(); LoadCustomEditor(customSelected); CustomEdited();
                 } else { draft.Mappings[selected] = chosen.Copy(); LoadEditor(selected); Edited(); }
+            }
+        }
+        void OpenPowerToys()
+        {
+            using (var dialog = new PowerToysForm(selected)) {
+                if (dialog.ShowDialog(this) != DialogResult.OK || String.IsNullOrEmpty(dialog.SelectedChord)) return;
+                draft.Mappings[selected] = new Mapping { Kind = ActionKind.SendShortcut, Target = dialog.SelectedChord };
+                PopulateList(); LoadEditor(selected); MarkDirty(); SelectPage(0);
+                SetFeedback("PowerToys shortcut staged for F" + (selected + 1) + ". Save changes to activate it.", false);
             }
         }
     }
