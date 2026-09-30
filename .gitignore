@@ -1,0 +1,18 @@
+# Build output and local test artifacts
+bin/
+bin-*/
+backups/
+obj/
+.vs/
+*.exe
+*.pdb
+*.zip
+*.log
+
+# Per-machine/user state should never be published
+config.json
+preferences.json
+*.bak
+
+# Generated release metadata
+SHA256SUMS.txt

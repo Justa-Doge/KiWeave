@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "enabled": false,
+  "mappings": [
+    {
+      "key": "F1",
+      "action": "Media",
+      "target": "VolumeDown",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F2",
+      "action": "Media",
+      "target": "VolumeUp",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F3",
+      "action": "Media",
+      "target": "VolumeMute",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F4",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F5",
+      "action": "Media",
+      "target": "VolumeUp",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F6",
+      "action": "SendShortcut",
+      "target": "Ctrl+Shift+S",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F7",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F8",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F9",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F10",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F11",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    },
+    {
+      "key": "F12",
+      "action": "PassThrough",
+      "target": "",
+      "arguments": "",
+      "workingDirectory": ""
+    }
+  ]
+}

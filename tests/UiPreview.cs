@@ -1,0 +1,82 @@
+using System;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Windows.Forms;
+namespace FunctionRowRemapper
+{
+    internal static class UiPreview
+    {
+        static T Field<T>(object o, string name) { return (T)o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(o); }
+        static object Call(object o, string name, params object[] args) { return o.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(o, args); }
+        static void CheckDropdownLayout(Control control)
+        {
+            foreach (Control child in control.Controls) {
+                var combo = child as DesignComboBox;
+                if (combo != null && combo.Visible && (combo.Top < 0 || combo.Bottom > combo.Parent.ClientSize.Height)) throw new Exception("Dropdown border is clipped: " + combo.Text);
+                CheckDropdownLayout(child);
+            }
+        }
+        static void Prepare(Form form) { form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-22000, -22000); form.Show(); Application.DoEvents(); }
+        static void Capture(Form form, string name) { form.PerformLayout(); Application.DoEvents(); CheckDropdownLayout(form); using (var b = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(b, new Rectangle(Point.Empty, form.Size)); b.Save(Path.Combine("bin-designed-ui", name + ".png")); } }
+        [STAThread] static int Main(string[] args)
+        {
+            Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            if (args.Contains("--interactive")) { using (var f = new MainForm(false, true)) Application.Run(f); return 0; }
+            string configBefore = File.ReadAllText(ConfigStore.DefaultPath);
+            using (var f = new MainForm(false, true)) {
+                Prepare(f); Call(f, "LoadEditor", 8); Capture(f, "function");
+                Call(f, "SelectPage", 1); Application.DoEvents();
+                Call(f, "LoadCustomEditor", 0); Capture(f, "custom");
+                f.Size = f.MinimumSize; Capture(f, "custom-minimum");
+                var customList = Field<ListView>(f, "customList");
+                Console.WriteLine("Custom list width: " + customList.ClientSize.Width + "; columns: " + customList.Columns[0].Width + ", " + customList.Columns[1].Width);
+                var draft = Field<Configuration>(f, "draft"); string original = ConfigStore.Serialize(draft);
+                Call(f, "LoadCustomEditor", 0);
+                if (ConfigStore.Serialize(draft) != original) throw new Exception("Opening the editor altered a mapping.");
+                draft.CustomHotkeys[0].Action = new Mapping { Kind = ActionKind.Python, Target = @"C:\example.py" };
+                Call(f, "LoadCustomEditor", 0); Capture(f, "python-minimum");
+                if (Field<ComboBox>(f, "customSpecificKind").SelectedItem.ToString() != "Run a Python script") throw new Exception("Saved Python action selected incorrectly.");
+                var scroll = Field<TableLayoutPanel>(f, "customStack").Parent as ScrollableControl;
+                scroll.ScrollControlIntoView(Field<TextBox>(f, "customWorking")); Capture(f, "python-scrolled");
+                draft.CustomHotkeys[0].Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" };
+                Call(f, "LoadCustomEditor", 0);
+                if (Field<ComboBox>(f, "customSpecificKind").SelectedItem.ToString() != "Open file explorer") throw new Exception("Saved preset selected incorrectly.");
+                Call(f, "CustomEdited");
+                if (draft.CustomHotkeys[0].Action.Target != "Win+E") throw new Exception("Loading a preset changed its shortcut.");
+                while (draft.CustomHotkeys.Length > 0) Call(f, "RemoveCustomHotkey");
+                if (Field<Panel>(f, "customEditorHost").Visible) throw new Exception("Empty custom editor stayed active.");
+                Capture(f, "empty");
+                Call(f, "AddCustomHotkey");
+                if (!Field<Panel>(f, "customEditorHost").Visible) throw new Exception("Adding a hotkey did not open its editor.");
+                f.Scale(new SizeF(1.5f, 1.5f)); Capture(f, "scaled-layout");
+                Call(f, "Save");
+            }
+            using (var f = new SequenceBuilderForm(new[] {
+                new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" } },
+                new SequenceStep { WaitMilliseconds = 1000 },
+                new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+V" } }
+            })) {
+                Prepare(f); Capture(f, "sequence"); f.Size = f.MinimumSize; Capture(f, "sequence-minimum");
+                Call(f, "MoveStep", 1); if (f.Result[1].IsWait) throw new Exception("Sequence move did not preserve the selected action.");
+            }
+            using (var f = new ActionPickerForm(true)) {
+                Prepare(f); Field<TextBox>(f, "search").Text = "clipboard"; Capture(f, "search");
+                var list = Field<ListBox>(f, "results");
+                if (list.Items.Count < 2 || !list.Items.Cast<MainForm.SpecificChoice>().All(c => c.SearchText.IndexOf("clipboard", StringComparison.OrdinalIgnoreCase) >= 0)) throw new Exception("Contains search failed.");
+                Field<TextBox>(f, "search").Text = "";
+                Field<ComboBox>(f, "category").SelectedItem = "VS Code";
+                if (list.Items.Count < 50 || !list.Items.Cast<MainForm.SpecificChoice>().All(c => c.Category == "VS Code")) throw new Exception("Category filtering failed.");
+                Capture(f, "code-category");
+                Field<ComboBox>(f, "category").SelectedIndex = 0;
+                Field<TextBox>(f, "search").Text = "does-not-exist"; if (list.Items.Count != 0) throw new Exception("Empty results failed.");
+            }
+            using (var f = new StepDetailsForm(new Mapping { Kind = ActionKind.Python, Target = @"C:\example.py" })) {
+                Prepare(f); Capture(f, "step-details");
+            }
+            if (File.ReadAllText(ConfigStore.DefaultPath) != configBefore) throw new Exception("Preview modified saved configuration.");
+            Console.WriteLine("UI previews generated; loading, search, sequence order and config preservation verified."); return 0;
+        }
+    }
+}
