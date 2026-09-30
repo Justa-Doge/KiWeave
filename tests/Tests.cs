@@ -56,6 +56,29 @@ namespace FunctionRowRemapper
                     }
                     return 0;
                 }
+                if (args.Contains("--function-preview")) {
+                    Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                    using (var form = new MainForm(false, true)) {
+                        form.StartPosition = FormStartPosition.Manual; form.Location = new System.Drawing.Point(-20000, -20000);
+                        form.Show(); Application.DoEvents();
+                        var listField = typeof(MainForm).GetField("list", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                        var list = (ListView)listField.GetValue(form);
+                        Assert(list.Items.Count == 12 && list.Items.Cast<ListViewItem>().All(x => !String.IsNullOrEmpty(x.SubItems[1].Text)), "a function action label is empty");
+                        for (int pass = 0; pass < 3; pass++) { form.Invalidate(true); form.Refresh(); Application.DoEvents(); }
+                        using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                            form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
+                            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "function-preview.png"); image.Save(path); Console.WriteLine(path);
+                        }
+                        typeof(MainForm).GetMethod("SelectPage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, new object[] { 1 });
+                        Application.DoEvents(); form.Refresh();
+                        using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                            form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
+                            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "custom-preview.png"); image.Save(path); Console.WriteLine(path);
+                        }
+                        form.Close();
+                    }
+                    return 0;
+                }
                 if (args.Contains("--ddc-detect") || args.Contains("--ddc-hardware")) {
                     foreach (var m in DdcService.Shared.Scan()) Console.WriteLine(m.Name + ": " + m.Status);
                     if (args.Contains("--ddc-hardware")) foreach (byte code in new byte[] {0x10,0x12,0x62}) Test("Hardware monitor control " + code.ToString("X2"), () => Console.WriteLine(DdcService.Shared.VerifyHardwareRoundTrip(code)));

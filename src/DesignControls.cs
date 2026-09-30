@@ -6,6 +6,11 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
+    internal sealed class DesignListView : ListView
+    {
+        internal DesignListView() { DoubleBuffered = true; }
+    }
+
     internal static class Design
     {
         internal static void ShadowedF(Graphics g, Font font, float x, float y)

@@ -44,8 +44,8 @@ namespace FunctionRowRemapper
         static readonly string[] FunctionGroups = { "Normal behavior", "Disable this key", "Keyboard input", "Media and sound", "Open or run something", "Monitor controls", "Custom action" };
         static readonly string[] CustomGroups = { "Keyboard input", "Media and sound", "Open or run something", "Custom action" };
         readonly Color ink = UiStyle.Ink, accent = UiStyle.Blue, muted = UiStyle.Muted;
-        readonly ListView list = new ListView();
-        readonly ListView customList = new ListView();
+        readonly ListView list = new DesignListView();
+        readonly ListView customList = new DesignListView();
         readonly ComboBox kind = new ComboBox(), media = new ComboBox(), simpleKind = new DesignComboBox(), specificKind = new DesignComboBox();
         readonly ComboBox customSimpleKind = new DesignComboBox(), customSpecificKind = new DesignComboBox();
         readonly ComboBox monitor = new DesignComboBox(), monitorControl = new DesignComboBox();

@@ -172,27 +172,29 @@ namespace FunctionRowRemapper
                 else { int width = Math.Max(80, view.ClientSize.Width - view.Columns[0].Width - 10); if (view.Columns[1].Width != width) view.Columns[1].Width = width; }
             };
             view.DrawItem += delegate(object sender, DrawListViewItemEventArgs e) {
-                using (var brush = new SolidBrush(UiStyle.Surface)) e.Graphics.FillRectangle(brush, e.Bounds);
-                if (e.Item.Selected) Design.Box(e.Graphics, new Rectangle(0, e.Bounds.Y + 2, view.ClientSize.Width - 4, e.Bounds.Height - 4), UiStyle.Soft, UiStyle.Soft, 8);
-            };
-            view.DrawSubItem += delegate(object sender, DrawListViewSubItemEventArgs e) {
+                // Windows can repaint one subitem when the pointer enters a row. Drawing the
+                // background in DrawItem but text later in DrawSubItem lets that partial repaint
+                // erase the action text. Paint the complete row in one pass instead.
+                var r = new Rectangle(0, e.Bounds.Y, view.ClientSize.Width, e.Bounds.Height);
                 bool selected = e.Item.Selected;
-                var r = e.Bounds;
+                using (var brush = new SolidBrush(UiStyle.Surface)) e.Graphics.FillRectangle(brush, r);
+                if (selected) Design.Box(e.Graphics, new Rectangle(0, r.Y + 2, r.Width - 4, r.Height - 4), UiStyle.Soft, UiStyle.Soft, 8);
                 if (keyCaption != "KEY") {
-                    if (e.ColumnIndex != 0) return;
-                    var keycap = new Rectangle(r.X + 10, r.Y + 10, Math.Min(r.Width - 20, 126), 27);
+                    var keycap = new Rectangle(10, r.Y + 10, Math.Min(r.Width - 20, 126), 27);
                     Design.Box(e.Graphics, keycap, selected ? UiStyle.Input : UiStyle.Canvas, UiStyle.Border, 6);
                     using (var font = new Font("Segoe UI", 9, FontStyle.Bold)) TextRenderer.DrawText(e.Graphics, e.Item.Text, font, keycap, selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-                    TextRenderer.DrawText(e.Graphics, e.Item.SubItems[1].Text, Font, new Rectangle(r.X + 10, r.Y + 45, r.Width - 20, 25), UiStyle.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
+                    TextRenderer.DrawText(e.Graphics, e.Item.SubItems[1].Text, Font, new Rectangle(10, r.Y + 45, r.Width - 20, 25), UiStyle.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
                     return;
                 }
-                if (e.ColumnIndex == 0) {
-                    var cap = new Rectangle(r.X + 7, r.Y + 7, r.Width - 15, r.Height - 14);
-                    Design.Box(e.Graphics, cap, selected ? UiStyle.Input : UiStyle.Canvas, selected ? Color.FromArgb(115, 92, 169) : UiStyle.Border, 6);
-                    using (var font = new Font("Segoe UI", keyCaption == "KEY" ? 9 : 8, FontStyle.Bold))
-                        TextRenderer.DrawText(e.Graphics, e.SubItem.Text, font, cap, selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-                } else TextRenderer.DrawText(e.Graphics, e.SubItem.Text, Font, new Rectangle(r.X + 4, r.Y, r.Width - 8, r.Height), selected ? UiStyle.Blue : UiStyle.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                var cap = new Rectangle(7, r.Y + 7, view.Columns[0].Width - 15, r.Height - 14);
+                Design.Box(e.Graphics, cap, selected ? UiStyle.Input : UiStyle.Canvas, selected ? Color.FromArgb(115, 92, 169) : UiStyle.Border, 6);
+                using (var font = new Font("Segoe UI", 9, FontStyle.Bold))
+                    TextRenderer.DrawText(e.Graphics, e.Item.Text, font, cap, selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(e.Graphics, e.Item.SubItems[1].Text, Font,
+                    new Rectangle(view.Columns[0].Width + 4, r.Y, Math.Max(1, r.Width - view.Columns[0].Width - 8), r.Height),
+                    selected ? UiStyle.Blue : UiStyle.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             };
+            view.DrawSubItem += delegate { }; // DrawItem owns every pixel of each row.
             view.SelectedIndexChanged += delegate { view.Invalidate(); };
             view.Resize += fitColumns; view.HandleCreated += fitColumns; view.VisibleChanged += fitColumns;
         }
