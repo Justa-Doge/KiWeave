@@ -2,7 +2,7 @@
 
 A small Windows tray app for giving F1 through F12 your own actions. Remapping works offline; an optional background check looks for newer versions on GitHub.
 
-Previously called Function Row Remapper. The current executable and internal project names still use `FunctionRowRemapper` until the app rebrand is finished; this does not affect saved mappings.
+Previously called Function Row Remapper. The visible app and tray now use **KeyWeave**; the executable, storage path, and internal project names remain `FunctionRowRemapper` for compatibility with existing installations and saved mappings.
 
 The interface uses a charcoal dark theme with purple accents, a sidebar for switching editors, rounded controls, and keycap-style mapping rows. Action labels use sentence case. The library and sequence windows share the same theme; standard Windows file/message dialogs still follow Windows' own appearance.
 

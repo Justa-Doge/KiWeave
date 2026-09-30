@@ -35,7 +35,7 @@ namespace FunctionRowRemapper
                             using (var current = Process.GetCurrentProcess()) foreach (var p in Process.GetProcessesByName(current.ProcessName)) using (p) if (p.Id != current.Id && p.SessionId == current.SessionId) AllowSetForegroundWindow((uint)p.Id);
                             wake.Set();
                         }
-                    } catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("An older copy of Function Row Remapper is running. Exit it, then open this updated app.", "Older copy running"); }
+                    } catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("An older copy of KeyWeave is running. Exit it, then open this updated app.", "Older copy running"); }
                     return;
                 }
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
@@ -50,7 +50,7 @@ namespace FunctionRowRemapper
                         }
                     }
                 }
-                catch (Exception ex) { MessageBox.Show("Function Row Remapper must close. Its hook will be released.\n\n" + ex.Message, "Function Row Remapper", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex) { MessageBox.Show("KeyWeave must close. Its hook will be released.\n\n" + ex.Message, "KeyWeave", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
         }
     }

@@ -23,6 +23,14 @@ namespace FunctionRowRemapper
         static void Reject(Action action) { bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } if (!rejected) throw new Exception("Expected rejection"); }
         static void Test(string name, Action action) { try { action(); passed++; Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + ": " + ex.Message); } }
         static Configuration Active(ActionKind kind, string target) { var c = new Configuration { Enabled = true }; c.Mappings[4] = new Mapping { Kind = kind, Target = target }; return c; }
+        static void CapturePreview(Form form, string name)
+        {
+            form.StartPosition = FormStartPosition.Manual; form.Location = new System.Drawing.Point(-20000, -20000); form.Show(); Application.DoEvents(); form.Refresh();
+            using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name + ".png"); image.Save(path); Console.WriteLine(path);
+            }
+        }
         [STAThread]
         public static int Main(string[] args)
         {
@@ -59,6 +67,9 @@ namespace FunctionRowRemapper
                         var powerPanel = powerView.Controls.OfType<PowerToysPanel>().First();
                         typeof(PowerToysPanel).GetMethod("BeginAdd", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(powerPanel, null);
                         Application.DoEvents(); form.Refresh();
+                        var moduleField = (Control)typeof(PowerToysPanel).GetField("moduleField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(powerPanel);
+                        var actionField = (Control)typeof(PowerToysPanel).GetField("actionField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(powerPanel);
+                        Assert(moduleField.Top < actionField.Top, "PowerToys module field must appear before specific function");
                         using (var image = new System.Drawing.Bitmap(form.Width, form.Height)) {
                             form.DrawToBitmap(image, new System.Drawing.Rectangle(System.Drawing.Point.Empty, form.Size));
                             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "powertoys-add-preview.png"); image.Save(path); Console.WriteLine(path);
@@ -94,6 +105,17 @@ namespace FunctionRowRemapper
                     }
                     return 0;
                 }
+                if (args.Contains("--dialogs-preview")) {
+                    Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                    using (var form = new ActionPickerForm(true)) { CapturePreview(form, "action-library-preview"); form.Size = form.MinimumSize; CapturePreview(form, "action-library-minimum-preview"); form.Close(); }
+                    using (var form = new SequenceBuilderForm(new[] {
+                        new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+C" } },
+                        new SequenceStep { WaitMilliseconds = 1000 },
+                        new SequenceStep { Action = new Mapping { Kind = ActionKind.Media, Target = "MediaPlayPause" } }
+                    })) { CapturePreview(form, "sequence-preview"); form.Size = form.MinimumSize; CapturePreview(form, "sequence-minimum-preview"); form.Close(); }
+                    using (var form = new StepDetailsForm(new Mapping { Kind = ActionKind.Python, Target = @"C:\example.py" })) { CapturePreview(form, "step-details-preview"); form.Close(); }
+                    return 0;
+                }
                 if (args.Contains("--ddc-detect") || args.Contains("--ddc-hardware")) {
                     foreach (var m in DdcService.Shared.Scan()) Console.WriteLine(m.Name + ": " + m.Status);
                     if (args.Contains("--ddc-hardware")) foreach (byte code in new byte[] {0x10,0x12,0x62}) Test("Hardware monitor control " + code.ToString("X2"), () => Console.WriteLine(DdcService.Shared.VerifyHardwareRoundTrip(code)));
@@ -108,6 +130,9 @@ namespace FunctionRowRemapper
                 Assert(MainForm.ChoicesFor(3, true)[0].Label == "Choose an action", "custom hotkey placeholder");
                 Assert(MainForm.ChoicesFor(6, false)[0].Label == "Choose an action", "function key placeholder");
                 Assert(MainForm.ChoicesFor(3, true)[0].Mapping.Kind != ActionKind.LockThenSleep, "sleep cannot be the default");
+            });
+            Test("Action library excludes its non-executing dropdown placeholder", delegate {
+                Assert(!ActionPickerForm.Catalog(true).Any(x => x.Label == "Choose an action"), "placeholder leaked into library");
             });
             Test("PowerToys active list excludes off and unassigned shortcuts", delegate {
                 Assert(PowerToysPanel.IsActive(new PowerToysShortcut { ModuleEnabled = true, Chord = "Shift+Win+C" }), "assigned enabled shortcut missing");

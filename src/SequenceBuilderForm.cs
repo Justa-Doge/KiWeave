@@ -12,13 +12,14 @@ namespace FunctionRowRemapper
         readonly ListBox list = new ListBox(), actions = new ListBox();
         readonly TextBox search = new TextBox();
         readonly Label summary = UiStyle.Text("", 10, false);
-        readonly NumericUpDown wait = new NumericUpDown { Minimum = 0.001M, Maximum = 60, Value = 1, Increment = 0.25M, DecimalPlaces = 3, Width = 90 };
+        readonly NumericUpDown wait = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, Value = 1, Increment = 0.25M, DecimalPlaces = 3, Width = 90 };
         readonly MainForm.SpecificChoice[] catalog = ActionPickerForm.Catalog(false);
         public List<SequenceStep> Result { get { return steps.Select(s => s.Copy()).ToList(); } }
         public SequenceBuilderForm(IEnumerable<SequenceStep> initial)
         {
             steps = (initial ?? Enumerable.Empty<SequenceStep>()).Select(s => s.Copy()).ToList();
             Text = "Sequence builder"; Font = new Font("Segoe UI", 10F); AutoScaleMode = AutoScaleMode.Dpi;
+            Icon = Program.AppIcon();
             ClientSize = new Size(1000, 720); MinimumSize = new Size(900, 660);
             StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false; Design.DarkTitlebar(this);
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 3 };
@@ -33,6 +34,7 @@ namespace FunctionRowRemapper
             library.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); library.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); library.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
             library.Controls.Add(UiStyle.Text("Search action library", 9, true), 0, 0); search.AccessibleName = "Search sequence actions"; search.Dock = DockStyle.Top; library.Controls.Add(new InputFrame(search), 0, 1);
             actions.Dock = DockStyle.Fill; actions.BorderStyle = BorderStyle.None; actions.IntegralHeight = false; actions.ItemHeight = 42; actions.BackColor = UiStyle.Surface; actions.ForeColor = UiStyle.Ink; actions.DrawMode = DrawMode.OwnerDrawFixed;
+            Design.DarkNative(actions);
             actions.DrawItem += DrawLibraryItem; library.Controls.Add(actions, 0, 2);
             var add = UiStyle.Button("+ Add action", delegate { AddAction(); }); add.Margin = new Padding(0, 10, 0, 0); library.Controls.Add(add, 0, 3); body.Controls.Add(library, 0, 0);
             var chain = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = UiStyle.Surface, Padding = new Padding(16), ColumnCount = 1, RowCount = 5 };
@@ -41,6 +43,7 @@ namespace FunctionRowRemapper
             chain.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); chain.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
             chain.Controls.Add(UiStyle.Text("Your sequence", 9, true), 0, 0);
             list.Dock = DockStyle.Fill; list.BorderStyle = BorderStyle.None; list.IntegralHeight = false; list.DrawMode = DrawMode.OwnerDrawFixed; list.ItemHeight = 74; list.BackColor = UiStyle.Surface; list.DrawItem += DrawStep; chain.Controls.Add(list, 0, 1);
+            Design.DarkNative(list);
             var tools = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
             tools.Controls.Add(UiStyle.Button("Up", delegate { MoveStep(-1); })); tools.Controls.Add(UiStyle.Button("Down", delegate { MoveStep(1); }));
             tools.Controls.Add(UiStyle.Button("Edit", delegate { EditStep(); })); tools.Controls.Add(UiStyle.Button("Remove", delegate { if (list.SelectedIndex >= 0) { int i = list.SelectedIndex; steps.RemoveAt(i); RefreshList(i); } }));
@@ -128,13 +131,14 @@ namespace FunctionRowRemapper
         StepDetailsForm(Mapping mapping, int milliseconds)
         {
             Text = mapping == null ? "Edit pause" : "Edit action"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
+            Icon = Program.AppIcon();
             ClientSize = new Size(540, 560); MinimumSize = new Size(500, 500); AutoScroll = true; StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false; Design.DarkTitlebar(this);
             var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root);
             root.Controls.Add(UiStyle.Text(Text, 20, true));
             var target = new TextBox { Text = mapping == null ? "" : mapping.Target };
             var args = new TextBox { Text = mapping == null ? "" : mapping.Arguments };
             var work = new TextBox { Text = mapping == null ? "" : mapping.WorkingDirectory };
-            var delay = new NumericUpDown { Minimum = 0.001M, Maximum = 60, DecimalPlaces = 3, Value = Math.Max(0.001M, milliseconds / 1000M), BackColor = UiStyle.Input, ForeColor = UiStyle.Ink };
+            var delay = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, DecimalPlaces = 3, Value = Math.Max(0.001M, milliseconds / 1000M) };
             if (mapping == null) root.Controls.Add(UiStyle.Field("Seconds", delay));
             else {
                 bool launch = (mapping.Kind >= ActionKind.Application && mapping.Kind <= ActionKind.Command) || mapping.Kind == ActionKind.Python;
@@ -145,7 +149,7 @@ namespace FunctionRowRemapper
                 }
                 if (mapping.Kind == ActionKind.Application || mapping.Kind == ActionKind.Command || mapping.Kind == ActionKind.Python) { root.Controls.Add(UiStyle.Field("Arguments (optional)", args)); root.Controls.Add(UiStyle.Field("Working folder (optional)", work)); }
             }
-            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 16, 0, 0) };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0, 16, 0, 0) };
             var ok = UiStyle.Button("Use step", delegate {
                 try {
                     if (mapping == null) WaitMilliseconds = (int)(delay.Value * 1000);

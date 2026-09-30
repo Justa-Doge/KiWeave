@@ -43,8 +43,7 @@ namespace FunctionRowRemapper
             UiStyle.Combo(modules); UiStyle.Combo(actions);
             moduleField = UiStyle.Field("PowerToys module", modules); actionField = UiStyle.Field("Specific function", actions);
             chordField = UiStyle.Field("Shortcut", chord);
-            // Docked stack controls render the most recently added field first.
-            stack.Controls.Add(actionField); stack.Controls.Add(moduleField); stack.Controls.Add(chordField);
+            stack.Controls.Add(moduleField, 0, 2); stack.Controls.Add(actionField, 0, 3); stack.Controls.Add(chordField, 0, 4);
             enableModule.Text = "Enable this PowerToys module"; enableModule.ForeColor = UiStyle.Ink; enableModule.AutoSize = true;
             enableModule.Dock = DockStyle.Top; enableModule.Margin = new Padding(0, 0, 0, 20); stack.Controls.Add(enableModule);
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 0, 0, 18) };

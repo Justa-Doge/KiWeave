@@ -91,7 +91,7 @@ namespace FunctionRowRemapper
                     Design.ShadowedF(e.Graphics, f, (48 - size.Width) / 2, (47 - size.Height) / 2);
                 }
             }; sideTop.Controls.Add(logo);
-            var brand = UiStyle.Text("Function row", 17, true); brand.ForeColor = Color.White; sideTop.Controls.Add(brand);
+            var brand = UiStyle.Text("KeyWeave", 17, true); brand.ForeColor = Color.White; sideTop.Controls.Add(brand);
             var subbrand = UiStyle.Text("A little more control.", 9, false); subbrand.ForeColor = Color.FromArgb(155, 155, 179); subbrand.Margin = new Padding(0, 0, 0, 38); sideTop.Controls.Add(subbrand);
             var workspace = UiStyle.Text("Workspace", 9, true); workspace.ForeColor = Color.FromArgb(132, 132, 157); workspace.Margin = new Padding(8, 0, 0, 12); sideTop.Controls.Add(workspace);
             functionNav = Nav("Function keys", "\uE765", delegate { SelectPage(0); });
@@ -261,13 +261,13 @@ namespace FunctionRowRemapper
             var right = Card(); columns.Controls.Add(right, 1, 0);
             customEditorHost.Dock = DockStyle.Fill; right.Controls.Add(customEditorHost); customEmpty.Dock = DockStyle.Fill; right.Controls.Add(customEmpty);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill }; customEditorHost.Controls.Add(scroll); customStack = UiStyle.Stack(); scroll.Controls.Add(customStack); scroll.SizeChanged += delegate { UiStyle.Wrap(customStack); };
-            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut   •   e.g. Ctrl+Alt+K", customShortcut));
+            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut (e.g. Ctrl+Alt+K)", customShortcut));
             customKind.Items.AddRange(Mapping.Labels); UiStyle.Combo(customSimpleKind); customSimpleKind.Items.AddRange(CustomGroups);
             customStack.Controls.Add(UiStyle.Field("Action category", customSimpleKind));
             customSimpleKind.SelectedIndexChanged += delegate { if (!loading) { loading = true; PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, null); loading = false; ApplyCustomChoice(); } };
             UiStyle.Combo(customSpecificKind); customStack.Controls.Add(UiStyle.Field("Action", customSpecificKind)); customSpecificKind.SelectedIndexChanged += delegate { ApplyCustomChoice(); };
             var tools = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 0, 0, 16) };
-            tools.Controls.Add(UiStyle.Button("Custom action", delegate { PickAction(true); }));
+            tools.Controls.Add(UiStyle.Button("Browse action library", delegate { PickAction(true); }));
             tools.Controls.Add(UiStyle.Button("Build sequence", delegate { OpenSequenceBuilder(); })); customStack.Controls.Add(tools);
             customBrowse = UiStyle.Button("Browse...", BrowseCustomTarget);
             customTargetField = UiStyle.Field("Key, shortcut or file", PathRow(customTarget, customBrowse)); customStack.Controls.Add(customTargetField);

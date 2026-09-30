@@ -13,6 +13,14 @@ namespace FunctionRowRemapper
 
     internal static class Design
     {
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
+        internal static void DarkNative(Control control)
+        {
+            EventHandler apply = delegate { try { SetWindowTheme(control.Handle, "DarkMode_Explorer", null); } catch { } };
+            control.HandleCreated += apply;
+            if (control.IsHandleCreated) apply(control, EventArgs.Empty);
+        }
         internal static void ShadowedF(Graphics g, Font font, float x, float y)
         {
             // A soft, offset shadow gives the glyph depth without blurring its white face.
@@ -87,7 +95,7 @@ namespace FunctionRowRemapper
             if (Glyph != null) Design.Glyph(e.Graphics, Glyph, new Rectangle(12, 0, 28, Height), ink);
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(Glyph == null ? 8 : 43, 0, Width - (Glyph == null ? 16 : 47), Height), ink,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | (Sidebar ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter));
-            if (Focused && ShowFocusCues) { r.Inflate(-4, -4); using (var path = Design.Round(r, 7)) using (var p = new Pen(Sidebar || Primary ? Color.White : UiStyle.Blue)) e.Graphics.DrawPath(p, path); }
+            if (Focused && ShowFocusCues) { r.Inflate(-4, -4); using (var path = Design.Round(r, 7)) using (var p = new Pen((Sidebar && Active) || Primary ? Color.White : UiStyle.Blue)) e.Graphics.DrawPath(p, path); }
         }
     }
     internal sealed class DesignCard : Panel
@@ -204,6 +212,9 @@ namespace FunctionRowRemapper
                 child.BackColor = UiStyle.Input;
                 child.ForeColor = UiStyle.Ink;
             }
+            // The native spinner buttons stay bright even under Windows' dark theme.
+            // Direct typing and arrow-key increments remain available without them.
+            if (Controls.Count > 0) Controls[0].Visible = false;
         }
     }
 

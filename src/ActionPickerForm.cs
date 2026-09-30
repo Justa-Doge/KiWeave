@@ -18,12 +18,13 @@ namespace FunctionRowRemapper
         internal static MainForm.SpecificChoice[] Catalog(bool allowSequence)
         {
             return new[] { 0, 1, 2, 3 }.SelectMany(g => MainForm.ChoicesFor(g, true))
-                .Where(c => allowSequence || c.Mapping.Kind != ActionKind.Sequence)
+                .Where(c => c.Label != "Choose an action" && (allowSequence || c.Mapping.Kind != ActionKind.Sequence))
                 .GroupBy(c => c.Label).Select(g => g.First()).OrderBy(c => c.Label).ToArray();
         }
         public ActionPickerForm(bool allowSequence)
         {
             Text = "Action library"; Font = new Font("Segoe UI", 10);
+            Icon = Program.AppIcon();
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(660, 780); MinimumSize = new Size(560, 650);
             StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false;
             Design.DarkTitlebar(this);
@@ -41,6 +42,7 @@ namespace FunctionRowRemapper
             category.Items.AddRange(catalog.Select(c => c.Category).Distinct().OrderBy(c => c).ToArray()); category.SelectedIndex = 0;
             root.Controls.Add(UiStyle.Field("Category", category), 0, 2);
             results.Dock = DockStyle.Fill; results.BorderStyle = BorderStyle.None; results.BackColor = UiStyle.Surface;
+            Design.DarkNative(results);
             results.DrawMode = DrawMode.OwnerDrawFixed; results.ItemHeight = 62; results.IntegralHeight = false;
             results.DrawItem += DrawAction; root.Controls.Add(results, 0, 3);
             count.Margin = new Padding(0, 8, 0, 0); count.AutoSize = false; count.Dock = DockStyle.Fill; root.Controls.Add(count, 0, 4);

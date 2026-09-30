@@ -86,7 +86,7 @@ namespace FunctionRowRemapper
         {
             this.startInTray = startInTray;
             isPreview = preview;
-            Text = "Function Row Remapper"; Font = new Font("Segoe UI", 10F); ForeColor = ink; BackColor = Color.FromArgb(245, 247, 251);
+            Text = "KeyWeave"; Font = new Font("Segoe UI", 10F); ForeColor = ink; BackColor = Color.FromArgb(245, 247, 251);
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(1200, 820); MinimumSize = new Size(1080, 740); StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
             Icon = Program.AppIcon();
             saved = new Configuration();
@@ -99,7 +99,7 @@ namespace FunctionRowRemapper
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             if (preview) {
                 loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; startup.Checked = Startup.Enabled;
-                Text = "Function Row Remapper - Design preview"; hideToTray.Enabled = false; status.Text = "Editor preview"; loading = false; return;
+                Text = "KeyWeave - Design preview"; hideToTray.Enabled = false; status.Text = "Editor preview"; loading = false; return;
             }
             try {
                 engine = new KeyboardEngine();
@@ -342,7 +342,7 @@ namespace FunctionRowRemapper
             } catch (Exception ex) { if (!IsDisposed) monitorStatus.Text = "Detection failed: " + ex.Message; }
             finally { scanning = false; if (!IsDisposed) detect.Enabled = true; }
         }
-        void MarkDirty() { dirty = true; Text = "Function Row Remapper *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); }
+        void MarkDirty() { dirty = true; Text = "KeyWeave *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); }
         void SetFeedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Color.FromArgb(255, 151, 153) : muted; }
         void BrowseTarget(object sender, EventArgs e)
         {
@@ -382,7 +382,7 @@ namespace FunctionRowRemapper
                 ConfigStore.Validate(draft, true); draft.Enabled = engine != null && engine.Enabled;
                 ConfigStore.Save(ConfigStore.DefaultPath, draft); saved = draft.Copy();
                 if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); PopulateCustomList();
-                dirty = false; Text = "Function Row Remapper";
+                dirty = false; Text = "KeyWeave";
                 try { if (startup.Checked != Startup.Enabled || (startup.Checked && !Startup.IsCurrent)) Startup.Set(startup.Checked); }
                 catch (Exception ex) { dirty = true; SetFeedback("Mappings saved, but startup setting failed: " + ex.Message, true); return false; }
                 SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
@@ -461,7 +461,7 @@ namespace FunctionRowRemapper
             var menu = new ContextMenuStrip { Font = Font, BackColor = UiStyle.Surface, ForeColor = UiStyle.Ink, Renderer = new ToolStripProfessionalRenderer(new DesignMenuColors()) };
             menu.Items.Add("Open settings", null, delegate { ShowSettings(); });
             trayToggle.Click += delegate { enabled.Checked = !enabled.Checked; }; menu.Items.Add(trayToggle); menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Exit", null, delegate { ExitApp(); });
-            tray.Icon = Program.TrayIcon(); tray.Text = "Function Row Remapper"; tray.ContextMenuStrip = menu; tray.Visible = preferences.UseTray; tray.DoubleClick += delegate { ShowSettings(); };
+            tray.Icon = Program.TrayIcon(); tray.Text = "KeyWeave"; tray.ContextMenuStrip = menu; tray.Visible = preferences.UseTray; tray.DoubleClick += delegate { ShowSettings(); };
             hideToTray.Enabled = preferences.UseTray;
         }
         void ToggleTray(object sender, EventArgs e)
