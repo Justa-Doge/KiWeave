@@ -12,6 +12,16 @@ namespace FunctionRowRemapper
     internal static class AppStorage
     {
         internal static string DataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave"); } }
+        internal static string ControlCommandPath { get { return Path.Combine(DataFolder, "control.command"); } }
+        internal static void QueueControlCommand(string command)
+        {
+            if (command != "open-discord" && command != "show-settings") throw new ArgumentException("Unsupported KiWeave control command.");
+            Directory.CreateDirectory(DataFolder); string temp = ControlCommandPath + ".tmp"; File.WriteAllText(temp, command, Encoding.UTF8); File.Copy(temp, ControlCommandPath, true); File.Delete(temp);
+        }
+        internal static string TakeControlCommand()
+        {
+            try { if (!File.Exists(ControlCommandPath)) return ""; string command = File.ReadAllText(ControlCommandPath, Encoding.UTF8).Trim(); File.Delete(ControlCommandPath); return command; } catch { return ""; }
+        }
         internal static string LegacyDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FunctionRowRemapper"); } }
         internal static string LegacyBrandDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyWeave"); } }
         internal static void MigrateLegacy()

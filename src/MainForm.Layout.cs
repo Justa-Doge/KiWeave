@@ -170,7 +170,7 @@ namespace FunctionRowRemapper
             AddSetting(left, startup, "Start with Windows", "Launch KiWeave quietly when you sign in.", ToggleStartup);
             AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);
             AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
-            AddSetting(left, networkAccess, "Allow network access", "Master switch for GitHub update checks and user-triggered HTTP actions. Local remapping stays available when off.", ToggleBackgroundPreference);
+            AddSetting(left, networkAccess, "Allow network access", "Administrator approval is required. Master switch for GitHub update checks and user-triggered HTTP actions; local remapping stays available when off.", ToggleBackgroundPreference);
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
 
             var tools = Card(); columns.Controls.Add(tools, 1, 0);

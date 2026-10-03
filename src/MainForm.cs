@@ -609,6 +609,9 @@ namespace FunctionRowRemapper
         {
             if (loading || isPreview) return;
             var next = NewPreferencesFromUi();
+            if (next.NetworkAccess != preferences.NetworkAccess && !Program.RequestElevatedNetworkChange(next.NetworkAccess)) {
+                loading = true; networkAccess.Checked = preferences.NetworkAccess; loading = false; SetFeedback("Administrator approval is required to change the master network switch.", true); return;
+            }
             try {
                 UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next;
                 NetworkPolicy.Enabled = next.NetworkAccess;
@@ -657,6 +660,13 @@ namespace FunctionRowRemapper
         }
         void ExitApp() { exitRequested = true; Close(); }
         internal void RequestShow() { Ui(ShowSettings); }
+        internal void RequestAutomationCommand(string command)
+        {
+            Ui(delegate {
+                if (command == "show-settings") { ShowSettings(); return; }
+                if (command == "open-discord") using (var dialog = new DiscordConnectionForm(this)) dialog.ShowDialog(this);
+            });
+        }
         void ShowSettings() { Show(); WindowState = FormWindowState.Normal; Activate(); CheckMissingTargets(); }
         void UpdateStatus()
         {

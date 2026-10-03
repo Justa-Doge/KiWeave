@@ -13,6 +13,11 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(uint processId);
         [DllImport("user32.dll")] static extern short GetAsyncKeyState(int virtualKey);
         internal static bool SafeModeRequested(string[] args, bool shiftHeld) { string[] values = args ?? new string[0]; if (Array.IndexOf(values, "--normal-mode") >= 0) return false; return shiftHeld || Array.IndexOf(values, "--safe-mode") >= 0; }
+        internal static bool RequestElevatedNetworkChange(bool enabled)
+        {
+            try { using (var p = Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--elevated-network " + (enabled ? "on" : "off")) { UseShellExecute = true, Verb = "runas" })) { p.WaitForExit(); return p.ExitCode == 0; } }
+            catch { return false; }
+        }
         internal static Icon AppIcon()
         {
             using (var stream = typeof(Program).Assembly.GetManifestResourceStream("KiWeave.AppIcon"))
@@ -28,6 +33,10 @@ namespace FunctionRowRemapper
         [STAThread]
         static void Main(string[] args)
         {
+            if (args != null && Array.IndexOf(args, "--elevated-network") >= 0) {
+                int index = Array.IndexOf(args, "--elevated-network"); if (index + 1 >= args.Length) return;
+                try { var preferences = UserPreferences.Load(UserPreferences.DefaultPath); preferences.NetworkAccess = String.Equals(args[index + 1], "on", StringComparison.OrdinalIgnoreCase); UserPreferences.Save(UserPreferences.DefaultPath, preferences); return; } catch { Environment.ExitCode = 1; return; }
+            }
             try { AppStorage.MigrateLegacy(); } catch (Exception ex) { AppLog.Record("Legacy data migration", ex); }
             bool safeMode = SafeModeRequested(args, (GetAsyncKeyState((int)Keys.ShiftKey) & 0x8000) != 0), restartNormally = false;
             bool created; string wakeName = @"Local\KiWeave-Show-" + Environment.UserName;
@@ -35,6 +44,7 @@ namespace FunctionRowRemapper
                 if (!created) {
                     if (safeMode) { MessageBox.Show("Exit the running KiWeave session before starting Safe Mode. Safe Mode never runs beside active hooks or hotkeys.", "KiWeave Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                     try {
+                        int controlIndex = Array.IndexOf(args, "--control"); if (controlIndex >= 0 && controlIndex + 1 < args.Length) AppStorage.QueueControlCommand(args[controlIndex + 1]);
                         using (var wake = EventWaitHandle.OpenExisting(wakeName)) {
                             using (var current = Process.GetCurrentProcess()) foreach (var p in Process.GetProcessesByName(current.ProcessName)) using (p) if (p.Id != current.Id && p.SessionId == current.SessionId) AllowSetForegroundWindow((uint)p.Id);
                             wake.Set();
@@ -49,7 +59,7 @@ namespace FunctionRowRemapper
                     else using (var wake = new EventWaitHandle(false, EventResetMode.AutoReset, wakeName))
                         using (var form = new MainForm(Array.IndexOf(args, "--tray") >= 0)) {
                             var handle = form.Handle;
-                            var listener = ThreadPool.RegisterWaitForSingleObject(wake, delegate(object state, bool timeout) { form.RequestShow(); }, null, Timeout.Infinite, false);
+                            var listener = ThreadPool.RegisterWaitForSingleObject(wake, delegate(object state, bool timeout) { string command = AppStorage.TakeControlCommand(); if (String.IsNullOrEmpty(command)) form.RequestShow(); else form.RequestAutomationCommand(command); }, null, Timeout.Infinite, false);
                             try { Application.Run(form); } finally { listener.Unregister(null); }
                         }
                 }
