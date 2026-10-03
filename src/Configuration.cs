@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    public enum ActionKind { PassThrough, Unbound, SendKey, SendShortcut, Media, Application, FileOrFolder, WindowsShortcut, Command, Monitor, Python, LockThenSleep, Sequence }
+    public enum ActionKind { PassThrough, Unbound, SendKey, SendShortcut, Media, Application, FileOrFolder, WindowsShortcut, Command, Monitor, Python, LockThenSleep, Sequence, SystemAction, HttpRequest, Conditional }
 
     public sealed class Mapping
     {
@@ -28,12 +28,26 @@ namespace FunctionRowRemapper
                 if (Kind == ActionKind.Media) return Shortcuts.MediaLabels[Target];
                 if (Kind == ActionKind.LockThenSleep) return "Lock Windows, then sleep";
                 if (Kind == ActionKind.Sequence) return "Action sequence (" + SequenceCodec.Parse(Target).Count + " steps)";
+                if (Kind == ActionKind.Conditional) return ConditionalCodec.Parse(Target).Summary;
+                if (Kind == ActionKind.SystemAction) {
+                    string profile;
+                    if (SystemActions.TryProfile(Target, out profile)) return "Activate profile: " + profile;
+                    return SystemActionLabels.ContainsKey(Target) ? SystemActionLabels[Target] : "System action";
+                }
+                if (Kind == ActionKind.HttpRequest) return "HTTP request: " + Target;
                 if (Kind == ActionKind.Monitor) return "DDC/CI: " + (DdcOperation.Find(MonitorControl) == null ? "Choose a control" : DdcOperation.Find(MonitorControl).Label) + " (" + MonitorStep + "%)";
                 if (Kind == ActionKind.SendKey || Kind == ActionKind.SendShortcut) return Target;
                 return Labels[(int)Kind] + ": " + Path.GetFileName(Target.TrimEnd('\\'));
             }
         }
-        public static readonly string[] Labels = { "Pass through", "Unbound", "Send a key", "Send a shortcut", "Media / system", "Open an application", "Open a file or folder", "Run a Windows shortcut", "Run a command or script", "Monitor (DDC/CI)", "Run a Python script", "Lock Windows, then sleep", "Action sequence" };
+        public static readonly Dictionary<string, string> SystemActionLabels = new Dictionary<string, string> {
+            { "CenterWindow", "Center active window" }, { "ToggleAlwaysOnTop", "Toggle always on top" }, { "CycleAudioOutput", "Switch to next audio output" },
+            { "DiscordMute", "Discord mute / unmute" }, { "DiscordDeafen", "Discord deafen / undeafen" },
+            { "SpotifyPlayPause", "Spotify play / pause" }, { "SpotifyNext", "Spotify next track" }, { "SpotifyPrevious", "Spotify previous track" },
+            { "ObsStartRecording", "OBS start recording" }, { "ObsStartStreaming", "OBS start streaming" },
+            { "OpenPowerToys", "Open PowerToys settings" }
+        };
+        public static readonly string[] Labels = { "Pass through", "Unbound", "Send a key", "Send a shortcut", "Media / system", "Open an application", "Open a file or folder", "Run a Windows shortcut", "Run a command or script", "Monitor (DDC/CI)", "Run a Python script", "Lock Windows, then sleep", "Action sequence", "System or integration action", "HTTP request", "Conditional action" };
     }
 
     public sealed class CustomHotkey
@@ -44,12 +58,36 @@ namespace FunctionRowRemapper
         public string Summary { get { return Action == null ? "Choose an action" : Action.Summary; } }
     }
 
+    public sealed class ModifierLayer
+    {
+        public string Name = "Layer";
+        public string ActivationKey = "CapsLock";
+        public Mapping[] Mappings = Enumerable.Range(0, 12).Select(i => new Mapping()).ToArray();
+        public ModifierLayer Copy() { return new ModifierLayer { Name = Name, ActivationKey = ActivationKey, Mappings = Mappings.Select(m => m.Copy()).ToArray() }; }
+    }
+
     public sealed class Configuration
     {
         public bool Enabled;
         public Mapping[] Mappings = Enumerable.Range(0, 12).Select(i => new Mapping()).ToArray();
         public CustomHotkey[] CustomHotkeys = new CustomHotkey[0];
-        public Configuration Copy() { return new Configuration { Enabled = Enabled, Mappings = Mappings.Select(m => m.Copy()).ToArray(), CustomHotkeys = (CustomHotkeys ?? new CustomHotkey[0]).Select(h => h.Copy()).ToArray() }; }
+        public ModifierLayer[] Layers = new ModifierLayer[0];
+        public Configuration Copy() { return new Configuration { Enabled = Enabled, Mappings = Mappings.Select(m => m.Copy()).ToArray(), CustomHotkeys = (CustomHotkeys ?? new CustomHotkey[0]).Select(h => h.Copy()).ToArray(), Layers = (Layers ?? new ModifierLayer[0]).Select(l => l.Copy()).ToArray() }; }
+    }
+
+    public static class LayerKeys
+    {
+        public static readonly string[] Names = { "CapsLock", "Apps", "Scroll", "Pause", "Insert", "RControlKey", "RMenu", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24" };
+        public static int VirtualKey(string name)
+        {
+            if (!Names.Contains(name)) throw new ArgumentException("Choose a supported layer key.");
+            Keys key; if (!Enum.TryParse<Keys>(name, false, out key)) throw new ArgumentException("Unknown layer key."); return (int)key;
+        }
+        public static string Label(string name)
+        {
+            if (name == "Apps") return "Menu / Apps"; if (name == "Scroll") return "Scroll Lock"; if (name == "Pause") return "Pause";
+            if (name == "RControlKey") return "Right Ctrl"; if (name == "RMenu") return "Right Alt"; return name;
+        }
     }
 
     public static class Shortcuts
@@ -116,6 +154,23 @@ namespace FunctionRowRemapper
                 if (m.Arguments.Length != 0 || m.WorkingDirectory.Length != 0 || m.MonitorId.Length != 0 || m.MonitorControl.Length != 0 || m.MonitorStep != 5) throw new ArgumentException("Action sequences cannot contain launch or monitor fields.");
                 SequenceCodec.Parse(m.Target); return;
             }
+            if (m.Kind == ActionKind.Conditional) {
+                if (m.Arguments.Length != 0 || m.WorkingDirectory.Length != 0 || m.MonitorId.Length != 0 || m.MonitorControl.Length != 0 || m.MonitorStep != 5) throw new ArgumentException("Conditional actions cannot contain launch or monitor fields.");
+                var rule = ConditionalCodec.Parse(m.Target);
+                try { Validate(rule.WhenMatched, checkExists); } catch (Exception ex) { throw new ArgumentException("Matching action: " + ex.Message); }
+                try { Validate(rule.Otherwise, checkExists); } catch (Exception ex) { throw new ArgumentException("Fallback action: " + ex.Message); }
+                return;
+            }
+            if (m.Kind == ActionKind.SystemAction) {
+                if (!SystemActions.IsKnown(m.Target) || m.Arguments.Length != 0 || m.WorkingDirectory.Length != 0 || m.MonitorId.Length != 0 || m.MonitorControl.Length != 0 || m.MonitorStep != 5) throw new ArgumentException("Choose a supported system or integration action.");
+                return;
+            }
+            if (m.Kind == ActionKind.HttpRequest) {
+                Uri uri;
+                if (!Uri.TryCreate(m.Target, UriKind.Absolute, out uri) || (uri.Scheme != "http" && uri.Scheme != "https") || !String.IsNullOrEmpty(uri.UserInfo)) throw new ArgumentException("Enter an http:// or https:// URL without embedded credentials.");
+                if (m.WorkingDirectory.Length != 0 || m.MonitorId.Length != 0 || m.MonitorControl.Length != 0 || m.MonitorStep != 5) throw new ArgumentException("HTTP actions accept a URL and an optional JSON body only.");
+                return;
+            }
             if (m.MonitorId.Length != 0 || m.MonitorControl.Length != 0 || m.MonitorStep != 5) throw new ArgumentException("This action cannot contain monitor settings.");
             bool launch = (m.Kind >= ActionKind.Application && m.Kind <= ActionKind.Command) || m.Kind == ActionKind.Python;
             if (!launch && (m.Arguments.Length != 0 || m.WorkingDirectory.Length != 0)) throw new ArgumentException("This action does not accept arguments or a working directory.");
@@ -156,9 +211,19 @@ namespace FunctionRowRemapper
                 CustomHotkey h = c.CustomHotkeys[i];
                 if (h == null || String.IsNullOrWhiteSpace(h.Shortcut) || h.Shortcut.Length > 80) throw new ArgumentException("Custom hotkey " + (i + 1) + " is incomplete.");
                 string normalized = HotkeyChord.Normalize(h.Shortcut);
-                if (!seen.Add(normalized)) throw new ArgumentException("Custom hotkeys must be unique.");
+                if (!seen.Add(normalized)) throw new ArgumentException("Custom hotkey conflict: " + normalized + " is assigned more than once. Give each entry a different shortcut.");
                 if (h.Action == null || h.Action.Kind == ActionKind.PassThrough || h.Action.Kind == ActionKind.Unbound) throw new ArgumentException("Custom hotkey " + (i + 1) + " needs a real action.");
                 try { Validate(h.Action, checkExists); } catch (Exception e) { throw new ArgumentException("Custom hotkey " + (i + 1) + ": " + e.Message); }
+            }
+            if (c.Layers == null || c.Layers.Length > 4) throw new ArgumentException("Use up to four modifier layers.");
+            var layerNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var layerKeys = new HashSet<int>();
+            for (int l = 0; l < c.Layers.Length; l++) {
+                ModifierLayer layer = c.Layers[l];
+                if (layer == null || String.IsNullOrWhiteSpace(layer.Name) || layer.Name.Trim().Length > 32 || layer.Name.Any(Char.IsControl)) throw new ArgumentException("Layer " + (l + 1) + " needs a name up to 32 characters.");
+                if (!layerNames.Add(layer.Name.Trim())) throw new ArgumentException("Layer names must be unique.");
+                int layerKey = LayerKeys.VirtualKey(layer.ActivationKey); if (!layerKeys.Add(layerKey)) throw new ArgumentException("Each layer needs a different activation key.");
+                if (layer.Mappings == null || layer.Mappings.Length != 12) throw new ArgumentException("Layer " + layer.Name + " needs exactly twelve mappings.");
+                for (int i = 0; i < 12; i++) try { Validate(layer.Mappings[i], checkExists); } catch (Exception e) { throw new ArgumentException(layer.Name + " F" + (i + 1) + ": " + e.Message); }
             }
         }
         static Dictionary<string, object> Object(object x, string[] fields)
@@ -176,8 +241,8 @@ namespace FunctionRowRemapper
             var rawRoot = serializer.DeserializeObject(json) as Dictionary<string, object>;
             if (rawRoot == null || !(rawRoot.ContainsKey("version")) || !(rawRoot["version"] is int)) throw new ArgumentException("Configuration version is missing or invalid.");
             int version = (int)rawRoot["version"];
-            var root = Object(rawRoot, version == 3 ? new[] { "version", "enabled", "mappings", "customHotkeys" } : new[] { "version", "enabled", "mappings" });
-            if (version != 1 && version != 2 && version != 3) throw new ArgumentException("Unsupported configuration version. Expected version 1, 2 or 3.");
+            var root = Object(rawRoot, version == 4 ? new[] { "version", "enabled", "mappings", "customHotkeys", "layers" } : version == 3 ? new[] { "version", "enabled", "mappings", "customHotkeys" } : new[] { "version", "enabled", "mappings" });
+            if (version < 1 || version > 4) throw new ArgumentException("Unsupported configuration version. Expected version 1 through 4.");
             if (!(root["enabled"] is bool)) throw new ArgumentException("Enabled must be true or false.");
             var entries = root["mappings"] as object[];
             if (entries == null || entries.Length != 12) throw new ArgumentException("Exactly twelve mappings are required.");
@@ -196,7 +261,7 @@ namespace FunctionRowRemapper
                     c.Mappings[index - 1] = new Mapping { Kind = kind, MonitorId = Text(d["monitorId"]), MonitorControl = Text(d["control"]), MonitorStep = (int)d["step"] };
                 } else c.Mappings[index - 1] = new Mapping { Kind = kind, Target = Text(d["target"]), Arguments = Text(d["arguments"]), WorkingDirectory = Text(d["workingDirectory"]) };
             }
-            if (version == 3) {
+            if (version >= 3) {
                 var hotkeys = root["customHotkeys"] as object[];
                 if (hotkeys == null || hotkeys.Length > 32) throw new ArgumentException("Custom hotkeys must be an array of up to 32 entries.");
                 c.CustomHotkeys = hotkeys.Select(item => {
@@ -206,13 +271,35 @@ namespace FunctionRowRemapper
                     return new CustomHotkey { Shortcut = Text(d["shortcut"]), Action = new Mapping { Kind = kind, Target = Text(d["target"]), Arguments = Text(d["arguments"]), WorkingDirectory = Text(d["workingDirectory"]) } };
                 }).ToArray();
             }
+            if (version == 4) {
+                var layers = root["layers"] as object[];
+                if (layers == null || layers.Length > 4) throw new ArgumentException("Layers must be an array of up to four entries.");
+                c.Layers = layers.Select(layerItem => {
+                    var layerData = Object(layerItem, new[] { "name", "activationKey", "mappings" });
+                    var layerMappings = layerData["mappings"] as object[];
+                    if (layerMappings == null || layerMappings.Length != 12) throw new ArgumentException("Each layer needs exactly twelve mappings.");
+                    var layer = new ModifierLayer { Name = Text(layerData["name"]), ActivationKey = Text(layerData["activationKey"]) }; var layerSeen = new HashSet<int>();
+                    foreach (object mappingItem in layerMappings) {
+                        var raw = mappingItem as Dictionary<string, object>;
+                        bool isMonitor = raw != null && raw.ContainsKey("action") && raw["action"] is string && (string)raw["action"] == "Monitor";
+                        var d = Object(mappingItem, isMonitor ? new[] { "key", "action", "monitorId", "control", "step" } : new[] { "key", "action", "target", "arguments", "workingDirectory" });
+                        string key = Text(d["key"]); int index;
+                        if (!key.StartsWith("F") || !Int32.TryParse(key.Substring(1), out index) || index < 1 || index > 12 || key != "F" + index || !layerSeen.Add(index)) throw new ArgumentException("Layer keys must be unique F1 through F12.");
+                        ActionKind kind; string action = Text(d["action"]);
+                        if (!Enum.TryParse<ActionKind>(action, false, out kind) || !Enum.IsDefined(typeof(ActionKind), kind) || kind.ToString() != action) throw new ArgumentException("Unknown layer action: " + action);
+                        layer.Mappings[index - 1] = isMonitor ? new Mapping { Kind = kind, MonitorId = Text(d["monitorId"]), MonitorControl = Text(d["control"]), MonitorStep = d["step"] is int ? (int)d["step"] : 0 }
+                            : new Mapping { Kind = kind, Target = Text(d["target"]), Arguments = Text(d["arguments"]), WorkingDirectory = Text(d["workingDirectory"]) };
+                    }
+                    return layer;
+                }).ToArray();
+            }
             Validate(c, false); return c;
         }
         public static string Serialize(Configuration c)
         {
             Validate(c, false);
             var s = new JavaScriptSerializer();
-            int version = c.CustomHotkeys != null && c.CustomHotkeys.Length > 0 ? 3 : (c.Mappings.Any(m => m.Kind == ActionKind.Monitor) ? 2 : 1);
+            int version = c.Layers != null && c.Layers.Length > 0 ? 4 : c.CustomHotkeys != null && c.CustomHotkeys.Length > 0 ? 3 : (c.Mappings.Any(m => m.Kind == ActionKind.Monitor) ? 2 : 1);
             var b = new StringBuilder("{\r\n  \"version\": " + version + ",\r\n  \"enabled\": " + (c.Enabled ? "true" : "false") + ",\r\n  \"mappings\": [\r\n");
             for (int i = 0; i < 12; i++) {
                 Mapping m = c.Mappings[i];
@@ -221,12 +308,27 @@ namespace FunctionRowRemapper
                 b.Append(i == 11 ? "\r\n" : ",\r\n");
             }
             b.Append("  ]");
-            if (version == 3) {
+            if (version >= 3) {
                 b.Append(",\r\n  \"customHotkeys\": [\r\n");
                 for (int i = 0; i < c.CustomHotkeys.Length; i++) {
                     var h = c.CustomHotkeys[i];
                     b.Append("    " + s.Serialize(new { shortcut = HotkeyChord.Normalize(h.Shortcut), action = h.Action.Kind.ToString(), target = h.Action.Target, arguments = h.Action.Arguments, workingDirectory = h.Action.WorkingDirectory }));
                     b.Append(i == c.CustomHotkeys.Length - 1 ? "\r\n" : ",\r\n");
+                }
+                b.Append("  ]");
+            }
+            if (version == 4) {
+                b.Append(",\r\n  \"layers\": [\r\n");
+                for (int l = 0; l < c.Layers.Length; l++) {
+                    ModifierLayer layer = c.Layers[l];
+                    b.Append("    {\r\n      \"name\": " + s.Serialize(layer.Name.Trim()) + ",\r\n      \"activationKey\": " + s.Serialize(layer.ActivationKey) + ",\r\n      \"mappings\": [\r\n");
+                    for (int i = 0; i < 12; i++) {
+                        Mapping m = layer.Mappings[i];
+                        if (m.Kind == ActionKind.Monitor) b.Append("        " + s.Serialize(new { key = "F" + (i + 1), action = "Monitor", monitorId = m.MonitorId, control = m.MonitorControl, step = m.MonitorStep }));
+                        else b.Append("        " + s.Serialize(new { key = "F" + (i + 1), action = m.Kind.ToString(), target = m.Target, arguments = m.Arguments, workingDirectory = m.WorkingDirectory }));
+                        b.Append(i == 11 ? "\r\n" : ",\r\n");
+                    }
+                    b.Append("      ]\r\n    }"); b.Append(l == c.Layers.Length - 1 ? "\r\n" : ",\r\n");
                 }
                 b.Append("  ]");
             }

@@ -368,11 +368,23 @@ Open command prompt|cmd.exe")) {
                 string path = Path.Combine(sys, row[1]);
                 if (File.Exists(path)) items.Add(new MainForm.SpecificChoice(row[0], new Mapping { Kind = ActionKind.Application, Target = path }, "Windows tools", "Opens the tool with your normal account; no command is pre-run."));
             }
+            AddSystem(items, "Center active window", "CenterWindow", "Window management", "Centers the foreground window inside its current monitor work area.");
+            AddSystem(items, "Toggle always on top", "ToggleAlwaysOnTop", "Window management", "Changes the always-on-top state of the foreground window.");
+            AddSystem(items, "Switch to next audio output", "CycleAudioOutput", "Audio devices", "Cycles through active Windows playback devices and makes the next one default.");
+            AddSystem(items, "Discord: mute or unmute", "DiscordMute", "Discord", "Uses Discord's default Ctrl+Shift+M shortcut. Discord shortcut settings can override it.");
+            AddSystem(items, "Discord: deafen or undeafen", "DiscordDeafen", "Discord", "Uses Discord's default Ctrl+Shift+D shortcut. Discord shortcut settings can override it.");
+            AddSystem(items, "Spotify: play or pause", "SpotifyPlayPause", "Spotify", "Uses the system media key and may control another active media app.");
+            AddSystem(items, "Spotify: next track", "SpotifyNext", "Spotify", "Uses the system media key and may control another active media app.");
+            AddSystem(items, "Spotify: previous track", "SpotifyPrevious", "Spotify", "Uses the system media key and may control another active media app.");
+            AddSystem(items, "OBS: start recording", "ObsStartRecording", "OBS Studio", "Uses OBS Studio's supported command-line control and its standard install location.");
+            AddSystem(items, "OBS: start streaming", "ObsStartStreaming", "OBS Studio", "Uses OBS Studio's supported command-line control and its standard install location.");
+            AddSystem(items, "Open PowerToys settings", "OpenPowerToys", "PowerToys", "Opens the installed PowerToys settings window.");
             return items.ToArray();
         }
         static IEnumerable<string[]> Rows(string text) { return text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().Split('|')); }
         static void AddKeys(List<MainForm.SpecificChoice> items, string category, string context, string data) { foreach (var row in Rows(data)) Key(items, row[0], row[1], category, context); }
         static void Key(List<MainForm.SpecificChoice> items, string label, string chord, string category, string context) { items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.SendShortcut, Target = chord }, category, context)); }
+        static void AddSystem(List<MainForm.SpecificChoice> items, string label, string action, string category, string context) { items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.SystemAction, Target = action }, category, context)); }
         static void Folder(List<MainForm.SpecificChoice> items, string label, Environment.SpecialFolder folder) { Folder(items, label, Environment.GetFolderPath(folder)); }
         static void Folder(List<MainForm.SpecificChoice> items, string label, string path) { if (!String.IsNullOrEmpty(path) && Directory.Exists(path)) items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.FileOrFolder, Target = path }, "Folders", "Opens this local folder without changing its contents.")); }
     }

@@ -12,6 +12,8 @@ obj/
 # Per-machine/user state should never be published
 config.json
 preferences.json
+profiles.json
+*.keyweave
 *.bak
 
 # Generated release metadata

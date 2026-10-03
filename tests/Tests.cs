@@ -3,21 +3,27 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    internal sealed class FakeSink : IActionSink
+    internal sealed class FakeSink : IActionSink, IProfileActionSink
     {
         public readonly List<int[]> Keys = new List<int[]>();
         public readonly List<ProcessStartInfo> Launches = new List<ProcessStartInfo>();
+        public readonly List<string> Profiles = new List<string>();
         public void Send(int[] keys) { Keys.Add(keys); }
         public void Launch(ProcessStartInfo p) { Launches.Add(p); }
+        void IProfileActionSink.ActivateProfile(string name) { Profiles.Add(name); }
     }
     internal static class Tests
     {
+        [DllImport("dwmapi.dll")]
+        static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
         static int passed, failed; static string scratch;
         static void Assert(bool condition, string detail) { if (!condition) throw new Exception(detail); }
         static void Reject(Action action) { bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } if (!rejected) throw new Exception("Expected rejection"); }
@@ -116,6 +122,16 @@ namespace FunctionRowRemapper
                     using (var form = new StepDetailsForm(new Mapping { Kind = ActionKind.Python, Target = @"C:\example.py" })) { CapturePreview(form, "step-details-preview"); form.Close(); }
                     return 0;
                 }
+                if (args.Contains("--v1-preview")) {
+                    Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                    var collection = new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Gaming", Applications = new[] { "game.exe", "obs64.exe" }, Configuration = new Configuration() } } };
+                    using (var form = new ProfileManagerForm(collection, new Configuration())) { CapturePreview(form, "profiles-preview"); form.Size = form.MinimumSize; CapturePreview(form, "profiles-minimum-preview"); form.Close(); }
+                    using (var form = new DiagnosticsForm("KeyWeave diagnostics\r\nVersion: 1.0.0\r\nKeyboard hook: ready\r\nShortcuts: enabled\r\nActive profile: Gaming\r\nSaved profiles: 1\r\nCustom hotkeys: 4\r\nRegistered hotkeys: 4\r\nPowerToys shortcuts found: 12\r\nDetected DDC/CI monitors: 1\r\nStart with Windows: yes\r\nTray mode: yes\r\nUnsaved edits: no\r\n")) { CapturePreview(form, "diagnostics-preview"); form.Size = form.MinimumSize; CapturePreview(form, "diagnostics-minimum-preview"); form.Close(); }
+                    using (var form = new ProfileStatusForm("Gaming", "Automatically matched game.exe.", false, true, new[] { "game.exe", "obs64.exe" })) { CapturePreview(form, "profile-status-preview"); form.Size = form.MinimumSize; CapturePreview(form, "profile-status-minimum-preview"); form.Close(); }
+                    using (var form = new AboutForm()) { CapturePreview(form, "about-preview"); form.Size = form.MinimumSize; CapturePreview(form, "about-minimum-preview"); form.Close(); }
+                    using (var form = new WelcomeForm()) { CapturePreview(form, "welcome-preview"); form.Size = form.MinimumSize; CapturePreview(form, "welcome-minimum-preview"); form.Close(); }
+                    return 0;
+                }
                 if (args.Contains("--ddc-detect") || args.Contains("--ddc-hardware")) {
                     foreach (var m in DdcService.Shared.Scan()) Console.WriteLine(m.Name + ": " + m.Status);
                     if (args.Contains("--ddc-hardware")) foreach (byte code in new byte[] {0x10,0x12,0x62}) Test("Hardware monitor control " + code.ToString("X2"), () => Console.WriteLine(DdcService.Shared.VerifyHardwareRoundTrip(code)));
@@ -126,6 +142,40 @@ namespace FunctionRowRemapper
         }
         static void UnitTests()
         {
+            Test("Every KiWeave window requests a dark title bar", delegate {
+                var forms = new Form[] {
+                    new MainForm(false, true), new ActionPickerForm(true), new AboutForm(), new DiagnosticsForm("Safe diagnostics"),
+                    new ImportReviewForm(new Configuration(), "preview.json"), new LayerManagerForm(new ModifierLayer[0]),
+                    new PrivacyCenterForm(false, "Safe diagnostics"), new ProfileManagerForm(new ProfileCollection(), new Configuration()),
+                    new WelcomeForm(), new SequenceBuilderForm(new SequenceStep[0]), new StepDetailsForm(new Mapping()), new ConditionalActionForm(null), new SafeModeForm(), new LiveKeyTesterForm(null, () => "Default", true), new ConflictCenterForm(new Configuration(), new ProfileCollection(), new PowerToysShortcut[0]), new ShortcutCaptureForm(true, true), new ConfigurationHistoryForm(new Configuration(), new ProfileCollection(), new UserPreferences(), false, new ConfigurationHistoryEntry[0]), new ProfileStatusForm("Gaming", "Selected manually.", false, true, new[] { "game.exe" })
+                };
+                try {
+                    foreach (var form in forms) { int dark; Assert(DwmGetWindowAttribute(form.Handle, 20, out dark, 4) == 0 && dark == 1, form.GetType().Name + " has a light title bar"); }
+                } finally { foreach (var form in forms) form.Dispose(); }
+            });
+            Test("Top-bar and nested menus use the dark palette", delegate {
+                using (var menu = Design.DarkMenu(System.Drawing.SystemFonts.MenuFont)) {
+                    var parent = new ToolStripMenuItem("Profiles"); parent.DropDownItems.Add("Default"); menu.Items.Add(parent);
+                    Design.RefreshDarkMenu(menu);
+                    Assert(menu.BackColor == UiStyle.Surface && menu.ForeColor == UiStyle.Ink, "top-level menu is light");
+                    Assert(parent.DropDown.BackColor == UiStyle.Surface && parent.DropDown.ForeColor == UiStyle.Ink, "nested menu is light");
+                    Assert(Object.ReferenceEquals(parent.DropDown.Renderer, menu.Renderer), "nested menu lost the dark renderer");
+                }
+            });
+            Test("Safe Mode launch detection is explicit and Shift-accessible", delegate {
+                Assert(Program.SafeModeRequested(new[] { "--safe-mode" }, false), "argument ignored");
+                Assert(Program.SafeModeRequested(new string[0], true), "Shift ignored");
+                Assert(!Program.SafeModeRequested(new[] { "--tray" }, false), "ordinary launch entered Safe Mode");
+                Assert(!Program.SafeModeRequested(new[] { "--normal-mode" }, true), "deliberate normal restart looped into Safe Mode");
+            });
+            Test("Safe Mode remains recovery-only and diagnostics stay redacted", delegate {
+                NetworkPolicy.Enabled = true;
+                using (var form = new SafeModeForm()) {
+                    string report = form.Diagnostics();
+                    Assert(!NetworkPolicy.Enabled && report.Contains("Safe Mode: active") && report.Contains("Keyboard hook: not loaded") && report.Contains("Global hotkeys: not registered") && report.Contains("Network access: blocked"), "recovery boundary missing");
+                    Assert(!report.Contains(ConfigStore.DefaultPath) && !report.Contains(Environment.UserName), "private path or identity leaked");
+                }
+            });
             Test("Dark numeric spinner keeps working up and down buttons", delegate {
                 using (var numeric = new DesignNumericUpDown { Minimum = 0, Maximum = 2, Value = 1, Increment = 0.25M, Width = 90 }) {
                     var handle = numeric.Handle;
@@ -142,6 +192,18 @@ namespace FunctionRowRemapper
                 Assert(MainForm.ChoicesFor(3, true)[0].Label == "Choose an action", "custom hotkey placeholder");
                 Assert(MainForm.ChoicesFor(6, false)[0].Label == "Choose an action", "function key placeholder");
                 Assert(MainForm.ChoicesFor(3, true)[0].Mapping.Kind != ActionKind.LockThenSleep, "sleep cannot be the default");
+                Assert(MainForm.ChoicesFor(3, true).Any(x => x.Mapping.Kind == ActionKind.Conditional), "custom conditional choice missing");
+                Assert(MainForm.ChoicesFor(6, false).Any(x => x.Mapping.Kind == ActionKind.Conditional), "function conditional choice missing");
+            });
+            Test("Profile activation appears in both mapping editors", delegate {
+                using (var form = new MainForm(false, true)) {
+                    var method = typeof(MainForm).GetMethod("PopulateChoices", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    foreach (string field in new[] { "specificKind", "customSpecificKind" }) {
+                        var box = (ComboBox)typeof(MainForm).GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(form);
+                        method.Invoke(form, new object[] { box, field == "specificKind" ? 6 : 3, field != "specificKind", new Mapping { Kind = ActionKind.SystemAction, Target = SystemActions.ActivateProfilePrefix + "Default" } });
+                        Assert(box.Items.Cast<object>().Any(x => x.ToString() == "Activate and pin profile: Default") && box.SelectedItem.ToString() == "Activate and pin profile: Default", field);
+                    }
+                }
             });
             Test("Action library excludes its non-executing dropdown placeholder", delegate {
                 Assert(!ActionPickerForm.Catalog(true).Any(x => x.Label == "Choose an action"), "placeholder leaked into library");
@@ -161,6 +223,9 @@ namespace FunctionRowRemapper
                 Assert(UpdateChecker.NewestUpdate(tags, "0.2.0") == null, "current version is not an update");
                 Assert(UpdateChecker.NewestUpdate("", "0.1.0") == null, "empty response");
                 Assert(UpdateChecker.NewestUpdate(tags, "invalid") == null, "invalid installed version");
+                string releases = "[{\"tag_name\":\"v1.2.0\",\"draft\":false,\"prerelease\":false},{\"tag_name\":\"v9.0.0\",\"draft\":false,\"prerelease\":true},{\"tag_name\":\"v8.0.0\",\"draft\":true,\"prerelease\":false}]";
+                Assert(UpdateChecker.NewestUpdate(UpdateChecker.TagsFromReleaseJson(releases), "1.0.0") == "v1.2.0", "GitHub release parsing");
+                Assert(UpdateChecker.NewestUpdate("release refs/tags/v1.0.0\n", "1.0.0-beta.1") == "v1.0.0", "final release should supersede beta");
             });
             Test("PowerToys shortcut scan includes live fields and skips defaults", delegate {
                 string root = Path.Combine(scratch, "PowerToysFixture"), module = Path.Combine(root, "ColorPicker"); Directory.CreateDirectory(module);
@@ -220,8 +285,56 @@ namespace FunctionRowRemapper
             Test("Shortcut parser supports modifiers and media", delegate { Assert(Shortcuts.Parse("Ctrl+Shift+S", false).SequenceEqual(new[] { 17, 16, 83 }), "shortcut"); Assert(Shortcuts.Parse("7", true)[0] == 55, "digit"); foreach (string media in Shortcuts.MediaLabels.Keys) Shortcuts.Parse(media, true); });
             Test("Malformed and reserved shortcuts rejected", delegate { foreach (string s in new[] { "", "Ctrl++A", "Ctrl+Ctrl+A", "Ctrl", "Ctrl+Alt+Delete", "Ctrl+Banana", "MouseButtons", "123", "Shift+Alt" }) Reject(() => Shortcuts.Parse(s, false)); Reject(() => Shortcuts.Parse("Ctrl+A", true)); });
             Test("Custom hotkeys normalize and require a modifier", delegate { Assert(HotkeyChord.Normalize("shift + win + l") == "Shift+Win+L", "normalize"); Reject(() => HotkeyChord.Parse("K")); });
+            Test("Shortcut capture normalizes reviewed keys without retaining input", delegate {
+                Assert(ShortcutCapture.Normalize(true, true, false, false, (int)Keys.K, true) == "Ctrl+Alt+K", "custom chord");
+                Assert(ShortcutCapture.Normalize(false, false, false, false, (int)Keys.F5, false) == "F5", "plain action key");
+                Assert(ShortcutCapture.Normalize(false, false, true, true, (int)Keys.D1, true) == "Shift+Win+1", "digit chord");
+                Reject(() => ShortcutCapture.Normalize(false, false, false, false, (int)Keys.A, true));
+                Reject(() => ShortcutCapture.Normalize(true, true, false, false, (int)Keys.Delete, true));
+            });
             Test("Custom hotkeys and Python scripts round-trip", delegate { var c = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+P", Action = new Mapping { Kind = ActionKind.Python, Target = Path.Combine(scratch, "hello.py"), Arguments = "--fast", WorkingDirectory = scratch } }, new CustomHotkey { Shortcut = "Shift+Win+L", Action = new Mapping { Kind = ActionKind.LockThenSleep } } } }; string json = ConfigStore.Serialize(c); var loaded = ConfigStore.Parse(json); Assert(json.Contains("\"version\": 3") && loaded.CustomHotkeys[0].Action.Kind == ActionKind.Python && loaded.CustomHotkeys[1].Action.Kind == ActionKind.LockThenSleep, "v3"); });
             Test("Action sequences preserve order and waits", delegate { var steps = new[] { new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" } }, new SequenceStep { WaitMilliseconds = 750 }, new SequenceStep { Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } } }; string text = SequenceCodec.Serialize(steps); var parsed = SequenceCodec.Parse(text); Assert(parsed.Count == 3 && parsed[1].WaitMilliseconds == 750 && parsed[2].Action.Target == "VolumeMute", "sequence"); });
+            Test("Conditional actions round-trip with strict local rules", delegate {
+                var rule = new ConditionalRule { Condition = ConditionKind.ForegroundApplication, Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }, Otherwise = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+M" } };
+                string encoded = ConditionalCodec.Serialize(rule); var parsed = ConditionalCodec.Parse(encoded);
+                Assert(parsed.Condition == ConditionKind.ForegroundApplication && parsed.Application == "Discord.exe" && parsed.WhenMatched.Target == "VolumeMute" && parsed.Otherwise.Target == "Ctrl+Shift+M", "conditional round trip");
+                var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Conditional, Target = encoded }; var loaded = ConfigStore.Parse(ConfigStore.Serialize(c));
+                Assert(ConditionalCodec.Parse(loaded.Mappings[0].Target).WhenMatched.Target == "VolumeMute", "configuration round trip");
+                Reject(() => ConditionalCodec.Parse(encoded.Replace("\"version\":1", "\"version\":1,\"extra\":true")));
+                Reject(() => ConditionalCodec.Serialize(new ConditionalRule { Application = @"C:\\private\\Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }, Otherwise = new Mapping { Kind = ActionKind.Unbound } }));
+                Reject(() => ConditionalCodec.Serialize(new ConditionalRule { Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Conditional, Target = encoded }, Otherwise = new Mapping { Kind = ActionKind.Unbound } }));
+            });
+            Test("Conditional matching uses only current local application state", delegate {
+                var foreground = new ConditionalRule { Condition = ConditionKind.ForegroundApplication, Application = "Discord.exe" };
+                Assert(ConditionalActions.Matches(foreground, "discord", null) && !ConditionalActions.Matches(foreground, "notepad.exe", null), "foreground matching");
+                var running = new ConditionalRule { Condition = ConditionKind.ApplicationRunning, Application = "Spotify.exe" };
+                Assert(ConditionalActions.Matches(running, "", name => name == "Spotify") && !ConditionalActions.Matches(running, "", name => false), "running matching");
+            });
+            Test("Conditional dispatcher runs exactly one outcome", delegate {
+                string process = Process.GetCurrentProcess().ProcessName + ".exe";
+                var yesRule = new ConditionalRule { Condition = ConditionKind.ApplicationRunning, Application = process, WhenMatched = new Mapping { Kind = ActionKind.SendKey, Target = "F6" }, Otherwise = new Mapping { Kind = ActionKind.SendKey, Target = "F7" } };
+                var noRule = new ConditionalRule { Condition = ConditionKind.ApplicationRunning, Application = "DefinitelyNotARealKiWeaveProcess.exe", WhenMatched = new Mapping { Kind = ActionKind.SendKey, Target = "F8" }, Otherwise = new Mapping { Kind = ActionKind.SendKey, Target = "F9" } };
+                var sink = new FakeSink(); var dispatcher = new ActionDispatcher(sink); dispatcher.Execute(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(yesRule) }); dispatcher.Execute(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(noRule) });
+                Assert(sink.Keys.Count == 2 && sink.Keys[0].SequenceEqual(new[] { (int)Keys.F6 }) && sink.Keys[1].SequenceEqual(new[] { (int)Keys.F9 }), "wrong branch routed");
+            });
+            Test("Sequence safety summary counts configured effects without executing", delegate {
+                var steps = new[] { new SequenceStep { Action = new Mapping { Kind = ActionKind.Application, Target = @"C:\Tools\app.exe" } }, new SequenceStep { WaitMilliseconds = 1250 }, new SequenceStep { Action = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/hook" } }, new SequenceStep { Action = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a', 64), MonitorControl = "BrightnessUp", MonitorStep = 5 } } };
+                var summary = ActionInsights.Sequence(steps); Assert(summary.Steps == 4 && summary.WaitMilliseconds == 1250 && summary.Launches == 1 && summary.NetworkRequests == 1 && summary.HardwareOperations == 1, summary.Compact);
+            });
+            Test("Sequence steps duplicate as independent copies", delegate {
+                using (var form = new SequenceBuilderForm(new[] { new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+C" } } })) {
+                    typeof(SequenceBuilderForm).GetMethod("DuplicateStep", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, null);
+                    Assert(form.Result.Count == 2 && form.Result[1].Action.Target == "Ctrl+C" && !Object.ReferenceEquals(form.Result[0].Action, form.Result[1].Action), "duplicate step");
+                }
+            });
+            Test("Action maturity labels distinguish stable and dependent actions", delegate {
+                Assert(ActionInsights.Maturity(new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+C" }) == "Stable", "stable");
+                Assert(ActionInsights.Maturity(new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/" }) == "Experimental", "experimental");
+                Assert(ActionInsights.Maturity(new Mapping { Kind = ActionKind.Monitor }) == "Hardware-dependent", "hardware");
+                Assert(ActionInsights.Maturity(new Mapping { Kind = ActionKind.Application, Target = @"C:\Tools\app.exe" }) == "App-dependent", "app");
+                var conditional = new ConditionalRule { Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/" }, Otherwise = new Mapping { Kind = ActionKind.Unbound } };
+                Assert(ActionInsights.Maturity(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(conditional) }) == "Experimental", "conditional maturity");
+            });
             Test("Unsafe paths and control fields rejected", delegate {
                 foreach (string p in new[] { @"\\server\share\app.exe", @"\\?\C:\app.exe", "https://example.com", "relative.exe", "C:\\app.exe:payload", "C:\\bad*.exe", "C:\\app.exe\n", "%WINDIR%\\notepad.exe" }) Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.Application, Target = p }, false));
                 Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.Unbound, Arguments = "bad" }, false));
@@ -259,9 +372,187 @@ namespace FunctionRowRemapper
             Test("DDC dispatch is separate from keys and launches and propagates cancellation", delegate { var sink = new FakeSink(); var monitor = new FakeDdc(); var d = new ActionDispatcher(sink, monitor); var m = MonitorConfig().Mappings[0]; d.Execute(m, () => false); Assert(monitor.Calls == 1 && !monitor.Allowed && monitor.Last.MonitorControl == "VolumeDown" && sink.Keys.Count == 0 && sink.Launches.Count == 0, "routing"); });
             Test("DDC held key repeats and disable cancels repeat", delegate { var c = MonitorConfig(); c.Enabled = true; var m = new KeyStateMachine(); Assert(m.Process(0x70,true,false,c).Action != null && m.Process(0x70,true,false,c).Action != null, "repeat"); c.Enabled = false; m.CancelHeldActions(); Assert(m.Process(0x70,true,false,c).Action == null && m.Process(0x70,false,false,c).Suppress, "disabled pair"); });
             Test("Undetected monitor cannot dispatch native writes", delegate { var service = new DdcService(); bool rejected = false; try { service.Apply(MonitorConfig().Mappings[0], () => true); } catch (InvalidOperationException) { rejected = true; } Assert(rejected,"unsupported"); service.Apply(MonitorConfig().Mappings[0], () => false); });
-            Test("Tray preference defaults on and persists independently", delegate { string path = Path.Combine(scratch,"preferences.json"); Assert(UserPreferences.Load(path).UseTray,"default"); UserPreferences.Save(path,new UserPreferences {UseTray=false}); Assert(!UserPreferences.Load(path).UseTray,"off"); UserPreferences.Save(path,new UserPreferences {UseTray=true}); Assert(UserPreferences.Load(path).UseTray && !UserPreferences.Load(path+".bak").UseTray,"on and backup"); });
-            Test("Tray preferences reject malformed and ambiguous input", delegate { foreach (string json in new[] {"{}", "{\"version\":2,\"useTray\":true}", "{\"version\":1,\"useTray\":\"false\"}", "{\"version\":1,\"useTray\":true,\"useTray\":false}", "{\"version\":1,\"useTray\":true,\"command\":\"x\"}"}) Reject(() => UserPreferences.Parse(json)); });
+            Test("Preferences default, migrate, persist and back up", delegate { string path = Path.Combine(scratch,"preferences.json"); var defaults = UserPreferences.Load(path); Assert(defaults.UseTray && defaults.CheckUpdates && defaults.AutomaticProfiles && !defaults.NetworkAccess,"privacy-first defaults"); var migrated = UserPreferences.Parse("{\"version\":1,\"useTray\":false}"); Assert(!migrated.UseTray && migrated.CheckUpdates && migrated.AutomaticProfiles && !migrated.NetworkAccess,"v1 migration"); var v2 = UserPreferences.Parse("{\"version\":2,\"useTray\":true,\"checkUpdates\":true,\"automaticProfiles\":true}"); Assert(v2.NetworkAccess,"v2 preserves enabled updates"); UserPreferences.Save(path,new UserPreferences {UseTray=false,CheckUpdates=false,AutomaticProfiles=true,NetworkAccess=true}); var loaded=UserPreferences.Load(path); Assert(!loaded.UseTray && !loaded.CheckUpdates && loaded.AutomaticProfiles && loaded.NetworkAccess,"saved"); UserPreferences.Save(path,new UserPreferences {UseTray=true,CheckUpdates=true,AutomaticProfiles=false,NetworkAccess=false}); Assert(UserPreferences.Load(path).UseTray && !UserPreferences.Load(path+".bak").UseTray,"backup"); });
+            Test("Preferences reject malformed and ambiguous input", delegate { foreach (string json in new[] {"{}", "{\"version\":2,\"useTray\":true}", "{\"version\":2,\"useTray\":true,\"checkUpdates\":true,\"automaticProfiles\":true,\"extra\":false}", "{\"version\":3,\"useTray\":true,\"checkUpdates\":true,\"automaticProfiles\":true}", "{\"version\":1,\"useTray\":\"false\"}", "{\"version\":1,\"useTray\":true,\"useTray\":false}", "{\"version\":1,\"useTray\":true,\"command\":\"x\"}"}) Reject(() => UserPreferences.Parse(json)); });
             Test("Corrupt preferences remain untouched on load failure", delegate { string path=Path.Combine(scratch,"corrupt-preferences.json"); File.WriteAllText(path,"{broken"); Reject(() => UserPreferences.Load(path)); Assert(File.ReadAllText(path)=="{broken","preserved"); });
+            Test("Profiles round-trip with automatic app matches", delegate {
+                string path = Path.Combine(scratch, "profiles.json");
+                var profile = new KeyWeaveProfile { Name = "Streaming", Applications = new[] { "obs64.exe", "Discord" }, Configuration = new Configuration() };
+                var collection = new ProfileCollection { Profiles = new[] { profile } }; ProfileStore.Save(path, collection);
+                var loaded = ProfileStore.Load(path); Assert(loaded.Profiles.Length == 1 && loaded.Find("streaming") != null, "profile missing");
+                Assert(loaded.ForApplication("OBS64") != null && loaded.ForApplication("discord.exe") != null, "automatic match");
+                var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
+                string legacy = serializer.Serialize(new { version = 1, profiles = new[] { new { name = "Legacy", applications = new[] { "old.exe" }, configuration = ConfigStore.Serialize(new Configuration()) } } });
+                var migrated = ProfileStore.Parse(legacy); Assert(migrated.Find("Legacy") != null && migrated.Find("Legacy").InheritFrom == "" && migrated.Find("Legacy").OverrideKeys.Length == 0, "version 1 migration");
+            });
+            Test("Profile inheritance resolves overrides and rejects loops", delegate {
+                var defaults = new Configuration { Enabled = true }; defaults.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };
+                var workEffective = defaults.Copy(); workEffective.Mappings[1] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                var work = new KeyWeaveProfile { Name = "Work", InheritFrom = "Default", Configuration = workEffective.Copy() };
+                var childEffective = workEffective.Copy(); childEffective.Mappings[2] = new Mapping { Kind = ActionKind.Media, Target = "MediaPlayPause" };
+                var child = new KeyWeaveProfile { Name = "Editing", InheritFrom = "Work", Configuration = childEffective.Copy() };
+                var collection = new ProfileCollection { Profiles = new[] { work, child } };
+                ProfileStore.SetEffectiveConfiguration(collection, work, workEffective, defaults); ProfileStore.SetEffectiveConfiguration(collection, child, childEffective, defaults);
+                Assert(work.OverrideKeys.SequenceEqual(new[] { "F2" }) && child.OverrideKeys.SequenceEqual(new[] { "F3" }), "intentional overrides");
+                defaults.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeDown" };
+                var resolved = collection.Resolve("Editing", defaults); Assert(resolved.Mappings[0].Target == "VolumeDown" && resolved.Mappings[1].Target == "VolumeMute" && resolved.Mappings[2].Target == "MediaPlayPause", "inheritance resolution");
+                string json = ProfileStore.Serialize(collection); var loaded = ProfileStore.Parse(json); Assert(json.Contains("\"version\":2") && loaded.Resolve("Editing", defaults).Mappings[0].Target == "VolumeDown", "inheritance round trip");
+                loaded.Find("Work").InheritFrom = "Editing"; Reject(() => ProfileStore.Validate(loaded, false));
+            });
+            Test("Conflict center explains Windows, PowerToys, layer and profile winners", delegate {
+                var defaults = new Configuration { CustomHotkeys = new[] {
+                    new CustomHotkey { Shortcut = "Win+L", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } },
+                    new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.Command, Target = @"C:\private\secret.cmd" } },
+                    new CustomHotkey { Shortcut = "Ctrl+CapsLock", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" } }
+                }, Layers = new[] { new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" } } };
+                var profiles = new ProfileCollection { Profiles = new[] {
+                    new KeyWeaveProfile { Name = "First", Applications = new[] { "game.exe" } },
+                    new KeyWeaveProfile { Name = "Second", Applications = new[] { "GAME" } }
+                } };
+                var pt = new[] { new PowerToysShortcut { Module = "ColorPicker", Action = "Activation", Chord = "Ctrl+Alt+K", ModuleEnabled = true } };
+                var issues = ConflictScanner.Scan(defaults, profiles, pt); string report = String.Join("\n", issues.Select(x => x.Title + " " + x.Detail + " " + x.Winner));
+                Assert(issues.Any(x => x.Title.Contains("owned by Windows") && x.Winner.Contains("Windows")), "Windows ownership");
+                Assert(issues.Any(x => x.Title.Contains("PowerToys") && x.Winner.Contains("registered first")), "PowerToys ownership");
+                Assert(issues.Any(x => x.Title.Contains("layer key") && x.Winner.Contains("layer rule wins")), "layer ownership");
+                Assert(issues.Any(x => x.Title.Contains("more than one profile") && x.Winner.Contains("First wins")), "profile ownership");
+                Assert(!report.Contains("secret.cmd") && !report.Contains(@"C:\private"), "private target leaked");
+            });
+            Test("Profiles reject duplicate app ownership", delegate {
+                var collection = new ProfileCollection { Profiles = new[] {
+                    new KeyWeaveProfile { Name = "One", Applications = new[] { "game.exe" } },
+                    new KeyWeaveProfile { Name = "Two", Applications = new[] { "GAME" } }
+                } };
+                Reject(() => ProfileStore.Validate(collection, false));
+            });
+            Test("Modifier layers round-trip without changing older configs", delegate {
+                var c = new Configuration { Enabled = true, Layers = new[] { new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" } } };
+                c.Layers[0].Mappings[4] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                string json = ConfigStore.Serialize(c); Assert(json.Contains("\"version\": 4") && json.Contains("\"layers\""), "version 4");
+                var parsed = ConfigStore.Parse(json); Assert(parsed.Layers.Length == 1 && parsed.Layers[0].Name == "Media" && parsed.Layers[0].Mappings[4].Target == "VolumeMute", "layer round trip");
+                Assert(ConfigStore.Parse(ConfigStore.Serialize(new Configuration())).Layers.Length == 0, "old configuration behavior");
+            });
+            Test("Modifier layers reject duplicate keys and invalid mappings", delegate {
+                var c = new Configuration { Layers = new[] { new ModifierLayer { Name = "One", ActivationKey = "CapsLock" }, new ModifierLayer { Name = "Two", ActivationKey = "CapsLock" } } }; Reject(() => ConfigStore.Validate(c, false));
+                c.Layers[1].ActivationKey = "Apps"; c.Layers[1].Name = "one"; Reject(() => ConfigStore.Validate(c, false));
+                c.Layers[1].Name = "Two"; c.Layers[0].Mappings = new Mapping[11]; Reject(() => ConfigStore.Validate(c, false));
+            });
+            Test("Held layer key selects layer mappings and preserves releases", delegate {
+                var c = new Configuration { Enabled = true, Layers = new[] { new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" } } };
+                c.Layers[0].Mappings[4] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                var machine = new KeyStateMachine(); var layerDown = machine.Process((int)Keys.CapsLock, true, false, c); Assert(layerDown.Suppress && layerDown.Action == null, "layer down");
+                var fDown = machine.Process(0x74, true, false, c); Assert(fDown.Suppress && fDown.Action != null && fDown.Action.Target == "VolumeMute", "layer mapping");
+                Assert(machine.Process(0x74, false, false, c).Suppress && machine.Process((int)Keys.CapsLock, false, false, c).Suppress, "paired releases");
+                Assert(!machine.Process(0x74, true, false, c).Suppress && !machine.Process(0x74, false, false, c).Suppress, "base restored");
+                Assert(!machine.Process((int)Keys.CapsLock, true, true, c).Suppress, "injected layer ignored");
+            });
+            Test("Live key diagnostics describe decisions without retaining history", delegate {
+                var c = new Configuration { Enabled = true, Layers = new[] { new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" } } };
+                c.Layers[0].Mappings[4] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                var machine = new KeyStateMachine(); var layer = machine.Process((int)Keys.CapsLock, true, false, c); var mapped = machine.Process(0x74, true, false, c);
+                Assert(layer.Suppress && layer.LayerName == "Media" && layer.ResolvedAction.Contains("Activate"), "layer diagnostic");
+                Assert(mapped.Suppress && mapped.LayerName == "Media" && mapped.ResolvedAction == "Mute / unmute", "mapping diagnostic");
+                machine.Process(0x74, false, false, c); machine.Process((int)Keys.CapsLock, false, false, c);
+            });
+            Test("Modifier layer state remains paired across disable and competing keys", delegate {
+                var c = new Configuration { Enabled = true, Layers = new[] {
+                    new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" },
+                    new ModifierLayer { Name = "Apps", ActivationKey = "Apps" }
+                } };
+                c.Layers[0].Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                c.Layers[1].Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };
+                var machine = new KeyStateMachine();
+                Assert(machine.Process((int)Keys.CapsLock, true, false, c).Suppress, "first layer down");
+                Assert(!machine.Process((int)Keys.Apps, true, false, c).Suppress, "competing layer must pass through");
+                var mapped = machine.Process(0x70, true, false, c); Assert(mapped.Suppress && mapped.Action.Target == "VolumeMute", "first layer remains active");
+                Assert(machine.Process(0x70, false, false, c).Suppress && !machine.Process((int)Keys.Apps, false, false, c).Suppress, "function and competing releases pair");
+                c.Enabled = false; machine.CancelHeldActions(); Assert(machine.Process((int)Keys.CapsLock, false, false, c).Suppress, "layer release remains paired after disable");
+                Assert(!machine.Process((int)Keys.CapsLock, true, false, c).Suppress && !machine.Process((int)Keys.CapsLock, false, false, c).Suppress, "disabled layer passes through");
+            });
+            Test("KeyWeave backup format round-trips and rejects unknown fields", delegate {
+                var c = new Configuration { Enabled = true, CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+B", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } } } };
+                var p = new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Games", Applications = new[] { "game.exe" }, Configuration = c.Copy() } } };
+                string text = BackupBundle.Serialize(c, p, new UserPreferences { UseTray = false, NetworkAccess = true }, true); var loaded = BackupBundle.Parse(text);
+                Assert(loaded.Configuration.Enabled && loaded.Configuration.CustomHotkeys.Length == 1 && loaded.Profiles.Find("Games") != null && !loaded.Preferences.UseTray && loaded.Preferences.NetworkAccess && loaded.StartWithWindows, "backup round trip");
+                string path = Path.Combine(scratch, "setup.keyweave"); BackupBundle.Save(path, c, p, new UserPreferences { UseTray = false }, true); Assert(BackupBundle.Load(path).Profiles.Find("Games") != null, "backup file load");
+                BackupBundle.Save(path, new Configuration(), new ProfileCollection(), new UserPreferences(), false); Assert(File.Exists(path + ".bak") && BackupBundle.Load(path + ".bak").Configuration.Enabled, "backup atomic replacement");
+                Reject(() => BackupBundle.Parse(text.Replace("\"format\":\"KeyWeave Backup\"", "\"unknown\":1,\"format\":\"KeyWeave Backup\"")));
+                Reject(() => BackupBundle.Parse(new string('x', BackupBundle.MaxBytes + 1)));
+            });
+            Test("Configuration history is bounded, local and compares without exposing targets", delegate {
+                string folder = Path.Combine(scratch, "history"); var profiles = new ProfileCollection(); var preferences = new UserPreferences();
+                var first = new Configuration(); first.Mappings[0] = new Mapping { Kind = ActionKind.Application, Target = @"C:\private\secret.exe" };
+                ConfigurationHistory.Capture(folder, "mapping save", first, profiles, preferences, false, 2);
+                var second = first.Copy(); second.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }; ConfigurationHistory.Capture(folder, "profile save", second, profiles, preferences, false, 2);
+                var third = second.Copy(); third.Mappings[1] = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+S" }; ConfigurationHistory.Capture(folder, "backup restore", third, profiles, preferences, true, 2);
+                var entries = ConfigurationHistory.List(folder); Assert(entries.Count == 2 && entries.All(x => x.Backup.PowerToys.Length == 0), "bounded/private history");
+                string comparison = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = first, Profiles = profiles, Preferences = preferences, StartWithWindows = false }, third, profiles, preferences, true);
+                Assert(comparison.Contains("F1") && comparison.Contains("Start with Windows") && !comparison.Contains("private") && !comparison.Contains("secret.exe"), "safe comparison");
+            });
+            Test("Private-safe log excludes exception messages and rotates", delegate {
+                string path = Path.Combine(scratch, "keyweave.log"), secret = "https://example.invalid/private-token";
+                AppLog.Write(path, "Test component", new InvalidOperationException(secret)); string text = File.ReadAllText(path);
+                Assert(text.Contains("Test component") && text.Contains("InvalidOperationException") && !text.Contains(secret), "private message leaked");
+            });
+            Test("Master network policy blocks HTTP before a request", delegate {
+                NetworkPolicy.Enabled = false; bool blocked = false; try { SystemActions.HttpRequest(new Mapping { Kind = ActionKind.HttpRequest, Target = "http://127.0.0.1:1/private" }); } catch (InvalidOperationException ex) { blocked = ex.Message.Contains("turned off"); }
+                Assert(blocked, "network action was not blocked");
+            });
+            Test("Import quarantine describes risky actions without executing", delegate {
+                var c = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+W", Action = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/hook", Arguments = "{\"ok\":true}" } } } };
+                c.Mappings[0] = new Mapping { Kind = ActionKind.Command, Target = @"C:\Tools\safe.cmd", Arguments = "--preview" };
+                string review = ActionPrivacy.Review(c, @"C:\private\import.json");
+                Assert(review.Contains("USES NETWORK") && review.Contains("OPENS OR RUNS LOCAL CONTENT") && review.Contains("example.invalid") && review.Contains("import.json") && !review.Contains(@"C:\private\import.json"), "risk review");
+            });
+            Test("Import quarantine exposes effects hidden behind conditions", delegate {
+                var rule = new ConditionalRule { Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/conditional" }, Otherwise = new Mapping { Kind = ActionKind.Application, Target = @"C:\Tools\fallback.exe" } };
+                var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(rule) };
+                string review = ActionPrivacy.Review(c, "condition.keyweave");
+                Assert(ActionPrivacy.Risk(c.Mappings[0]) == "CONDITIONAL: USES NETWORK" && review.Contains("1 network") && review.Contains("1 local launch/open") && review.Contains("When foreground app") && review.Contains("Match:"), "nested risks hidden");
+            });
+            Test("System integrations and HTTP actions validate", delegate {
+                ConfigStore.Validate(new Mapping { Kind = ActionKind.SystemAction, Target = "CenterWindow" }, false);
+                ConfigStore.Validate(new Mapping { Kind = ActionKind.SystemAction, Target = SystemActions.ActivateProfilePrefix + "Gaming" }, false);
+                ConfigStore.Validate(new Mapping { Kind = ActionKind.HttpRequest, Target = "http://127.0.0.1:9000/hook", Arguments = "{\"ok\":true}" }, false);
+                Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.SystemAction, Target = "Unknown" }, false));
+                Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.HttpRequest, Target = "file:///secret" }, false));
+                Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.HttpRequest, Target = "https://user:pass@example.com/" }, false));
+            });
+            Test("Profile actions validate, summarize and route without touching disk", delegate {
+                var action = new Mapping { Kind = ActionKind.SystemAction, Target = SystemActions.ActivateProfilePrefix + "Gaming" };
+                var sink = new FakeSink(); new ActionDispatcher(sink, new FakeDdc()).Execute(action);
+                Assert(action.Summary == "Activate profile: Gaming" && sink.Profiles.SequenceEqual(new[] { "Gaming" }), "profile action routing");
+                Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.SystemAction, Target = SystemActions.ActivateProfilePrefix }, false));
+                Reject(() => ConfigStore.Validate(new Mapping { Kind = ActionKind.SystemAction, Target = SystemActions.ActivateProfilePrefix + "Bad\nName" }, false));
+            });
+            Test("HTTP action reaches a local endpoint", delegate {
+                NetworkPolicy.Enabled = true;
+                string requestLine = null; Exception serverError = null;
+                var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                var thread = new Thread(new ThreadStart(delegate {
+                    try {
+                        using (var client = listener.AcceptTcpClient()) using (var stream = client.GetStream()) using (var reader = new StreamReader(stream)) {
+                            requestLine = reader.ReadLine(); string line; while (!String.IsNullOrEmpty(line = reader.ReadLine())) { }
+                            byte[] response = System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"); stream.Write(response, 0, response.Length);
+                        }
+                    } catch (Exception ex) { serverError = ex; }
+                }));
+                thread.IsBackground = true; thread.Start();
+                try { SystemActions.HttpRequest(new Mapping { Kind = ActionKind.HttpRequest, Target = "http://127.0.0.1:" + port + "/keyweave" }); }
+                finally { listener.Stop(); thread.Join(2000); }
+                if (serverError != null) throw serverError;
+                Assert(requestLine == "GET /keyweave HTTP/1.1", "unexpected request: " + requestLine);
+                NetworkPolicy.Enabled = false;
+            });
+            Test("Media integrations route through the safe input sink", delegate {
+                var sink = new FakeSink(); var dispatcher = new ActionDispatcher(sink, new FakeDdc());
+                dispatcher.Execute(new Mapping { Kind = ActionKind.SystemAction, Target = "SpotifyPlayPause" });
+                dispatcher.Execute(new Mapping { Kind = ActionKind.SystemAction, Target = "DiscordMute" });
+                Assert(sink.Keys.Count == 2 && sink.Keys[0].Last() == (int)Keys.MediaPlayPause && sink.Keys[1].Last() == (int)Keys.M, "integration shortcut routing");
+            });
+            Test("Release version metadata is 1.0.0 beta 1", delegate {
+                Assert(UpdateChecker.CurrentVersion == "1.0.0-beta.1" && typeof(Program).Assembly.GetName().Version.ToString() == "1.0.0.0", "version mismatch");
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }
@@ -271,18 +562,21 @@ namespace FunctionRowRemapper
             using (var observer = new NativeObserver()) {
                 Test("Production hook ignores injected F5", delegate { using (var engine = new KeyboardEngine(new WindowsActionSink(), false)) { engine.Apply(Active(ActionKind.Unbound, "")); observer.Clear(); SendTest(false); SendTest(true); Thread.Sleep(150); Assert(observer.F5 == 2, "production injection must pass"); } });
                 Test("Native hook suppresses marked test F5 and emits one F6 pair", delegate { using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) { engine.Apply(Active(ActionKind.SendKey, "F6")); observer.Clear(); SendTest(false); Thread.Sleep(120); for (int i = 0; i < 8; i++) SendTest(false); SendTest(true); Thread.Sleep(150); Assert(observer.F5 == 0 && observer.F6Down == 1 && observer.F6Up == 1, "F5=" + observer.F5 + ", F6=" + observer.F6Down + "/" + observer.F6Up); } });
+                Test("Native live tester receives one transient resolved event", delegate { using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) using (var seen = new AutoResetEvent(false)) { engine.Apply(Active(ActionKind.Unbound, "")); KeyDiagnostic latest = null; engine.KeyObserved += item => { latest = item; seen.Set(); }; observer.Clear(); SendTest(false); Assert(seen.WaitOne(1000), "no diagnostic event"); SendTest(true); Assert(latest != null && latest.KeyName == "F5" && latest.Suppressed && latest.ResolvedAction == "Unbound (do nothing)", "incorrect diagnostic"); } });
+                Test("Native modifier layer suppresses its hold key and routes F5", delegate { var c = new Configuration { Enabled = true, Layers = new[] { new ModifierLayer { Name = "Test", ActivationKey = "CapsLock" } } }; c.Layers[0].Mappings[4] = new Mapping { Kind = ActionKind.SendKey, Target = "F6" }; using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) { engine.Apply(c); observer.Clear(); SendTestKey((int)Keys.CapsLock, false); SendTest(false); SendTest(true); SendTestKey((int)Keys.CapsLock, true); Thread.Sleep(150); Assert(observer.CapsLock == 0 && observer.F5 == 0 && observer.F6Down == 1 && observer.F6Up == 1, "Caps=" + observer.CapsLock + ", F5=" + observer.F5 + ", F6=" + observer.F6Down + "/" + observer.F6Up); } });
                 Test("Native Unbound swallows both edges; disable restores pass-through", delegate { using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) { engine.Apply(Active(ActionKind.Unbound, "")); observer.Clear(); SendTest(false); SendTest(true); Thread.Sleep(100); Assert(observer.F5 == 0, "unbound"); engine.SetEnabled(false); SendTest(false); SendTest(true); Thread.Sleep(100); Assert(observer.F5 == 2, "disable"); } });
                 Test("Native held key launches exactly one real process", delegate { string marker = Path.Combine(scratch, "launch-marker.txt"); var c = Active(ActionKind.Application, Process.GetCurrentProcess().MainModule.FileName); c.Mappings[4].Arguments = "--probe \"" + marker + "\""; using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) { engine.Apply(c); observer.Clear(); SendTest(false); for (int i = 0; i < 20; i++) SendTest(false); SendTest(true); WaitFor(() => File.Exists(marker)); Thread.Sleep(200); Assert(File.ReadAllLines(marker).Length == 1 && observer.F5 == 0, "launch count/suppression"); } });
                 Test("Native pass-through and disposal restore both edges", delegate { using (var engine = new KeyboardEngine(new WindowsActionSink(), true)) { engine.Apply(new Configuration { Enabled = true }); observer.Clear(); SendTest(false); SendTest(true); Thread.Sleep(100); Assert(observer.F5 == 2, "pass through"); engine.Apply(Active(ActionKind.Unbound, "")); } observer.Clear(); SendTest(false); SendTest(true); Thread.Sleep(100); Assert(observer.F5 == 2, "after disposal"); });
             }
         }
         static void WaitFor(Func<bool> condition) { var sw = Stopwatch.StartNew(); while (!condition() && sw.ElapsedMilliseconds < 4000) Thread.Sleep(25); Assert(condition(), "Timed out waiting for test action"); }
-        static void SendTest(bool up) { var a = new[] { Native.Key(0x74, up, Native.TestTag) }; Assert(Native.SendInput(1, a, Marshal.SizeOf(typeof(Native.Input))) == 1, "test SendInput failed"); }
+        static void SendTest(bool up) { SendTestKey(0x74, up); }
+        static void SendTestKey(int key, bool up) { var a = new[] { Native.Key(key, up, Native.TestTag) }; Assert(Native.SendInput(1, a, Marshal.SizeOf(typeof(Native.Input))) == 1, "test SendInput failed"); }
         sealed class NativeObserver : IDisposable
         {
             readonly Thread thread; readonly ManualResetEvent ready = new ManualResetEvent(false); readonly Native.HookProc callback; Control control; IntPtr hook;
-            public int F5, F6Down, F6Up;
-            public void Clear() { F5 = F6Down = F6Up = 0; }
+            public int CapsLock, F5, F6Down, F6Up;
+            public void Clear() { CapsLock = F5 = F6Down = F6Up = 0; }
             public NativeObserver()
             {
                 callback = Observe; thread = new Thread(delegate() { control = new Control(); var h = control.Handle; hook = Native.SetWindowsHookEx(13, callback, Native.GetModuleHandle(null), 0); ready.Set(); Application.Run(); Native.UnhookWindowsHookEx(hook); control.Dispose(); }) { IsBackground = true };
@@ -290,7 +584,7 @@ namespace FunctionRowRemapper
             }
             IntPtr Observe(int code, IntPtr w, IntPtr l)
             {
-                if (code >= 0) { var k = (Native.KeyboardData)Marshal.PtrToStructure(l, typeof(Native.KeyboardData)); if (k.ExtraInfo == Native.TestTag && k.Vk == 0x74) { Interlocked.Increment(ref F5); return new IntPtr(1); } if (k.ExtraInfo == Native.Tag && k.Vk == 0x75) { if ((k.Flags & 0x80) == 0) Interlocked.Increment(ref F6Down); else Interlocked.Increment(ref F6Up); return new IntPtr(1); } }
+                if (code >= 0) { var k = (Native.KeyboardData)Marshal.PtrToStructure(l, typeof(Native.KeyboardData)); if (k.ExtraInfo == Native.TestTag && k.Vk == (int)Keys.CapsLock) { Interlocked.Increment(ref CapsLock); return new IntPtr(1); } if (k.ExtraInfo == Native.TestTag && k.Vk == 0x74) { Interlocked.Increment(ref F5); return new IntPtr(1); } if (k.ExtraInfo == Native.Tag && k.Vk == 0x75) { if ((k.Flags & 0x80) == 0) Interlocked.Increment(ref F6Down); else Interlocked.Increment(ref F6Up); return new IntPtr(1); } }
                 return Native.CallNextHookEx(hook, code, w, l);
             }
             public void Dispose() { control.BeginInvoke((Action)delegate { Application.ExitThread(); }); thread.Join(2000); ready.Dispose(); }

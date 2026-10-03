@@ -13,6 +13,17 @@ namespace FunctionRowRemapper
 
     internal static class Design
     {
+        enum PreferredAppMode { Default, AllowDark, ForceDark, ForceLight, Max }
+        [DllImport("uxtheme.dll", EntryPoint = "#135")]
+        static extern PreferredAppMode SetPreferredAppMode(PreferredAppMode mode);
+        [DllImport("uxtheme.dll", EntryPoint = "#136")]
+        static extern void FlushMenuThemes();
+        internal static void EnableDarkAppMode()
+        {
+            try { SetPreferredAppMode(PreferredAppMode.ForceDark); FlushMenuThemes(); }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+        }
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
         internal static void DarkNative(Control control)
@@ -31,6 +42,26 @@ namespace FunctionRowRemapper
         }
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
         internal static void DarkTitlebar(Form form) { form.HandleCreated += delegate { try { int on = 1; DwmSetWindowAttribute(form.Handle, 20, ref on, 4); } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { } }; }
+        internal static ContextMenuStrip DarkMenu(Font font)
+        {
+            var menu = new ContextMenuStrip {
+                Font = font, BackColor = UiStyle.Surface, ForeColor = UiStyle.Ink,
+                Renderer = new ToolStripProfessionalRenderer(new DesignMenuColors())
+            };
+            menu.Opening += delegate { RefreshDarkMenu(menu); };
+            return menu;
+        }
+        internal static void RefreshDarkMenu(ContextMenuStrip menu) { DarkMenuItems(menu.Items, menu.Renderer); }
+        static void DarkMenuItems(ToolStripItemCollection items, ToolStripRenderer renderer)
+        {
+            foreach (ToolStripItem item in items) {
+                item.BackColor = UiStyle.Surface; item.ForeColor = UiStyle.Ink;
+                var submenu = item as ToolStripMenuItem;
+                if (submenu == null || submenu.DropDownItems.Count == 0) continue;
+                submenu.DropDown.BackColor = UiStyle.Surface; submenu.DropDown.ForeColor = UiStyle.Ink; submenu.DropDown.Renderer = renderer;
+                DarkMenuItems(submenu.DropDownItems, renderer);
+            }
+        }
         internal static Color Background(Control control)
         {
             while (control != null) { if (control.BackColor.A == 255) return control.BackColor; control = control.Parent; }
@@ -304,8 +335,16 @@ namespace FunctionRowRemapper
         public override Color ImageMarginGradientMiddle { get { return UiStyle.Surface; } }
         public override Color ImageMarginGradientEnd { get { return UiStyle.Surface; } }
         public override Color MenuItemSelected { get { return UiStyle.Soft; } }
+        public override Color MenuItemSelectedGradientBegin { get { return UiStyle.Soft; } }
+        public override Color MenuItemSelectedGradientEnd { get { return UiStyle.Soft; } }
+        public override Color MenuItemPressedGradientBegin { get { return UiStyle.Soft; } }
+        public override Color MenuItemPressedGradientMiddle { get { return UiStyle.Soft; } }
+        public override Color MenuItemPressedGradientEnd { get { return UiStyle.Soft; } }
         public override Color MenuItemBorder { get { return UiStyle.Border; } }
         public override Color MenuBorder { get { return UiStyle.Border; } }
+        public override Color CheckBackground { get { return UiStyle.Input; } }
+        public override Color CheckSelectedBackground { get { return UiStyle.Soft; } }
+        public override Color CheckPressedBackground { get { return UiStyle.Soft; } }
         public override Color SeparatorDark { get { return UiStyle.Border; } }
         public override Color SeparatorLight { get { return UiStyle.Border; } }
     }

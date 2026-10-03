@@ -62,17 +62,20 @@ namespace FunctionRowRemapper
 
     public sealed partial class MainForm
     {
-        readonly Panel functionPage = new Panel(), customPage = new Panel(), customHotkeyView = new Panel(), powerToysView = new Panel();
+        readonly Panel functionPage = new Panel(), customPage = new Panel(), settingsPage = new Panel(), customHotkeyView = new Panel(), powerToysView = new Panel();
         DesignButton hotkeysTab, powerToysTab;
         readonly Label pageTitle = UiStyle.Text("Function keys", 26, true), pageSubtitle = UiStyle.Text("", 10, false);
-        DesignButton functionNav, customNav;
+        DesignButton functionNav, customNav, settingsNav;
+        readonly DesignButton profileBadge = new DesignButton();
         readonly Label customTitle = UiStyle.Text("Edit shortcut", 19, true);
+        readonly ComboBox layerView = new DesignComboBox();
         readonly Label customHelp = UiStyle.Text("", 10, false), sequenceSummary = UiStyle.Text("", 10, false);
         readonly Panel customEditorHost = new Panel();
         readonly Label customEmpty = UiStyle.Text("Create your first shortcut\n\nChoose Add hotkey to get started.", 15, true);
         Control functionTargetField, functionArgsField, functionWorkField, customTargetField, customArgsField, customWorkField;
         Control sequenceField;
-        Button removeCustomButton;
+        Button removeCustomButton, functionRecord, customShortcutRecord, customActionRecord, functionConditionalButton, customConditionalButton;
+        Button moreButton, saveChangesButton;
         TableLayoutPanel functionStack, customStack;
 
         void BuildUi()
@@ -91,48 +94,53 @@ namespace FunctionRowRemapper
                     Design.ShadowedF(e.Graphics, f, (48 - size.Width) / 2, (47 - size.Height) / 2);
                 }
             }; sideTop.Controls.Add(logo);
-            var brand = UiStyle.Text("KeyWeave", 17, true); brand.ForeColor = Color.White; sideTop.Controls.Add(brand);
+            var brand = UiStyle.Text("KiWeave", 17, true); brand.ForeColor = Color.White; sideTop.Controls.Add(brand);
             var subbrand = UiStyle.Text("A little more control.", 9, false); subbrand.ForeColor = Color.FromArgb(155, 155, 179); subbrand.Margin = new Padding(0, 0, 0, 38); sideTop.Controls.Add(subbrand);
             var workspace = UiStyle.Text("Workspace", 9, true); workspace.ForeColor = Color.FromArgb(132, 132, 157); workspace.Margin = new Padding(8, 0, 0, 12); sideTop.Controls.Add(workspace);
             functionNav = Nav("Function keys", "\uE765", delegate { SelectPage(0); });
-            customNav = Nav("Custom hotkeys", "\uE713", delegate { SelectPage(1); });
+            customNav = Nav("Custom hotkeys", "\uE70F", delegate { SelectPage(1); });
             sideTop.Controls.Add(functionNav); sideTop.Controls.Add(customNav);
-            var safety = UiStyle.Stack(); safety.Dock = DockStyle.Bottom;
+            var sidebarBottom = new Panel { Dock = DockStyle.Bottom, Height = 178, Margin = Padding.Empty };
+            var safety = UiStyle.Stack(); safety.Dock = DockStyle.Fill; safety.Padding = new Padding(8, 0, 8, 4);
             var safeTitle = UiStyle.Text("Always in control", 10, true); safeTitle.ForeColor = Color.FromArgb(214, 210, 237); safety.Controls.Add(safeTitle);
             var safeText = UiStyle.Text("Hold Ctrl + Alt + Shift\nfor 1.5s to pause shortcuts.", 9, false); safeText.ForeColor = Color.FromArgb(156, 155, 180); safety.Controls.Add(safeText); sidebar.Controls.Add(safety);
+            settingsNav = Nav("Settings", "\uE713", delegate { SelectPage(2); }); settingsNav.Dock = DockStyle.Bottom;
+            sidebarBottom.Controls.Add(safety); sidebarBottom.Controls.Add(settingsNav); sidebar.Controls.Add(sidebarBottom);
 
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 28, 26, 20), ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 28, 26, 20), ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 90)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 50)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); shell.Controls.Add(root, 1, 0);
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); shell.Controls.Add(root, 1, 0);
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = Padding.Empty };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 215));
             var headings = UiStyle.Stack(); headings.Controls.Add(pageTitle); headings.Controls.Add(pageSubtitle); header.Controls.Add(headings, 0, 0);
             var active = UiStyle.Stack(); active.Padding = new Padding(0, 4, 0, 0);
             enabled.Text = "Shortcuts enabled"; enabled.AutoSize = false; enabled.Size = new Size(206, 36); enabled.CheckedChanged += ToggleEnabled;
-            status.AutoSize = true; status.ForeColor = muted; status.Font = new Font("Segoe UI", 9); status.Margin = new Padding(50, 3, 0, 0); active.Controls.Add(enabled); active.Controls.Add(status); header.Controls.Add(active, 1, 0); root.Controls.Add(header, 0, 0);
+            profileBadge.AutoSize = false; profileBadge.Size = new Size(206, 34); profileBadge.MinimumSize = new Size(206, 34); profileBadge.Padding = new Padding(10, 4, 10, 4); profileBadge.Margin = new Padding(0, 2, 0, 0);
+            profileBadge.Text = "Profile: Default"; profileBadge.Click += delegate { OpenProfileStatus(); };
+            active.Controls.Add(enabled); active.Controls.Add(profileBadge); header.Controls.Add(active, 1, 0); root.Controls.Add(header, 0, 0);
             var pages = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-            functionPage.Dock = customPage.Dock = DockStyle.Fill; pages.Controls.Add(functionPage); pages.Controls.Add(customPage); root.Controls.Add(pages, 0, 1);
-            BuildFunctionPage(functionPage); BuildCustomPage(customPage);
-
-            var options = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 14, 0, 0), Margin = Padding.Empty };
-            startup.Text = "Start with Windows"; startup.AutoSize = true; startup.ForeColor = UiStyle.Muted; startup.Margin = new Padding(0, 0, 24, 0); startup.CheckedChanged += delegate { if (!loading) MarkDirty(); };
-            useTray.Text = "Keep running in tray"; useTray.AutoSize = true; useTray.ForeColor = UiStyle.Muted; useTray.Margin = new Padding(0); useTray.CheckedChanged += ToggleTray;
-            options.Controls.Add(startup); options.Controls.Add(useTray); root.Controls.Add(options, 0, 2);
+            functionPage.Dock = customPage.Dock = settingsPage.Dock = DockStyle.Fill; pages.Controls.Add(functionPage); pages.Controls.Add(customPage); pages.Controls.Add(settingsPage); root.Controls.Add(pages, 0, 1);
+            BuildFunctionPage(functionPage); BuildCustomPage(customPage); BuildSettingsPage(settingsPage);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             feedback.Dock = DockStyle.Fill; feedback.ForeColor = muted; feedback.Text = "All set. Edit a key to get started."; feedback.Font = new Font("Segoe UI", 9); feedback.Padding = new Padding(0, 10, 12, 0); footer.Controls.Add(feedback, 0, 0);
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-            var more = UiStyle.Button("More", delegate { });
-            var menu = new ContextMenuStrip { Font = Font, BackColor = UiStyle.Surface, ForeColor = UiStyle.Ink, Renderer = new ToolStripProfessionalRenderer(new DesignMenuColors()) };
+            moreButton = UiStyle.Button("More", delegate { });
+            var menu = Design.DarkMenu(Font);
+            menu.Items.Add("Profiles...", null, delegate { OpenProfiles(); }); menu.Items.Add("Diagnostics...", null, delegate { OpenDiagnostics(); }); menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Back up everything...", null, ExportBackup); menu.Items.Add("Restore backup...", null, ImportBackup); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Import configuration...", null, Import); menu.Items.Add("Export configuration...", null, Export);
             menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Reset function keys", null, delegate { Bulk(false); });
             menu.Items.Add("Disable all function keys", null, delegate { Bulk(true); }); menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("About KiWeave...", null, delegate { using (var about = new AboutForm()) about.ShowDialog(this); });
+            menu.Items.Add("Open log folder", null, delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } });
             menu.Items.Add("Exit app", null, delegate { ExitApp(); });
-            more.Click += delegate { menu.Show(more, new Point(0, more.Height)); }; more.Disposed += delegate { menu.Dispose(); };
+            moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); }; moreButton.Disposed += delegate { menu.Dispose(); };
             hideToTray = UiStyle.Button("Hide to tray", delegate { if (preferences.UseTray) Hide(); });
-            buttons.Controls.Add(more); buttons.Controls.Add(hideToTray); buttons.Controls.Add(UiStyle.Button("Save changes", delegate { Save(); }, true));
-            footer.Controls.Add(buttons, 1, 0); root.Controls.Add(footer, 0, 3); SelectPage(0);
+            saveChangesButton = UiStyle.Button("Save changes", delegate { Save(); }, true);
+            buttons.Controls.Add(moreButton); buttons.Controls.Add(hideToTray); buttons.Controls.Add(saveChangesButton);
+            footer.Controls.Add(buttons, 1, 0); root.Controls.Add(footer, 0, 2); SelectPage(0);
         }
         DesignButton Nav(string text, string glyph, EventHandler click)
         {
@@ -141,11 +149,57 @@ namespace FunctionRowRemapper
         }
         void SelectPage(int index)
         {
-            functionPage.Visible = index == 0; customPage.Visible = index == 1;
-            functionNav.Active = index == 0; customNav.Active = index == 1; functionNav.Invalidate(); customNav.Invalidate();
-            pageTitle.Text = index == 0 ? "Function keys" : "Custom hotkeys";
-            pageSubtitle.Text = index == 0 ? "Small keys. Big possibilities." :
+            functionPage.Visible = index == 0; customPage.Visible = index == 1; settingsPage.Visible = index == 2;
+            functionNav.Active = index == 0; customNav.Active = index == 1; settingsNav.Active = index == 2;
+            functionNav.Invalidate(); customNav.Invalidate(); settingsNav.Invalidate();
+            moreButton.Visible = index != 2; saveChangesButton.Visible = index != 2;
+            pageTitle.Text = index == 0 ? "Function keys" : index == 1 ? "Custom hotkeys" : "Settings";
+            pageSubtitle.Text = index == 0 ? "Small keys. Big possibilities." : index == 2 ? "Make KiWeave feel at home." :
                 powerToysView.Visible ? "PowerToys shortcuts, right where your hotkeys live." : "Your favorite actions, one shortcut away.";
+            if (index == 2 && feedback.Text == "All set. Edit a key to get started.") feedback.Text = "Settings save as you change them.";
+            else if (index != 2 && feedback.Text == "Settings save as you change them.") feedback.Text = "All set. Edit a key to get started.";
+        }
+
+        void BuildSettingsPage(Control page)
+        {
+            var columns = PageColumns(page);
+            var general = Card(); general.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(general, 0, 0);
+            var left = UiStyle.Stack(); general.Controls.Add(left);
+            left.Controls.Add(UiStyle.Text("General", 15, true));
+            var intro = UiStyle.Text("Background behavior saves as soon as you change it.", 9, false); intro.Margin = new Padding(0, 0, 0, 22); left.Controls.Add(intro);
+            AddSetting(left, startup, "Start with Windows", "Launch KiWeave quietly when you sign in.", ToggleStartup);
+            AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);
+            AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
+            AddSetting(left, networkAccess, "Allow network access", "Master switch for GitHub update checks and user-triggered HTTP actions. Local remapping stays available when off.", ToggleBackgroundPreference);
+            AddSetting(left, checkUpdates, "Check for updates on launch", "Quietly checks public GitHub releases. Offline checks are ignored.", ToggleBackgroundPreference);
+
+            var tools = Card(); columns.Controls.Add(tools, 1, 0);
+            var right = UiStyle.Stack(); tools.Controls.Add(right);
+            right.Controls.Add(UiStyle.Text("Tools and data", 15, true));
+            var toolsHelp = UiStyle.Text("Back up your setup, troubleshoot problems, or revisit the basics.", 9, false); toolsHelp.Margin = new Padding(0, 0, 0, 18); right.Controls.Add(toolsHelp);
+            var primary = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
+            primary.Controls.Add(UiStyle.Button("Check for updates", delegate { CheckForUpdatesNow(); }, true));
+            primary.Controls.Add(UiStyle.Button("Manage profiles", delegate { OpenProfiles(); })); right.Controls.Add(primary);
+            var backup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
+            backup.Controls.Add(UiStyle.Button("Back up everything", ExportBackup)); backup.Controls.Add(UiStyle.Button("Restore backup", ImportBackup)); right.Controls.Add(backup);
+            var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
+            help.Controls.Add(UiStyle.Button("Welcome guide", delegate { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); }));
+            help.Controls.Add(UiStyle.Button("Privacy center", delegate { OpenPrivacyCenter(); }, true));
+            help.Controls.Add(UiStyle.Button("Live key tester", delegate { OpenLiveKeyTester(); }));
+            help.Controls.Add(UiStyle.Button("Conflict center", delegate { OpenConflictCenter(); }));
+            help.Controls.Add(UiStyle.Button("Undo and history", delegate { OpenHistory(); }));
+            help.Controls.Add(UiStyle.Button("Diagnostics", delegate { OpenDiagnostics(); })); right.Controls.Add(help);
+            var folders = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
+            folders.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenDataFolder(); }));
+            folders.Controls.Add(UiStyle.Button("Open log folder", delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } })); right.Controls.Add(folders);
+            right.Controls.Add(UiStyle.Button("About KiWeave", delegate { using (var about = new AboutForm()) about.ShowDialog(this); }));
+        }
+
+        void AddSetting(TableLayoutPanel stack, CheckBox box, string title, string description, EventHandler changed)
+        {
+            var row = UiStyle.Stack(); row.Margin = new Padding(0, 0, 0, 12);
+            box.Text = title; box.AutoSize = true; box.ForeColor = UiStyle.Ink; box.Font = new Font("Segoe UI", 10, FontStyle.Bold); box.Margin = new Padding(0, 0, 0, 5); box.CheckedChanged += changed; row.Controls.Add(box);
+            var help = UiStyle.Text(description, 9, false); help.Margin = new Padding(24, 0, 0, 0); row.Controls.Add(help); stack.Controls.Add(row);
         }
         TableLayoutPanel PageColumns(Control page)
         {
@@ -208,7 +262,15 @@ namespace FunctionRowRemapper
         }
         void BuildFunctionPage(Control page)
         {
-            var columns = PageColumns(page); var left = Card(); left.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(left, 0, 0);
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); page.Controls.Add(layout);
+            var layerBar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Margin = Padding.Empty };
+            layerBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); layerBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); layerBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var layerLabel = UiStyle.Text("Editing", 9, true); layerLabel.Margin = new Padding(0, 11, 10, 0); layerBar.Controls.Add(layerLabel, 0, 0);
+            UiStyle.Combo(layerView); layerView.Width = 260; layerView.Dock = DockStyle.Left; layerView.SelectedIndexChanged += delegate { SelectLayerView(layerView.SelectedIndex - 1); }; layerBar.Controls.Add(layerView, 1, 0);
+            layerBar.Controls.Add(UiStyle.Button("Manage layers", delegate { ManageLayers(); }), 2, 0); layout.Controls.Add(layerBar, 0, 0);
+            var editorHost = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty }; layout.Controls.Add(editorHost, 0, 1);
+            var columns = PageColumns(editorHost); var left = Card(); left.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(left, 0, 0);
             var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
             rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             rows.Controls.Add(UiStyle.Text("Your function row", 9, true), 0, 0); PrepareList(list, "KEY"); rows.Controls.Add(list, 0, 1); left.Controls.Add(rows);
@@ -220,11 +282,16 @@ namespace FunctionRowRemapper
             UiStyle.Combo(simpleKind); simpleKind.Items.AddRange(FunctionGroups); functionStack.Controls.Add(UiStyle.Field("Action category", simpleKind));
             simpleKind.SelectedIndexChanged += delegate { if (!loading) { loading = true; PopulateChoices(specificKind, simpleKind.SelectedIndex, false, null); loading = false; ApplyFunctionChoice(); } };
             UiStyle.Combo(specificKind); functionStack.Controls.Add(UiStyle.Field("Action", specificKind)); specificKind.SelectedIndexChanged += delegate { ApplyFunctionChoice(); };
-            functionStack.Controls.Add(UiStyle.Button("Browse action library", delegate { PickAction(false); }));
+            var functionTools = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 0, 0, 16) };
+            functionTools.Controls.Add(UiStyle.Button("Browse action library", delegate { PickAction(false); }));
+            functionConditionalButton = UiStyle.Button("Edit condition", delegate { OpenConditionalBuilder(false); }); functionTools.Controls.Add(functionConditionalButton);
+            functionTools.Controls.Add(UiStyle.Button("Action info", delegate { ShowActionInfo(CurrentMappings()[selected]); }));
+            functionTools.Controls.Add(UiStyle.Button("Test action", delegate { TestAction(CurrentMappings()[selected]); })); functionStack.Controls.Add(functionTools);
             BuildMonitorEditor(); functionStack.Controls.Add(monitorPanel);
             browse.Text = "Browse..."; browse.AutoSize = true; browse.Click += BrowseTarget; folder.Text = "Folder..."; folder.AutoSize = true;
             folder.Click += delegate { using (var d = new FolderBrowserDialog()) if (d.ShowDialog(this) == DialogResult.OK) target.Text = d.SelectedPath; };
-            functionTargetField = UiStyle.Field("Key, shortcut or file", PathRow(target, browse, folder)); functionStack.Controls.Add(functionTargetField);
+            functionRecord = UiStyle.Button("Record", delegate { RecordShortcut(target, false); });
+            functionTargetField = UiStyle.Field("Key, shortcut or file", PathRow(target, functionRecord, browse, folder)); functionStack.Controls.Add(functionTargetField);
             UiStyle.Combo(media); media.Items.AddRange(Shortcuts.MediaLabels.Values.ToArray()); // Kept as the internal media-value adapter; the action picker displays it.
             functionArgsField = UiStyle.Field("Arguments (optional)", arguments); functionStack.Controls.Add(functionArgsField);
             workBrowse.Text = "Browse..."; workBrowse.AutoSize = true;
@@ -261,16 +328,20 @@ namespace FunctionRowRemapper
             var right = Card(); columns.Controls.Add(right, 1, 0);
             customEditorHost.Dock = DockStyle.Fill; right.Controls.Add(customEditorHost); customEmpty.Dock = DockStyle.Fill; right.Controls.Add(customEmpty);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill }; customEditorHost.Controls.Add(scroll); customStack = UiStyle.Stack(); scroll.Controls.Add(customStack); scroll.SizeChanged += delegate { UiStyle.Wrap(customStack); };
-            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut (e.g. Ctrl+Alt+K)", customShortcut));
+            customShortcutRecord = UiStyle.Button("Record", delegate { RecordShortcut(customShortcut, true); });
+            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut (e.g. Ctrl+Alt+K)", PathRow(customShortcut, customShortcutRecord)));
             customKind.Items.AddRange(Mapping.Labels); UiStyle.Combo(customSimpleKind); customSimpleKind.Items.AddRange(CustomGroups);
             customStack.Controls.Add(UiStyle.Field("Action category", customSimpleKind));
             customSimpleKind.SelectedIndexChanged += delegate { if (!loading) { loading = true; PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, null); loading = false; ApplyCustomChoice(); } };
             UiStyle.Combo(customSpecificKind); customStack.Controls.Add(UiStyle.Field("Action", customSpecificKind)); customSpecificKind.SelectedIndexChanged += delegate { ApplyCustomChoice(); };
             var tools = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 0, 0, 16) };
             tools.Controls.Add(UiStyle.Button("Browse action library", delegate { PickAction(true); }));
-            tools.Controls.Add(UiStyle.Button("Build sequence", delegate { OpenSequenceBuilder(); })); customStack.Controls.Add(tools);
-            customBrowse = UiStyle.Button("Browse...", BrowseCustomTarget);
-            customTargetField = UiStyle.Field("Key, shortcut or file", PathRow(customTarget, customBrowse)); customStack.Controls.Add(customTargetField);
+            tools.Controls.Add(UiStyle.Button("Build sequence", delegate { OpenSequenceBuilder(); }));
+            customConditionalButton = UiStyle.Button("Edit condition", delegate { OpenConditionalBuilder(true); }); tools.Controls.Add(customConditionalButton);
+            tools.Controls.Add(UiStyle.Button("Action info", delegate { if (customSelected >= 0 && customSelected < draft.CustomHotkeys.Length) ShowActionInfo(draft.CustomHotkeys[customSelected].Action); }));
+            tools.Controls.Add(UiStyle.Button("Test action", delegate { if (customSelected >= 0 && customSelected < draft.CustomHotkeys.Length) TestAction(draft.CustomHotkeys[customSelected].Action); })); customStack.Controls.Add(tools);
+            customBrowse = UiStyle.Button("Browse...", BrowseCustomTarget); customActionRecord = UiStyle.Button("Record", delegate { RecordShortcut(customTarget, false); });
+            customTargetField = UiStyle.Field("Key, shortcut or file", PathRow(customTarget, customActionRecord, customBrowse)); customStack.Controls.Add(customTargetField);
             UiStyle.Combo(customMedia); customMedia.Items.AddRange(Shortcuts.MediaLabels.Values.ToArray());
             customArgsField = UiStyle.Field("Arguments (optional)", customArguments); customWorkField = UiStyle.Field("Working folder (optional)", customWorking);
             customStack.Controls.Add(customArgsField); customStack.Controls.Add(customWorkField);
@@ -296,9 +367,10 @@ namespace FunctionRowRemapper
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
                 var chosen = dialog.SelectedAction; if (chosen == null) return;
                 if (custom && chosen.Kind == ActionKind.Sequence) { OpenSequenceBuilder(); return; }
+                if (chosen.Kind == ActionKind.Conditional) { OpenConditionalBuilder(custom); return; }
                 if (custom) {
                     var h = draft.CustomHotkeys[customSelected]; h.Action = chosen.Copy(); LoadCustomEditor(customSelected); CustomEdited();
-                } else { draft.Mappings[selected] = chosen.Copy(); LoadEditor(selected); Edited(); }
+                } else { CurrentMappings()[selected] = chosen.Copy(); LoadEditor(selected); Edited(); }
             }
         }
     }

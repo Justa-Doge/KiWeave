@@ -15,19 +15,19 @@ namespace FunctionRowRemapper
         {
             this.tag = tag;
             icon.Icon = Program.TrayIcon();
-            icon.Text = "KeyWeave update available";
+            icon.Text = "KiWeave update available";
             icon.BalloonTipClicked += delegate { OpenRelease(); };
             icon.DoubleClick += delegate { OpenRelease(); };
             lifetime.Tick += delegate { Dispose(); };
             icon.Visible = true;
-            icon.ShowBalloonTip(8000, "KeyWeave update available",
+            icon.ShowBalloonTip(8000, "KiWeave update available",
                 tag + " is on GitHub. Click to view it. Nothing was downloaded or installed.", ToolTipIcon.Info);
             lifetime.Start();
         }
 
         void OpenRelease()
         {
-            try { Process.Start(new ProcessStartInfo("https://github.com/Justa-Doge/KeyWeave/tree/" + tag) { UseShellExecute = true }); }
+            try { Process.Start(new ProcessStartInfo("https://github.com/Justa-Doge/KeyWeave/releases/tag/" + tag) { UseShellExecute = true }); }
             catch { /* The notification is informational; failure to open a browser cannot affect hotkeys. */ }
             Dispose();
         }

@@ -26,13 +26,16 @@ namespace FunctionRowRemapper
             if (args.Contains("--interactive")) { using (var f = new MainForm(false, true)) Application.Run(f); return 0; }
             string configBefore = File.ReadAllText(ConfigStore.DefaultPath);
             using (var f = new MainForm(false, true)) {
+                var draft = Field<Configuration>(f, "draft"); draft.Layers = new[] { new ModifierLayer { Name = "Media layer", ActivationKey = "CapsLock" } }; draft.Mappings[8] = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+S" }; Call(f, "RefreshLayerView"); Call(f, "PopulateList");
                 Prepare(f); Call(f, "LoadEditor", 8); Capture(f, "function");
                 Call(f, "SelectPage", 1); Application.DoEvents();
                 Call(f, "LoadCustomEditor", 0); Capture(f, "custom");
                 f.Size = f.MinimumSize; Capture(f, "custom-minimum");
+                Call(f, "SelectPage", 2); Application.DoEvents(); Capture(f, "settings");
+                Call(f, "SelectPage", 1); Application.DoEvents();
                 var customList = Field<ListView>(f, "customList");
                 Console.WriteLine("Custom list width: " + customList.ClientSize.Width + "; columns: " + customList.Columns[0].Width + ", " + customList.Columns[1].Width);
-                var draft = Field<Configuration>(f, "draft"); string original = ConfigStore.Serialize(draft);
+                string original = ConfigStore.Serialize(draft);
                 Call(f, "LoadCustomEditor", 0);
                 if (ConfigStore.Serialize(draft) != original) throw new Exception("Opening the editor altered a mapping.");
                 draft.CustomHotkeys[0].Action = new Mapping { Kind = ActionKind.Python, Target = @"C:\example.py" };
@@ -53,6 +56,23 @@ namespace FunctionRowRemapper
                 f.Scale(new SizeF(1.5f, 1.5f)); Capture(f, "scaled-layout");
                 Call(f, "Save");
             }
+            using (var f = new LayerManagerForm(new[] { new ModifierLayer { Name = "Media layer", ActivationKey = "CapsLock" } })) { Prepare(f); Capture(f, "layers"); f.Size = f.MinimumSize; Capture(f, "layers-minimum"); f.Close(); }
+            var profileDefault = new Configuration(); profileDefault.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };
+            var inheritedProfile = new KeyWeaveProfile { Name = "Gaming", Applications = new[] { "game.exe" }, InheritFrom = "Default", OverrideKeys = new[] { "F2" }, Configuration = profileDefault.Copy() };
+            inheritedProfile.Configuration.Mappings[1] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+            using (var f = new ProfileManagerForm(new ProfileCollection { Profiles = new[] { inheritedProfile } }, inheritedProfile.Configuration, profileDefault)) { Prepare(f); Capture(f, "profiles-inheritance"); f.Size = f.MinimumSize; Capture(f, "profiles-inheritance-minimum"); f.Close(); }
+            using (var f = new PrivacyCenterForm(false, "KiWeave diagnostics\r\nVersion: 1.0.0-beta.1\r\nMaster network access: blocked\r\n")) { Prepare(f); Capture(f, "privacy-center"); f.Size = f.MinimumSize; Capture(f, "privacy-center-minimum"); f.Close(); }
+            using (var f = new LiveKeyTesterForm(null, () => "Default", true)) { Prepare(f); Capture(f, "live-key-tester"); f.Size = f.MinimumSize; Capture(f, "live-key-tester-minimum"); f.Close(); }
+            var conflictConfig = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Win+L", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } }, new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" } } } };
+            var conflictPowerToys = new[] { new PowerToysShortcut { Module = "ColorPicker", Action = "Activation", Chord = "Ctrl+Alt+K", ModuleEnabled = true } };
+            using (var f = new ConflictCenterForm(conflictConfig, new ProfileCollection(), conflictPowerToys)) { Prepare(f); Capture(f, "conflict-center"); f.Size = f.MinimumSize; Capture(f, "conflict-center-minimum"); f.Close(); }
+            using (var f = new ShortcutCaptureForm(true, true)) { Prepare(f); Capture(f, "shortcut-capture"); f.Size = f.MinimumSize; Capture(f, "shortcut-capture-minimum"); f.Close(); }
+            var historical = new Configuration(); historical.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+            var historyBackup = new KeyWeaveBackup { Configuration = historical, Profiles = new ProfileCollection(), Preferences = new UserPreferences(), StartWithWindows = false, CreatedUtc = DateTime.UtcNow.AddMinutes(-12) };
+            var historyEntry = new ConfigurationHistoryEntry { Path = "preview.keyweave", Reason = "Mapping save", CreatedUtc = historyBackup.CreatedUtc, Bytes = 4096, Backup = historyBackup };
+            using (var f = new ConfigurationHistoryForm(new Configuration(), new ProfileCollection(), new UserPreferences(), false, new[] { historyEntry })) { Prepare(f); Capture(f, "history"); f.Size = f.MinimumSize; Capture(f, "history-minimum"); f.Close(); }
+            var imported = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+W", Action = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/hook", Arguments = "{\"ok\":true}" } } } }; imported.Mappings[0] = new Mapping { Kind = ActionKind.Command, Target = @"C:\Tools\sample.cmd", Arguments = "--preview" };
+            using (var f = new ImportReviewForm(imported, "example-import.json")) { Prepare(f); Capture(f, "import-review"); f.Size = f.MinimumSize; Capture(f, "import-review-minimum"); f.Close(); }
             using (var f = new SequenceBuilderForm(new[] {
                 new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" } },
                 new SequenceStep { WaitMilliseconds = 1000 },
@@ -61,6 +81,9 @@ namespace FunctionRowRemapper
                 Prepare(f); Capture(f, "sequence"); f.Size = f.MinimumSize; Capture(f, "sequence-minimum");
                 Call(f, "MoveStep", 1); if (f.Result[1].IsWait) throw new Exception("Sequence move did not preserve the selected action.");
             }
+            var conditionPreview = new ConditionalRule { Condition = ConditionKind.ForegroundApplication, Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }, Otherwise = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+M" } };
+            using (var f = new ConditionalActionForm(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(conditionPreview) })) { Prepare(f); Capture(f, "conditional"); f.Size = f.MinimumSize; Capture(f, "conditional-minimum"); f.Close(); }
+            using (var f = new SafeModeForm()) { Prepare(f); Capture(f, "safe-mode"); f.Size = f.MinimumSize; Capture(f, "safe-mode-minimum"); var safeScroll = Field<DesignScrollPanel>(f, "scroll"); safeScroll.AutoScrollPosition = new Point(0, safeScroll.VerticalScroll.Maximum); Application.DoEvents(); Capture(f, "safe-mode-minimum-scrolled"); f.Close(); }
             using (var f = new ActionPickerForm(true)) {
                 Prepare(f); Field<TextBox>(f, "search").Text = "clipboard"; Capture(f, "search");
                 var list = Field<ListBox>(f, "results");

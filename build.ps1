@@ -15,6 +15,8 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $projectDir 'src') -Filter '*
 $references = @('/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll')
 & $compiler /nologo /target:winexe /platform:x64 /optimize+ /warn:4 "/win32manifest:$projectDir\app.manifest" "/win32icon:$iconPath" "/resource:$iconPath,FunctionRowRemapper.AppIcon" "/out:$binDir\FunctionRowRemapper.exe" $references $sources
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
+Copy-Item -LiteralPath (Join-Path $projectDir 'LICENSE') -Destination (Join-Path $binDir 'LICENSE') -Force
+Copy-Item -LiteralPath (Join-Path $projectDir 'NOTICE') -Destination (Join-Path $binDir 'NOTICE') -Force
 $tests = Join-Path $projectDir 'tests\Tests.cs'
 if (Test-Path -LiteralPath $tests) {
     & $compiler /nologo /target:exe /platform:x64 /optimize+ /warn:4 /main:FunctionRowRemapper.Tests "/resource:$iconPath,FunctionRowRemapper.AppIcon" "/out:$binDir\FunctionRowRemapper.Tests.exe" $references $sources $tests

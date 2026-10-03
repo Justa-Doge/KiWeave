@@ -1,23 +1,27 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
 
 namespace FunctionRowRemapper
 {
     internal static class UpdateChecker
     {
         // Bump this when publishing a matching vX.Y.Z tag for an installed build.
-        internal const string CurrentVersion = "0.1.3";
-        internal const string Repository = "https://github.com/Justa-Doge/KeyWeave.git";
+        internal const string CurrentVersion = "1.0.0-beta.1";
+        internal const string ReleasesApi = "https://api.github.com/repos/Justa-Doge/KeyWeave/releases";
         static readonly Regex TagPattern = new Regex(@"^v(\d{1,5})\.(\d{1,5})\.(\d{1,5})$", RegexOptions.CultureInvariant);
 
         internal static string NewestUpdate(string lsRemoteOutput, string installedVersion)
         {
+            bool installedPrerelease = installedVersion != null && installedVersion.IndexOf('-') >= 0;
             Version installed;
-            if (!Version.TryParse(installedVersion, out installed)) return null;
+            if (!Version.TryParse((installedVersion ?? "").Split('-')[0], out installed)) return null;
             Version newest = installed;
             string newestTag = null;
             foreach (string line in lsRemoteOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
@@ -28,40 +32,51 @@ namespace FunctionRowRemapper
                 if (!match.Success) continue;
                 Version candidate;
                 if (!Version.TryParse(match.Groups[1].Value + "." + match.Groups[2].Value + "." + match.Groups[3].Value, out candidate)) continue;
-                if (candidate > newest) { newest = candidate; newestTag = tag; }
+                if (candidate > newest || (installedPrerelease && candidate == installed)) { newest = candidate; newestTag = tag; installedPrerelease = false; }
             }
             return newestTag;
         }
 
         internal static void CheckInBackground(Action<string> onUpdate)
         {
+            if (!NetworkPolicy.Enabled) return;
             Task.Run(delegate {
                 try {
-                    string newest = NewestUpdate(ReadRemoteTags(), CurrentVersion);
+                    string newest = NewestUpdate(ReadReleaseTags(), CurrentVersion);
                     if (newest != null) onUpdate(newest);
-                } catch { /* Private repo, offline PC, or Git unavailable: leave startup unaffected. */ }
+                } catch { /* Offline PC, unavailable repository, or missing Git: leave startup unaffected. */ }
             });
         }
 
-        static string ReadRemoteTags()
+        internal static string TagsFromReleaseJson(string json)
         {
-            string bundledGit = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "native", "git", "cmd", "git.exe");
-            string git = File.Exists(bundledGit) ? bundledGit : "git";
-            var start = new ProcessStartInfo(git, "-c credential.interactive=never ls-remote --tags --refs " + Repository) {
-                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-            };
-            start.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
-            start.EnvironmentVariables["GCM_INTERACTIVE"] = "never";
-            using (var process = new Process { StartInfo = start }) {
-                var output = new StringBuilder();
-                process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) lock (output) { if (output.Length < 65536) output.AppendLine(e.Data); } };
-                process.ErrorDataReceived += delegate { }; // Do not expose credential-helper output in the UI.
-                process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine();
-                if (!process.WaitForExit(8000)) { try { process.Kill(); } catch { } return ""; }
-                process.WaitForExit();
-                if (process.ExitCode != 0) return "";
-                lock (output) return output.ToString();
+            if (json == null || json.Length > 262144) return "";
+            var releases = new JavaScriptSerializer { MaxJsonLength = 262144, RecursionLimit = 16 }.DeserializeObject(json) as object[]; if (releases == null) return "";
+            var output = new StringBuilder();
+            foreach (object item in releases) {
+                var release = item as Dictionary<string, object>; object tag, draft, prerelease;
+                if (release == null || !release.TryGetValue("tag_name", out tag) || !(tag is string)) continue;
+                if (release.TryGetValue("draft", out draft) && draft is bool && (bool)draft) continue;
+                if (release.TryGetValue("prerelease", out prerelease) && prerelease is bool && (bool)prerelease) continue;
+                output.Append("release refs/tags/").Append((string)tag).AppendLine();
+            }
+            return output.ToString();
+        }
+
+        internal static void CheckNow(Action<string, Exception> completed)
+        {
+            if (!NetworkPolicy.Enabled) { completed(null, new InvalidOperationException("Network access is turned off in KiWeave Settings.")); return; }
+            Task.Run(delegate {
+                try { completed(NewestUpdate(ReadReleaseTags(), CurrentVersion), null); }
+                catch (Exception ex) { completed(null, ex); }
+            });
+        }
+        static string ReadReleaseTags()
+        {
+            var request = (HttpWebRequest)WebRequest.Create(ReleasesApi + "?per_page=30"); request.Method = "GET"; request.UserAgent = "KiWeave/" + CurrentVersion;
+            request.Accept = "application/vnd.github+json"; request.Timeout = 8000; request.ReadWriteTimeout = 8000;
+            using (var response = (HttpWebResponse)request.GetResponse()) using (var stream = response.GetResponseStream()) using (var reader = new StreamReader(stream, Encoding.UTF8)) {
+                string json = reader.ReadToEnd(); return TagsFromReleaseJson(json);
             }
         }
     }

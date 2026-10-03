@@ -13,6 +13,78 @@ namespace FunctionRowRemapper
         public SequenceStep Copy() { return IsWait ? new SequenceStep { WaitMilliseconds = WaitMilliseconds } : new SequenceStep { Action = Action.Copy() }; }
         public string Summary { get { return IsWait ? "Wait " + (WaitMilliseconds / 1000.0).ToString("0.###") + " seconds" : Action.Summary; } }
     }
+    internal sealed class SequenceSafetySummary
+    {
+        internal int Steps, WaitMilliseconds, Launches, NetworkRequests, HardwareOperations;
+        internal string Compact
+        {
+            get { return Steps + " / " + SequenceCodec.MaxSteps + " steps  ·  " + (WaitMilliseconds / 1000d).ToString("0.###") + "s waits  ·  " + Launches + " launches  ·  " + NetworkRequests + " network  ·  " + HardwareOperations + " hardware"; }
+        }
+        internal string Details
+        {
+            get { return "Steps: " + Steps + " / " + SequenceCodec.MaxSteps + "\r\nConfigured wait time: " + (WaitMilliseconds / 1000d).ToString("0.###") + " seconds\r\nLaunches: " + Launches + "\r\nNetwork requests: " + NetworkRequests + "\r\nHardware operations: " + HardwareOperations; }
+        }
+    }
+    internal static class ActionInsights
+    {
+        internal static SequenceSafetySummary Sequence(IEnumerable<SequenceStep> source)
+        {
+            var result = new SequenceSafetySummary();
+            foreach (var step in source ?? Enumerable.Empty<SequenceStep>()) {
+                result.Steps++;
+                if (step == null) continue;
+                if (step.IsWait) { result.WaitMilliseconds += step.WaitMilliseconds; continue; }
+                CountPotentialEffects(result, step.Action);
+            }
+            return result;
+        }
+        static void CountPotentialEffects(SequenceSafetySummary result, Mapping m)
+        {
+            if (m == null) return;
+            if (m.Kind == ActionKind.Conditional) {
+                try { var rule = ConditionalCodec.Parse(m.Target); CountPotentialEffects(result, rule.WhenMatched); CountPotentialEffects(result, rule.Otherwise); } catch { }
+                return;
+            }
+            if (m.Kind == ActionKind.Application || m.Kind == ActionKind.FileOrFolder || m.Kind == ActionKind.WindowsShortcut || m.Kind == ActionKind.Command || m.Kind == ActionKind.Python) result.Launches++;
+            if (m.Kind == ActionKind.HttpRequest) result.NetworkRequests++;
+            if (m.Kind == ActionKind.Monitor) result.HardwareOperations++;
+        }
+        internal static string Maturity(Mapping mapping)
+        {
+            if (mapping == null) return "Stable";
+            if (mapping.Kind == ActionKind.HttpRequest) return "Experimental";
+            if (mapping.Kind == ActionKind.Monitor) return "Hardware-dependent";
+            if (mapping.Kind == ActionKind.Application || mapping.Kind == ActionKind.FileOrFolder || mapping.Kind == ActionKind.WindowsShortcut || mapping.Kind == ActionKind.Command || mapping.Kind == ActionKind.Python) return "App-dependent";
+            if (mapping.Kind == ActionKind.SystemAction) {
+                string target = mapping.Target ?? "";
+                if (target.StartsWith("Obs", StringComparison.Ordinal) || target.StartsWith("Discord", StringComparison.Ordinal) || target.StartsWith("Spotify", StringComparison.Ordinal) || target == "OpenPowerToys") return "App-dependent";
+            }
+            if (mapping.Kind == ActionKind.Sequence) {
+                try {
+                    string[] labels = SequenceCodec.Parse(mapping.Target).Where(x => !x.IsWait).Select(x => Maturity(x.Action)).ToArray();
+                    if (labels.Contains("Experimental")) return "Experimental";
+                    if (labels.Contains("Hardware-dependent")) return "Hardware-dependent";
+                    if (labels.Contains("App-dependent")) return "App-dependent";
+                } catch { return "Experimental"; }
+            }
+            if (mapping.Kind == ActionKind.Conditional) {
+                try {
+                    var rule = ConditionalCodec.Parse(mapping.Target); string[] labels = { Maturity(rule.WhenMatched), Maturity(rule.Otherwise) };
+                    if (labels.Contains("Experimental")) return "Experimental";
+                    if (labels.Contains("Hardware-dependent")) return "Hardware-dependent";
+                    if (labels.Contains("App-dependent")) return "App-dependent";
+                } catch { return "Experimental"; }
+            }
+            return "Stable";
+        }
+        internal static string MaturityExplanation(string maturity)
+        {
+            if (maturity == "Experimental") return "May need extra review or manual testing before relying on it.";
+            if (maturity == "Hardware-dependent") return "Availability and behavior depend on connected hardware and its driver support.";
+            if (maturity == "App-dependent") return "Requires the selected file, application, or integration to remain available.";
+            return "Uses KiWeave's established local action path.";
+        }
+    }
     public static class SequenceCodec
     {
         public const int MaxSteps = 20;

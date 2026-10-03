@@ -15,20 +15,20 @@ namespace FunctionRowRemapper
         readonly MainForm.SpecificChoice[] catalog;
         readonly Button choose;
         internal Mapping SelectedAction { get; private set; }
-        internal static MainForm.SpecificChoice[] Catalog(bool allowSequence)
+        internal static MainForm.SpecificChoice[] Catalog(bool allowSequence, bool allowConditional = true)
         {
             return new[] { 0, 1, 2, 3 }.SelectMany(g => MainForm.ChoicesFor(g, true))
-                .Where(c => c.Label != "Choose an action" && (allowSequence || c.Mapping.Kind != ActionKind.Sequence))
+                .Where(c => c.Label != "Choose an action" && (allowSequence || c.Mapping.Kind != ActionKind.Sequence) && (allowConditional || c.Mapping.Kind != ActionKind.Conditional))
                 .GroupBy(c => c.Label).Select(g => g.First()).OrderBy(c => c.Label).ToArray();
         }
-        public ActionPickerForm(bool allowSequence)
+        public ActionPickerForm(bool allowSequence, bool allowConditional = true)
         {
             Text = "Action library"; Font = new Font("Segoe UI", 10);
             Icon = Program.AppIcon();
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(660, 780); MinimumSize = new Size(560, 650);
             StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false;
             Design.DarkTitlebar(this);
-            catalog = Catalog(allowSequence);
+            catalog = Catalog(allowSequence, allowConditional);
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 6 };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 84)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 90));
@@ -93,7 +93,7 @@ namespace FunctionRowRemapper
             TextRenderer.DrawText(e.Graphics, c.Label, Font, area, selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             using (var small = new Font("Segoe UI", 8.5f)) TextRenderer.DrawText(e.Graphics, c.Category + " · " + ActionType(c.Mapping.Kind), small, new Rectangle(area.X, e.Bounds.Y + 34, area.Width, 18), UiStyle.Muted, TextFormatFlags.EndEllipsis);
         }
-        internal static string ActionGlyph(ActionKind kind) { return kind == ActionKind.Media ? "\uE8D6" : kind == ActionKind.LockThenSleep ? "\uE72E" : kind == ActionKind.Sequence ? "\uE8FD" : kind == ActionKind.Python || kind == ActionKind.Command ? "\uE943" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "\uE765" : "\uE8A7"; }
-        internal static string ActionType(ActionKind kind) { return kind == ActionKind.Media ? "Media and sound" : kind == ActionKind.LockThenSleep ? "Power action" : kind == ActionKind.Sequence ? "Multiple steps" : kind == ActionKind.Python ? "Python script" : kind == ActionKind.Command ? "Command or script" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "Keyboard action" : "Open or launch"; }
+        internal static string ActionGlyph(ActionKind kind) { return kind == ActionKind.Media ? "\uE8D6" : kind == ActionKind.LockThenSleep ? "\uE72E" : kind == ActionKind.Sequence ? "\uE8FD" : kind == ActionKind.Conditional ? "\uE8EF" : kind == ActionKind.Python || kind == ActionKind.Command ? "\uE943" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "\uE765" : "\uE8A7"; }
+        internal static string ActionType(ActionKind kind) { return kind == ActionKind.Media ? "Media and sound" : kind == ActionKind.LockThenSleep ? "Power action" : kind == ActionKind.Sequence ? "Multiple steps" : kind == ActionKind.Conditional ? "Conditional action" : kind == ActionKind.Python ? "Python script" : kind == ActionKind.Command ? "Command or script" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "Keyboard action" : "Open or launch"; }
     }
 }

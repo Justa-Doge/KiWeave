@@ -16,9 +16,26 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="app.ico"><LogicalName>FunctionRowRemapper.AppIcon</LogicalName></EmbeddedResource>
-    <Compile Include="src\UpdateExit.cs" />
+    <Compile Include="src\AssemblyInfo.cs" />
     <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" />
     <Compile Include="src\PowerToysIntegration.cs" /><Compile Include="src\PowerToysPanel.cs" />
+    <Compile Include="src\Profiles.cs" /><Compile Include="src\ProfileManagerForm.cs" /><Compile Include="src\DiagnosticsForm.cs" />
+    <Compile Include="src\ProfileStatusForm.cs" />
+    <Compile Include="src\ConditionalActions.cs" />
+    <Compile Include="src\ConditionalActionForm.cs" />
+    <Compile Include="src\SafeModeForm.cs" />
+    <Compile Include="src\LayerManagerForm.cs" />
+    <Compile Include="src\ConflictCenterForm.cs" />
+    <Compile Include="src\ShortcutCaptureForm.cs" />
+    <Compile Include="src\ConfigurationHistory.cs" />
+    <Compile Include="src\LiveKeyTesterForm.cs" />
+    <Compile Include="src\PrivacyCenterForm.cs" />
+    <Compile Include="src\ImportReviewForm.cs" />
+    <Compile Include="src\SystemActions.cs" />
+    <Compile Include="src\BackupBundle.cs" />
+    <Compile Include="src\AboutForm.cs" />
+    <Compile Include="src\WelcomeForm.cs" />
+    <Compile Include="src\AppLog.cs" />
     <Compile Include="src\MainForm.Layout.cs" /><Compile Include="src\ActionPickerForm.cs" /><Compile Include="src\DesignControls.cs" /><Compile Include="src\ExpandedActions.cs" />
     <Reference Include="System" /><Reference Include="System.Core" /><Reference Include="System.Drawing" /><Reference Include="System.Windows.Forms" /><Reference Include="System.Web.Extensions" />
     <Compile Include="src\Configuration.cs" /><Compile Include="src\Ddc.cs" /><Compile Include="src\Engine.cs" /><Compile Include="src\Hotkeys.cs" /><Compile Include="src\JsonSyntax.cs" /><Compile Include="src\MainForm.cs" /><Compile Include="src\Program.cs" /><Compile Include="src\Sequence.cs" /><Compile Include="src\SequenceBuilderForm.cs" /><Compile Include="src\UserPreferences.cs" />

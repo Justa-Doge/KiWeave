@@ -10,33 +10,62 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    // No full keyboard history is retained. State consists only of twelve current F-key presses.
+    // No full keyboard history is retained. State consists only of twelve current F-key presses
+    // and the currently held layer key.
     public sealed class KeyDecision
     {
         public bool Suppress;
         public Mapping Action;
+        public string LayerName = "Base";
+        public string ResolvedAction = "Not handled by KiWeave";
+    }
+    public sealed class KeyDiagnostic
+    {
+        public int VirtualKey;
+        public string KeyName = "", Modifiers = "None", Source = "Physical", LayerName = "Base", ResolvedAction = "Not handled by KiWeave", ProfileName = "Default";
+        public bool Suppressed;
     }
     public sealed class KeyStateMachine
     {
         sealed class Press { public bool Suppress; public Mapping Mapping; public bool Cancelled; }
         readonly Press[] pressed = new Press[12];
+        int activeLayerKey;
+        bool suppressLayerRelease;
         public KeyDecision Process(int vk, bool down, bool injected, Configuration config)
         {
             var d = new KeyDecision();
-            if (injected || vk < 0x70 || vk > 0x7B) return d;
+            if (injected) return d;
+            ModifierLayer layerForKey = config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == vk);
+            if (layerForKey != null || (activeLayerKey == vk && suppressLayerRelease)) {
+                if (down) {
+                    if (layerForKey != null) { d.LayerName = layerForKey.Name; d.ResolvedAction = config.Enabled ? "Activate layer " + layerForKey.Name : "Shortcuts are paused"; }
+                    if (layerForKey != null && config.Enabled && (activeLayerKey == 0 || activeLayerKey == vk)) { activeLayerKey = vk; suppressLayerRelease = true; d.Suppress = true; }
+                } else if (activeLayerKey == vk) {
+                    d.Suppress = suppressLayerRelease; activeLayerKey = 0; suppressLayerRelease = false;
+                }
+                return d;
+            }
+            if (vk < 0x70 || vk > 0x7B) return d;
             int i = vk - 0x70; Press p = pressed[i];
             if (!down) {
                 if (p != null) { d.Suppress = p.Suppress; pressed[i] = null; }
                 return d;
             }
             if (p == null) {
-                Mapping m = config.Mappings[i];
+                ModifierLayer activeLayer = activeLayerKey == 0 || config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == activeLayerKey);
+                Mapping m = activeLayer == null ? config.Mappings[i] : activeLayer.Mappings[i];
+                d.LayerName = activeLayer == null ? "Base" : activeLayer.Name; d.ResolvedAction = config.Enabled ? m.Summary : "Shortcuts are paused";
                 p = new Press { Suppress = config.Enabled && m.Kind != ActionKind.PassThrough, Mapping = m.Copy() };
                 pressed[i] = p;
                 if (p.Suppress && m.Kind != ActionKind.Unbound) d.Action = p.Mapping;
             }
             else if (p.Suppress && config.Enabled && !p.Cancelled && p.Mapping.Repeats) d.Action = p.Mapping;
             d.Suppress = p.Suppress; return d;
+        }
+        public string ActiveLayerName(Configuration config)
+        {
+            ModifierLayer active = activeLayerKey == 0 || config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == activeLayerKey);
+            return active == null ? "Base" : active.Name;
         }
         public void CancelHeldActions() { foreach (Press p in pressed) if (p != null) p.Cancelled = true; }
     }
@@ -54,10 +83,19 @@ namespace FunctionRowRemapper
     }
 
     public interface IActionSink { void Send(int[] keys); void Launch(ProcessStartInfo info); }
-    public sealed class WindowsActionSink : IActionSink
+    internal interface IProfileActionSink { void ActivateProfile(string name); }
+    public sealed class WindowsActionSink : IActionSink, IProfileActionSink
     {
+        readonly Action<string> profileActivation;
+        public WindowsActionSink() { }
+        internal WindowsActionSink(Action<string> profileActivation) { this.profileActivation = profileActivation; }
         public void Send(int[] keys) { Native.SendChord(keys); }
         public void Launch(ProcessStartInfo info) { using (Process p = Process.Start(info)) { } }
+        void IProfileActionSink.ActivateProfile(string name)
+        {
+            if (profileActivation == null) throw new InvalidOperationException("Profile switching is unavailable in this KiWeave session.");
+            profileActivation(name);
+        }
     }
     public sealed class ActionDispatcher
     {
@@ -70,6 +108,11 @@ namespace FunctionRowRemapper
         {
             ConfigStore.Validate(m, true);
             if (m.Kind == ActionKind.Monitor) { monitors.Apply(m, stillActive); return; }
+            if (m.Kind == ActionKind.Conditional) {
+                var rule = ConditionalCodec.Parse(m.Target); Execute(ConditionalActions.Matches(rule) ? rule.WhenMatched : rule.Otherwise, stillActive); return;
+            }
+            if (m.Kind == ActionKind.SystemAction) { SystemActions.Execute(m.Target, sink); return; }
+            if (m.Kind == ActionKind.HttpRequest) { SystemActions.HttpRequest(m); return; }
             if (m.Kind == ActionKind.PassThrough || m.Kind == ActionKind.Unbound) return;
             if (m.Kind == ActionKind.LockThenSleep) { if (Native.LockWorkStation()) { Thread.Sleep(750); Native.SetSuspendState(false, false, false); } return; }
             if (m.Kind == ActionKind.Sequence) { foreach (var step in SequenceCodec.Parse(m.Target)) { if (!stillActive()) return; if (step.IsWait) Thread.Sleep(step.WaitMilliseconds); else Execute(step.Action, stillActive); } return; }
@@ -116,9 +159,11 @@ namespace FunctionRowRemapper
         volatile bool stopping, installed; int generation;
         public event Action EmergencyDisabled;
         public event Action<string> Error;
+        public event Action<KeyDiagnostic> KeyObserved;
         public bool Installed { get { return installed; } }
         public bool Enabled { get { return Volatile.Read(ref config).Enabled; } }
         public KeyboardEngine() : this(new WindowsActionSink(), false) { }
+        internal KeyboardEngine(Action<string> profileActivation) : this(new WindowsActionSink(profileActivation), false) { }
         // Test-only injection seam. The shipping application never enables it.
         internal KeyboardEngine(IActionSink sink, bool testInjected)
         {
@@ -186,7 +231,14 @@ namespace FunctionRowRemapper
                 bool ignore = k.ExtraInfo == Native.Tag || (injected && (!testInjected || k.ExtraInfo != Native.TestTag));
                 bool down = msg == 0x100 || msg == 0x104;
 
-                KeyDecision d = machine.Process((int)k.Vk, msg == 0x100 || msg == 0x104, ignore, Volatile.Read(ref config));
+                Configuration snapshot = Volatile.Read(ref config);
+                KeyDecision d = machine.Process((int)k.Vk, down, ignore, snapshot);
+                var observed = KeyObserved;
+                if (observed != null && down) {
+                    string modifiers = String.Join("+", new[] { Native.IsDown(0x11) ? "Ctrl" : "", Native.IsDown(0x12) ? "Alt" : "", Native.IsDown(0x10) ? "Shift" : "", (Native.IsDown(0x5B) || Native.IsDown(0x5C)) ? "Win" : "" }.Where(x => x.Length > 0));
+                    var diagnostic = new KeyDiagnostic { VirtualKey = (int)k.Vk, KeyName = KeyLabel((int)k.Vk), Modifiers = modifiers.Length == 0 ? "None" : modifiers, Source = ignore ? "Injected (ignored)" : injected ? "Injected test input" : "Physical", Suppressed = d.Suppress, LayerName = d.LayerName == "Base" ? machine.ActiveLayerName(snapshot) : d.LayerName, ResolvedAction = ignore ? "Ignored injected input" : d.ResolvedAction };
+                    ThreadPool.QueueUserWorkItem(delegate { try { observed(diagnostic); } catch { } });
+                }
                 if (d.Action != null) (d.Action.Kind == ActionKind.Monitor ? monitorQueue : queue).TryAdd(new Job { Mapping = d.Action, Generation = Volatile.Read(ref generation) });
                 if (d.Suppress) return new IntPtr(1);
             }
@@ -194,6 +246,11 @@ namespace FunctionRowRemapper
                 Interlocked.Increment(ref generation); var c = Volatile.Read(ref config).Copy(); c.Enabled = false; Volatile.Write(ref config, c);
             }
             return Native.CallNextHookEx(hook, code, wParam, lParam);
+        }
+        static string KeyLabel(int vk)
+        {
+            if (vk >= 0x70 && vk <= 0x87) return "F" + (vk - 0x6F);
+            string name = ((Keys)vk).ToString(); return String.IsNullOrWhiteSpace(name) || Char.IsDigit(name[0]) ? "VK 0x" + vk.ToString("X2") : name;
         }
         public void Dispose()
         {
@@ -222,9 +279,25 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll", SetLastError = true)] internal static extern bool LockWorkStation();
         [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr handle, int id, uint modifiers, uint key);
         [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterHotKey(IntPtr handle, int id);
+        [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] internal struct MonitorInfo { public int Size; public Rect Monitor, Work; public uint Flags; }
+        [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
+        [DllImport("user32.dll")] internal static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+        [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] internal static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
         [DllImport("powrprof.dll", SetLastError = true)] internal static extern bool SetSuspendState(bool hibernate, bool forceCritical, bool disableWakeEvent);
         [DllImport("user32.dll", SetLastError = true)] internal static extern uint SendInput(uint count, Input[] inputs, int size);
         internal static bool IsDown(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
+        internal static string ForegroundProcessName()
+        {
+            try {
+                uint id; GetWindowThreadProcessId(GetForegroundWindow(), out id); if (id == 0) return "";
+                using (var process = Process.GetProcessById((int)id)) return process.ProcessName;
+            } catch { return ""; }
+        }
         internal static Input Key(int vk, bool up, UIntPtr tag)
         {
             bool extended = (vk >= 0x21 && vk <= 0x2E && vk != 0x2A && vk != 0x2B) || vk == 0x5B || vk == 0x5C || vk == 0x6F || (vk >= 0xA6 && vk <= 0xB7);

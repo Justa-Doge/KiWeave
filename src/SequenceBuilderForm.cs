@@ -46,7 +46,7 @@ namespace FunctionRowRemapper
             Design.DarkNative(list);
             var tools = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
             tools.Controls.Add(UiStyle.Button("Up", delegate { MoveStep(-1); })); tools.Controls.Add(UiStyle.Button("Down", delegate { MoveStep(1); }));
-            tools.Controls.Add(UiStyle.Button("Edit", delegate { EditStep(); })); tools.Controls.Add(UiStyle.Button("Remove", delegate { if (list.SelectedIndex >= 0) { int i = list.SelectedIndex; steps.RemoveAt(i); RefreshList(i); } }));
+            tools.Controls.Add(UiStyle.Button("Edit", delegate { EditStep(); })); tools.Controls.Add(UiStyle.Button("Duplicate", delegate { DuplicateStep(); })); tools.Controls.Add(UiStyle.Button("Remove", delegate { if (list.SelectedIndex >= 0) { int i = list.SelectedIndex; steps.RemoveAt(i); RefreshList(i); } }));
             foreach (Button b in tools.Controls) { b.MinimumSize = new Size(55, 34); b.Padding = new Padding(7, 4, 7, 4); b.Margin = new Padding(0, 0, 6, 0); }
             chain.Controls.Add(tools, 0, 2); chain.Controls.Add(UiStyle.Text("Add a pause", 9, true), 0, 3);
             var waitRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
@@ -93,7 +93,13 @@ namespace FunctionRowRemapper
         {
             list.BeginUpdate(); list.Items.Clear(); foreach (var s in steps) list.Items.Add(s); list.EndUpdate();
             if (steps.Count > 0) list.SelectedIndex = Math.Min(Math.Max(0, selected), steps.Count - 1);
-            summary.ForeColor = UiStyle.Muted; summary.Text = steps.Count == 0 ? "Add an action to start your routine." : steps.Count + " / " + SequenceCodec.MaxSteps + " steps  ·  " + (steps.Where(s => s.IsWait).Sum(s => s.WaitMilliseconds) / 1000.0).ToString("0.###") + "s of pauses";
+            summary.ForeColor = UiStyle.Muted; summary.Text = steps.Count == 0 ? "Add an action to start your routine." : ActionInsights.Sequence(steps).Compact;
+        }
+        void DuplicateStep()
+        {
+            int i = list.SelectedIndex; if (i < 0) return;
+            if (steps.Count >= SequenceCodec.MaxSteps) { summary.ForeColor = Color.FromArgb(255, 151, 153); summary.Text = "A sequence supports up to " + SequenceCodec.MaxSteps + " steps."; return; }
+            steps.Insert(i + 1, steps[i].Copy()); RefreshList(i + 1);
         }
         void MoveStep(int amount)
         {
