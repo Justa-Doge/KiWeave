@@ -57,8 +57,8 @@ namespace FunctionRowRemapper
         readonly TableLayoutPanel monitorPanel = new TableLayoutPanel();
         DdcMonitor[] detected = new DdcMonitor[0];
         bool scanning;
-        readonly TextBox target = new TextBox(), arguments = new TextBox(), working = new TextBox();
-        readonly TextBox customShortcut = new TextBox(), customTarget = new TextBox(), customArguments = new TextBox(), customWorking = new TextBox();
+        readonly TextBox target = new DesignTextBox(), arguments = new DesignTextBox(), working = new DesignTextBox();
+        readonly TextBox customShortcut = new DesignTextBox(), customTarget = new DesignTextBox(), customArguments = new DesignTextBox(), customWorking = new DesignTextBox();
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;

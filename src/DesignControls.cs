@@ -9,6 +9,7 @@ namespace FunctionRowRemapper
     internal sealed class DesignListView : ListView
     {
         internal DesignListView() { DoubleBuffered = true; }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
     }
 
     internal static class Design
@@ -172,12 +173,24 @@ namespace FunctionRowRemapper
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(12, 0, Math.Max(1, Width - 45), Height), Enabled ? ForeColor : UiStyle.Muted, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             using (var p = new Pen(UiStyle.Muted, 1.6f)) e.Graphics.DrawLines(p, new[] { new Point(Width - 25, Height / 2 - 2), new Point(Width - 20, Height / 2 + 3), new Point(Width - 15, Height / 2 - 2) });
         }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
             bool selected = (e.State & DrawItemState.Selected) != 0;
             using (var brush = new SolidBrush(selected ? UiStyle.Soft : UiStyle.Input)) e.Graphics.FillRectangle(brush, e.Bounds);
             if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, new Rectangle(e.Bounds.X + 12, e.Bounds.Y, e.Bounds.Width - 24, e.Bounds.Height), selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
+    }
+
+    // Native text/list controls keep their accessibility and keyboard behavior,
+    // while opting into the same dark scrollbar theme as the rest of KiWeave.
+    internal sealed class DesignTextBox : TextBox
+    {
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
+    }
+    internal sealed class DesignListBox : ListBox
+    {
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
     }
     internal sealed class InputFrame : Panel
     {

@@ -1,6 +1,6 @@
 # KiWeave
 
-Current development build: **1.0.0-beta.3**. This is a beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
+Current development build: **1.0.0-beta.3.5**. This is a small beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
 
 A Windows tray app for turning F1 through F12 and custom global hotkeys into personal actions, profiles, app integrations, and automations. Remapping works offline; an optional background check looks for newer versions on GitHub.
 
@@ -48,7 +48,7 @@ Profiles can also be selected manually from the tray menu. The header badge and 
 
 ## Windows and app integrations
 
-The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 3 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
+The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 3.5 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
 
 **Call an HTTP endpoint** performs an eight-second GET when its body is empty or a JSON POST when a body is supplied. It is intended for local dashboards, webhooks, and Stream Deck-style tools. The URL cannot contain embedded credentials. HTTP actions contact the configured server only when their assigned key is pressed and the master network switch is on; KiWeave does not send them automatically.
 

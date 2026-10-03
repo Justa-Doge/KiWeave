@@ -7,8 +7,8 @@ namespace FunctionRowRemapper
 {
     internal sealed class LayerManagerForm : Form
     {
-        readonly ListBox list = new ListBox();
-        readonly TextBox name = new TextBox();
+        readonly ListBox list = new DesignListBox();
+        readonly TextBox name = new DesignTextBox();
         readonly ComboBox key = new DesignComboBox();
         readonly Label feedback = UiStyle.Text("", 9, false);
         ModifierLayer[] layers;

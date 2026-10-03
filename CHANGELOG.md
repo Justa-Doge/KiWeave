@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-beta.3.5
+
+- Applied the dark native theme consistently to list, text, combo, and scrollable controls so scrollbars match KiWeave's dark panels.
+- Kept the private KiWeave-only state checker out of the release source.
+
 ## 1.0.0-beta.3 (local development)
 
 - Discord authorization can persist across KiWeave launches through an encrypted Windows-account refresh token. Access tokens remain memory-only; Disconnect/Forget authorization removes the local token.

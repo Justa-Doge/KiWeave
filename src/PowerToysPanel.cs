@@ -10,7 +10,7 @@ namespace FunctionRowRemapper
     {
         readonly ListView activeList = new DesignListView();
         readonly ComboBox modules = new DesignComboBox(), actions = new DesignComboBox();
-        readonly TextBox chord = new TextBox();
+        readonly TextBox chord = new DesignTextBox();
         readonly CheckBox enableModule = new CheckBox();
         readonly Label title = UiStyle.Text("Select an active shortcut", 19, true);
         readonly Label summary = UiStyle.Text("Choose one from the list to edit it.", 9, false);

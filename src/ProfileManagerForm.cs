@@ -9,8 +9,8 @@ namespace FunctionRowRemapper
     {
         readonly ProfileCollection profiles;
         readonly Configuration current, defaultConfiguration;
-        readonly ListBox list = new ListBox();
-        readonly TextBox name = new TextBox(), applications = new TextBox();
+        readonly ListBox list = new DesignListBox();
+        readonly TextBox name = new DesignTextBox(), applications = new DesignTextBox();
         readonly DesignComboBox inheritance = new DesignComboBox();
         readonly Label feedback = new Label();
         public KeyWeaveProfile SelectedProfile { get; private set; }

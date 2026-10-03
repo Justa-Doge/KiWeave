@@ -70,7 +70,7 @@ namespace FunctionRowRemapper
         readonly Configuration defaultConfiguration;
         readonly ProfileCollection profiles;
         readonly IEnumerable<PowerToysShortcut> suppliedPowerToys;
-        readonly ListBox list = new ListBox();
+        readonly ListBox list = new DesignListBox();
         readonly Label summary = new DesignLabel(), title = new DesignLabel(), detail = new DesignLabel(), winner = new DesignLabel();
         readonly Button open;
         public ConflictIssue SelectedIssue { get { return list.SelectedItem as ConflictIssue; } }

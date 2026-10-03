@@ -88,7 +88,7 @@ namespace FunctionRowRemapper
 
     internal sealed class ConfigurationHistoryForm : Form
     {
-        readonly ListBox list = new ListBox(); readonly Label title = new DesignLabel(), meta = new DesignLabel(), comparison = new DesignLabel(); readonly Button restore;
+        readonly ListBox list = new DesignListBox(); readonly Label title = new DesignLabel(), meta = new DesignLabel(), comparison = new DesignLabel(); readonly Button restore;
         readonly Configuration current; readonly ProfileCollection profiles; readonly UserPreferences preferences; readonly bool startup;
         internal ConfigurationHistoryEntry SelectedEntry { get { return list.SelectedItem as ConfigurationHistoryEntry; } }
         internal ConfigurationHistoryForm(Configuration configuration, ProfileCollection profileCollection, UserPreferences userPreferences, bool startWithWindows) : this(configuration, profileCollection, userPreferences, startWithWindows, null) { }

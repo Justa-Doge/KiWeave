@@ -8,7 +8,7 @@ namespace FunctionRowRemapper
     internal sealed class ConditionalActionForm : Form
     {
         readonly ComboBox condition = new DesignComboBox();
-        readonly TextBox application = new TextBox();
+        readonly TextBox application = new DesignTextBox();
         readonly Label matched = UiStyle.Text("Do nothing", 10, false), fallback = UiStyle.Text("Do nothing", 10, false);
         Mapping whenMatched = new Mapping { Kind = ActionKind.Unbound }, otherwise = new Mapping { Kind = ActionKind.Unbound };
         internal Mapping Result { get; private set; }

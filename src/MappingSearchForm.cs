@@ -77,8 +77,8 @@ namespace FunctionRowRemapper
     internal sealed class MappingSearchForm : Form
     {
         readonly List<MappingSearchResult> all;
-        readonly TextBox search = new TextBox();
-        readonly ListBox results = new ListBox();
+        readonly TextBox search = new DesignTextBox();
+        readonly ListBox results = new DesignListBox();
         readonly Label action = UiStyle.Text("", 10, false), count = UiStyle.Text("", 9, false);
         internal MappingSearchResult SelectedResult { get { return results.SelectedItem as MappingSearchResult; } }
 

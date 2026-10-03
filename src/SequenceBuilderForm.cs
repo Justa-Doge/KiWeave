@@ -9,8 +9,8 @@ namespace FunctionRowRemapper
     internal sealed class SequenceBuilderForm : Form
     {
         readonly List<SequenceStep> steps;
-        readonly ListBox list = new ListBox(), actions = new ListBox();
-        readonly TextBox search = new TextBox();
+        readonly ListBox list = new DesignListBox(), actions = new DesignListBox();
+        readonly TextBox search = new DesignTextBox();
         readonly Label summary = UiStyle.Text("", 10, false);
         readonly NumericUpDown wait = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, Value = 1, Increment = 0.25M, DecimalPlaces = 3, Width = 90 };
         readonly MainForm.SpecificChoice[] catalog = ActionPickerForm.Catalog(false);
@@ -141,9 +141,9 @@ namespace FunctionRowRemapper
             ClientSize = new Size(540, 560); MinimumSize = new Size(500, 500); AutoScroll = true; StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false; Design.DarkTitlebar(this);
             var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root);
             root.Controls.Add(UiStyle.Text(Text, 20, true));
-            var target = new TextBox { Text = mapping == null ? "" : mapping.Target };
-            var args = new TextBox { Text = mapping == null ? "" : mapping.Arguments };
-            var work = new TextBox { Text = mapping == null ? "" : mapping.WorkingDirectory };
+            var target = new DesignTextBox { Text = mapping == null ? "" : mapping.Target };
+            var args = new DesignTextBox { Text = mapping == null ? "" : mapping.Arguments };
+            var work = new DesignTextBox { Text = mapping == null ? "" : mapping.WorkingDirectory };
             var delay = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, DecimalPlaces = 3, Value = Math.Max(0.001M, milliseconds / 1000M) };
             if (mapping == null) root.Controls.Add(UiStyle.Field("Seconds", delay));
             else {

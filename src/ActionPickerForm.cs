@@ -8,9 +8,9 @@ namespace FunctionRowRemapper
 {
     internal sealed class ActionPickerForm : Form
     {
-        readonly TextBox search = new TextBox();
+        readonly TextBox search = new DesignTextBox();
         readonly ComboBox category = new DesignComboBox();
-        readonly ListBox results = new ListBox();
+        readonly ListBox results = new DesignListBox();
         readonly Label count = UiStyle.Text("", 9, false);
         readonly MainForm.SpecificChoice[] catalog;
         readonly Button choose;
