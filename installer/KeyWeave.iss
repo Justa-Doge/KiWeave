@@ -1,5 +1,5 @@
 #define MyAppName "KiWeave"
-#define MyAppVersion "1.0.0-beta.2.5"
+#define MyAppVersion "1.0.0-beta.3"
 #define MyAppPublisher "Justa-Doge"
 #define MyAppURL "https://github.com/Justa-Doge/KeyWeave"
 #define MyAppExeName "KiWeave.exe"
@@ -31,6 +31,8 @@ RestartApplications=no
 
 [Files]
 Source: "..\bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\bin\UninstallKiWeave.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\uninstall.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion

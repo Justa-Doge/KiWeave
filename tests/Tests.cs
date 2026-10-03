@@ -581,8 +581,15 @@ namespace FunctionRowRemapper
                 dispatcher.Execute(new Mapping { Kind = ActionKind.SystemAction, Target = "DiscordMute" });
                 Assert(sink.Keys.Count == 2 && sink.Keys[0].Last() == (int)Keys.MediaPlayPause && sink.Keys[1].Last() == (int)Keys.M, "integration shortcut routing");
             });
-            Test("Release version metadata is 1.0.0 beta 2.5", delegate {
-                Assert(UpdateChecker.CurrentVersion == "1.0.0-beta.2.5" && typeof(Program).Assembly.GetName().Version.ToString() == "1.0.0.0", "version mismatch");
+            Test("Configuration health scan is local and read-only", delegate {
+                var clean = ConfigurationHealth.Scan(new Configuration(), new ProfileCollection(), new DdcMonitor[0]);
+                Assert(!clean.HasWarnings, "safe defaults should be healthy");
+                var broken = new Configuration(); broken.Mappings[0] = new Mapping { Kind = ActionKind.Application, Target = Path.Combine(Path.GetTempPath(), "KiWeave-health-missing-" + Guid.NewGuid().ToString("N") + ".exe") };
+                var report = ConfigurationHealth.Scan(broken, new ProfileCollection(), new DdcMonitor[0]);
+                Assert(report.HasWarnings && report.Findings.Any(f => f.Title == "Missing target"), "missing target was not reported");
+            });
+            Test("Release version metadata is 1.0.0 beta 3", delegate {
+                Assert(UpdateChecker.CurrentVersion == "1.0.0-beta.3" && typeof(Program).Assembly.GetName().Version.ToString() == "1.0.0.0", "version mismatch");
             });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }

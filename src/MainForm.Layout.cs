@@ -65,7 +65,7 @@ namespace FunctionRowRemapper
         readonly Panel functionPage = new Panel(), customPage = new Panel(), settingsPage = new Panel(), customHotkeyView = new Panel(), powerToysView = new Panel();
         DesignButton hotkeysTab, powerToysTab;
         readonly Label pageTitle = UiStyle.Text("Function keys", 26, true), pageSubtitle = UiStyle.Text("", 10, false);
-        DesignButton functionNav, customNav, settingsNav;
+        DesignButton functionNav, customNav, extensionNav, integrationNav, settingsNav;
         readonly DesignButton profileBadge = new DesignButton();
         readonly Label customTitle = UiStyle.Text("Edit shortcut", 19, true);
         readonly ComboBox layerView = new DesignComboBox();
@@ -75,7 +75,7 @@ namespace FunctionRowRemapper
         Control functionTargetField, functionArgsField, functionWorkField, customTargetField, customArgsField, customWorkField;
         Control sequenceField;
         Button removeCustomButton, functionRecord, customShortcutRecord, customActionRecord, functionConditionalButton, customConditionalButton;
-        Button moreButton, saveChangesButton;
+        Button moreButton, saveChangesButton, readOnlyButton;
         TableLayoutPanel functionStack, customStack;
 
         void BuildUi()
@@ -100,12 +100,14 @@ namespace FunctionRowRemapper
             functionNav = Nav("Function keys", "\uE765", delegate { SelectPage(0); });
             customNav = Nav("Custom hotkeys", "\uE70F", delegate { SelectPage(1); });
             sideTop.Controls.Add(functionNav); sideTop.Controls.Add(customNav);
-            var sidebarBottom = new Panel { Dock = DockStyle.Bottom, Height = 178, Margin = Padding.Empty };
+            var sidebarBottom = new Panel { Dock = DockStyle.Bottom, Height = 268, Margin = Padding.Empty };
             var safety = UiStyle.Stack(); safety.Dock = DockStyle.Fill; safety.Padding = new Padding(8, 0, 8, 4);
             var safeTitle = UiStyle.Text("Always in control", 10, true); safeTitle.ForeColor = Color.FromArgb(214, 210, 237); safety.Controls.Add(safeTitle);
             var safeText = UiStyle.Text("Hold Ctrl + Alt + Shift\nfor 1.5s to pause shortcuts.", 9, false); safeText.ForeColor = Color.FromArgb(156, 155, 180); safety.Controls.Add(safeText); sidebar.Controls.Add(safety);
+            extensionNav = Nav("Extensions", "\uE71C", delegate { OpenFirstPartyExtensions(); }); extensionNav.Dock = DockStyle.Bottom;
+            integrationNav = Nav("Integration health", "\uE8B5", delegate { OpenIntegrationHealth(); }); integrationNav.Dock = DockStyle.Bottom;
             settingsNav = Nav("Settings", "\uE713", delegate { SelectPage(2); }); settingsNav.Dock = DockStyle.Bottom;
-            sidebarBottom.Controls.Add(safety); sidebarBottom.Controls.Add(settingsNav); sidebar.Controls.Add(sidebarBottom);
+            sidebarBottom.Controls.Add(safety); sidebarBottom.Controls.Add(extensionNav); sidebarBottom.Controls.Add(integrationNav); sidebarBottom.Controls.Add(settingsNav); sidebar.Controls.Add(sidebarBottom);
 
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 28, 26, 20), ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -164,7 +166,8 @@ namespace FunctionRowRemapper
         {
             var columns = PageColumns(page);
             var general = Card(); general.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(general, 0, 0);
-            var left = UiStyle.Stack(); general.Controls.Add(left);
+            var generalScroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; general.Controls.Add(generalScroll);
+            var left = UiStyle.Stack(); generalScroll.Controls.Add(left);
             left.Controls.Add(UiStyle.Text("General", 15, true));
             var intro = UiStyle.Text("Background behavior saves as soon as you change it.", 9, false); intro.Margin = new Padding(0, 0, 0, 22); left.Controls.Add(intro);
             AddSetting(left, startup, "Start with Windows", "Launch KiWeave quietly when you sign in.", ToggleStartup);
@@ -174,7 +177,8 @@ namespace FunctionRowRemapper
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
 
             var tools = Card(); columns.Controls.Add(tools, 1, 0);
-            var right = UiStyle.Stack(); tools.Controls.Add(right);
+            var toolsScroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; tools.Controls.Add(toolsScroll);
+            var right = UiStyle.Stack(); toolsScroll.Controls.Add(right);
             right.Controls.Add(UiStyle.Text("Tools and data", 15, true));
             var toolsHelp = UiStyle.Text("Back up your setup, troubleshoot problems, or revisit the basics.", 9, false); toolsHelp.Margin = new Padding(0, 0, 0, 18); right.Controls.Add(toolsHelp);
             var primary = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
@@ -195,6 +199,29 @@ namespace FunctionRowRemapper
             folders.Controls.Add(UiStyle.Button("Open log folder", delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } })); right.Controls.Add(folders);
             right.Controls.Add(UiStyle.Button("Discord connection", delegate { using (var dialog = new DiscordConnectionForm(this)) dialog.ShowDialog(this); }));
             right.Controls.Add(UiStyle.Button("About KiWeave", delegate { using (var about = new AboutForm()) about.ShowDialog(this); }));
+
+            readOnlyButton = UiStyle.Button("Lock editing", delegate { ToggleReadOnlyMode(); }); right.Controls.Add(readOnlyButton);
+
+            if (Program.IsElevated()) {
+                var admin = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 16, 0, 0), Padding = new Padding(18) };
+                var adminStack = UiStyle.Stack(); admin.Controls.Add(adminStack);
+                adminStack.Controls.Add(UiStyle.Text("Administrator controls", 15, true));
+                var adminState = UiStyle.Text("Administrator session active", 10, true); adminState.ForeColor = Color.FromArgb(255, 191, 112); adminStack.Controls.Add(adminState);
+                adminStack.Controls.Add(UiStyle.Text("These consoles are available only while KiWeave itself is elevated. Opening one does not change anything automatically. Scripts, Python, commands, webhooks, and arbitrary custom actions remain blocked from elevation.", 9, false));
+                var adminButtons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 10, 0, 0) };
+                adminButtons.Controls.Add(UiStyle.Button("Device Manager", delegate { OpenAdministratorTool("AdminDeviceManager"); }));
+                adminButtons.Controls.Add(UiStyle.Button("Services", delegate { OpenAdministratorTool("AdminServices"); }));
+                adminButtons.Controls.Add(UiStyle.Button("Event Viewer", delegate { OpenAdministratorTool("AdminEventViewer"); }));
+                adminButtons.Controls.Add(UiStyle.Button("Windows Firewall", delegate { OpenAdministratorTool("AdminFirewall"); }));
+                adminButtons.Controls.Add(UiStyle.Button("Disk Management", delegate { OpenAdministratorTool("AdminDiskManagement"); }));
+                adminStack.Controls.Add(adminButtons); right.Controls.Add(admin);
+            }
+        }
+
+        void OpenAdministratorTool(string name)
+        {
+            try { SystemActions.ExecuteAdministratorTool(name); }
+            catch (Exception ex) { SetFeedback("Administrator tool could not be opened: " + ex.Message, true); }
         }
 
         void AddSetting(TableLayoutPanel stack, CheckBox box, string title, string description, EventHandler changed)

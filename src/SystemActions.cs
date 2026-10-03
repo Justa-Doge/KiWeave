@@ -16,7 +16,7 @@ namespace FunctionRowRemapper
     internal static class SystemActions
     {
         internal const string ActivateProfilePrefix = "ActivateProfile:";
-        internal static readonly string[] Names = { "CenterWindow", "ToggleAlwaysOnTop", "CycleAudioOutput", "DiscordMute", "DiscordDeafen", "SpotifyPlayPause", "SpotifyNext", "SpotifyPrevious", "ObsStartRecording", "ObsStartStreaming", "OpenPowerToys" };
+        internal static readonly string[] Names = { "CenterWindow", "ToggleAlwaysOnTop", "CycleAudioOutput", "DiscordMute", "DiscordDeafen", "SpotifyPlayPause", "SpotifyNext", "SpotifyPrevious", "ObsStartRecording", "ObsStartStreaming", "OpenPowerToys", "AdminDeviceManager", "AdminServices", "AdminEventViewer", "AdminFirewall", "AdminDiskManagement" };
         internal static bool TryProfile(string name, out string profile)
         {
             profile = "";
@@ -33,6 +33,9 @@ namespace FunctionRowRemapper
                 if (target == null) throw new InvalidOperationException("Profile switching is unavailable in this KiWeave session.");
                 target.ActivateProfile(profile); return;
             }
+            string extension = FirstPartyExtensionCatalog.ActionExtension(name);
+            if (extension != null && !FirstPartyExtensionCatalog.IsEnabled(extension))
+                throw new InvalidOperationException("The " + extension + " first-party extension is disabled. Enable it from Extensions before using this mapping.");
             if (name == "CenterWindow") { CenterForegroundWindow(); return; }
             if (name == "ToggleAlwaysOnTop") { ToggleAlwaysOnTop(); return; }
             if (name == "CycleAudioOutput") { AudioDevices.CycleDefaultOutput(); return; }
@@ -43,6 +46,7 @@ namespace FunctionRowRemapper
             if (name == "SpotifyPrevious") { sink.Send(Shortcuts.Parse("MediaPreviousTrack", true)); return; }
             if (name.StartsWith("Obs", StringComparison.Ordinal)) { RunObs(name); return; }
             if (name == "OpenPowerToys") { OpenPowerToys(); return; }
+            if (name.StartsWith("Admin", StringComparison.Ordinal)) { RunAdminTool(name); return; }
             throw new ArgumentException("Unknown system or integration action.");
         }
         static void CenterForegroundWindow()
@@ -78,6 +82,16 @@ namespace FunctionRowRemapper
             string exe = paths.FirstOrDefault(File.Exists); if (exe == null) throw new FileNotFoundException("PowerToys was not found.");
             using (Process p = Process.Start(new ProcessStartInfo(exe, "--open-settings") { UseShellExecute = true })) { }
         }
+        static void RunAdminTool(string name)
+        {
+            string snapIn = name == "AdminDeviceManager" ? "devmgmt.msc" : name == "AdminServices" ? "services.msc" : name == "AdminEventViewer" ? "eventvwr.msc" : name == "AdminFirewall" ? "wf.msc" : name == "AdminDiskManagement" ? "diskmgmt.msc" : null;
+            if (snapIn == null) throw new ArgumentException("Unknown administrator tool.");
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), snapIn);
+            if (!File.Exists(path)) throw new FileNotFoundException("The Windows administrator tool was not found.", path);
+            try { using (Process p = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, Verb = "runas" })) { } }
+            catch (System.ComponentModel.Win32Exception ex) { throw new InvalidOperationException("Administrator approval was cancelled or unavailable.", ex); }
+        }
+        internal static void ExecuteAdministratorTool(string name) { RunAdminTool(name); }
         internal static void HttpRequest(Mapping mapping)
         {
             NetworkPolicy.Require();

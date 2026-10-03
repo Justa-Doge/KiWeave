@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -13,6 +14,11 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(uint processId);
         [DllImport("user32.dll")] static extern short GetAsyncKeyState(int virtualKey);
         internal static bool SafeModeRequested(string[] args, bool shiftHeld) { string[] values = args ?? new string[0]; if (Array.IndexOf(values, "--normal-mode") >= 0) return false; return shiftHeld || Array.IndexOf(values, "--safe-mode") >= 0; }
+        internal static bool IsElevated()
+        {
+            try { using (var identity = WindowsIdentity.GetCurrent()) { var principal = new WindowsPrincipal(identity); return principal.IsInRole(WindowsBuiltInRole.Administrator); } }
+            catch { return false; }
+        }
         internal static bool RequestElevatedNetworkChange(bool enabled)
         {
             try { using (var p = Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--elevated-network " + (enabled ? "on" : "off")) { UseShellExecute = true, Verb = "runas" })) { p.WaitForExit(); return p.ExitCode == 0; } }
@@ -35,7 +41,9 @@ namespace FunctionRowRemapper
         {
             if (args != null && Array.IndexOf(args, "--elevated-network") >= 0) {
                 int index = Array.IndexOf(args, "--elevated-network"); if (index + 1 >= args.Length) return;
-                try { var preferences = UserPreferences.Load(UserPreferences.DefaultPath); preferences.NetworkAccess = String.Equals(args[index + 1], "on", StringComparison.OrdinalIgnoreCase); UserPreferences.Save(UserPreferences.DefaultPath, preferences); return; } catch { Environment.ExitCode = 1; return; }
+                string mode = args[index + 1];
+                if (!IsElevated() || (!String.Equals(mode, "on", StringComparison.OrdinalIgnoreCase) && !String.Equals(mode, "off", StringComparison.OrdinalIgnoreCase))) { Environment.ExitCode = 2; return; }
+                try { var preferences = UserPreferences.Load(UserPreferences.DefaultPath); preferences.NetworkAccess = String.Equals(mode, "on", StringComparison.OrdinalIgnoreCase); UserPreferences.Save(UserPreferences.DefaultPath, preferences); return; } catch { Environment.ExitCode = 1; return; }
             }
             try { AppStorage.MigrateLegacy(); } catch (Exception ex) { AppLog.Record("Legacy data migration", ex); }
             bool safeMode = SafeModeRequested(args, (GetAsyncKeyState((int)Keys.ShiftKey) & 0x8000) != 0), restartNormally = false;

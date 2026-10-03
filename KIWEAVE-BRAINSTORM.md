@@ -459,3 +459,96 @@ Dropped because timing-based behavior can feel inconsistent with modifiers, game
 - Existing configurations remain migratable.
 - Background behavior should be explainable.
 - The UI should make the safe action the obvious action.
+
+## Expanded roadmap backlog
+
+These are approved ideas for future KiWeave updates. They are roadmap entries, not promises that every item is already implemented.
+
+1. Per-application profiles with automatic foreground-app switching.
+2. Modifier layers with user-selected layer keys.
+3. Profile colors and icons, excluding personal images from exports by default.
+4. Crash-safe drafts with clearer recovery prompts.
+5. Global mapping search across profiles, layers, and nested sequences.
+6. Dependency explanations for every app, device, or integration action.
+7. Local profile schedules by time and day, with no network service.
+8. Read-only configuration mode that keeps active mappings running.
+9. A readable configuration diff before restores, imports, profile switches, or migrations.
+10. Migration preview that preserves the untouched original.
+11. Import quarantine with permission and risk review before activation.
+12. Emergency known-good backup beside the normal local backup folder.
+13. Backup rotation and retention controls.
+14. Optional encrypted full backups only if the privacy tradeoff is justified.
+15. A local secrets vault for webhook and API credentials, never included in exports.
+16. Deliberate sequence cancellation with an unmistakable emergency interaction.
+17. Sequence limits for runtime, repeats, launches, network requests, and hardware operations.
+18. Integration health dashboard with refreshable read-only status and repair guidance.
+19. Manually created redacted diagnostic bundles with a complete preview.
+20. Release checksum and package-integrity verification.
+21. Stable, beta, and alpha update-channel preferences.
+22. Safe localization using text-only translation files.
+23. Accessibility and keyboard-only navigation pass.
+24. Live key tester improvements for suppression, translation, and layer state.
+25. Conflict explanations with suggested fixes and affected integrations.
+26. Mapping, sequence, layer, condition, and profile duplication templates.
+27. Declarative local action-pack gallery with reviewed imports.
+28. Action-pack trust labels and optional signature verification.
+29. Portable-mode improvements with explicit data-location controls.
+30. Windows notification preferences for updates, health, and safety warnings.
+31. Custom tray-menu profile switching.
+32. Local “why did this action run?” explanations without key-history logging.
+33. Dry-run mode for sequences and imported packs.
+34. Per-integration permission toggles beneath the master network policy.
+35. Backup privacy scan before export.
+36. One-click recovery after a failed startup.
+37. Admin-only Settings controls visible only in an elevated KiWeave session.
+38. Restricted elevated local-`.exe` launches, subject to a separate privacy and safety review.
+39. Read-only Windows admin-console shortcuts with explicit UAC prompts.
+40. A release-readiness checklist before the eventual 1.0.0 launch.
+
+## Further roadmap backlog
+
+41. Per-profile backup snapshots.
+42. An “Explain this shortcut” hover panel.
+43. Conflict auto-resolution suggestions.
+44. Temporary shortcut suspension by focused app.
+45. Game mode with anti-cheat-safe restrictions.
+46. Hardware keyboard detection and layout profiles.
+47. Import/export redaction presets.
+48. Backup expiration reminders.
+49. Restore-point labels and private notes.
+50. First-use action execution preview.
+51. Test-without-saving editor mode.
+52. A visual profile-inheritance tree.
+53. Modifier-layer conflict visualization.
+54. Shortcut collision simulation.
+55. App-path migration assistant.
+56. Offline documentation browser.
+57. Built-in keyboard shortcut reference.
+58. Integration-specific reconnect controls.
+59. Discord authorization-expiry warnings.
+60. PowerToys configuration drift detection.
+61. Monitor capability-change alerts.
+62. Audio-device availability alerts.
+63. Safe startup after repeated crashes.
+64. Automatic rollback after failed configuration activation.
+65. User-selectable notification severity.
+66. Privacy-dashboard export history.
+67. Local audit trail with automatic redaction.
+68. Experimental-feature kill switch.
+69. Separate developer mode for test actions.
+70. Signed community action-pack repository.
+71. Action-pack version compatibility checks.
+72. Profile import merge mode.
+73. Profile conflict-resolution wizard.
+74. Keyboard-layout change detection.
+75. Per-Windows-user profiles.
+76. Multi-monitor-specific mappings.
+77. Remote-desktop-aware profiles.
+78. VM-aware profile switching.
+79. Controller and MIDI input support: read physical controllers through Windows.Gaming.Input/Game Input, read MIDI through Windows MIDI Services, and keep virtual-gamepad output as a separately reviewed optional backend rather than making the archived ViGEmBus driver a default dependency.
+80. Final release-readiness and security checklist before 1.0.0.
+81. Stream Deck integration: a KiWeave plugin with declarative action buttons, profile switching, shortcut status, and safe local IPC. Use Elgato's official SDK/WebSocket plugin model, keep secrets out of the plugin, and never execute arbitrary plugin-provided code.
+82. Script workspace: open selected `.py`, `.ps1`, `.cmd`, `.bat`, `.js`, `.lua`, and other explicitly supported script files in VS Code when available, with a safe fallback to the user-selected editor. Opening a script never executes it; execution remains opt-in, visibly labeled, and subject to language/path validation and import quarantine.
+83. First-party Extensions page: browse KiWeave-maintained integrations and declarative action packs from the official release source, showing version, permissions, supported KiWeave version, maturity, integrity state, and local-data impact before installation. No arbitrary extension code, silent downloads, or hidden network permissions.
+84. Modular first-party integrations: move Discord, Spotify, OBS, PowerToys, Stream Deck, MIDI, controller, and future app-specific support out of the default core experience and expose them through the first-party Extensions page. Existing mappings must migrate by stable integration IDs, disabled extensions must fail safely, and uninstalling an extension must preserve the user's mappings and notes.
+85. Extensions browsing polish: use an installed-versus-featured card layout, local search, details views, and clear permission/maturity labels. The browsing pattern is inspired by Windhawk's mod pages; KiWeave's extension model, safety rules, and attribution are its own.

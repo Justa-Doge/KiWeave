@@ -86,12 +86,13 @@ namespace FunctionRowRemapper
         readonly System.Collections.Generic.Dictionary<int, CustomHotkey> registeredHotkeys = new System.Collections.Generic.Dictionary<int, CustomHotkey>();
         Configuration saved, draft;
         ProfileCollection profiles = new ProfileCollection();
+        ConfigurationHealthReport healthReport = ConfigurationHealthReport.Empty;
         string currentProfile = "Default";
         bool automaticProfileActive;
         string pinnedProfile = "";
         string profileReason = "Default profile at launch.";
         string automaticProfileProcess = "";
-        int selected, selectedLayer = -1, customSelected = -1; bool loading, dirty;
+        int selected, selectedLayer = -1, customSelected = -1; bool loading, dirty, readOnlyMode;
         string initialError;
 
         public MainForm(bool startInTray) : this(startInTray, false) { }
@@ -419,7 +420,7 @@ namespace FunctionRowRemapper
                 loading = true; var m = CurrentMappings()[selected]; LoadMonitorChoices(m.MonitorId, m.MonitorControl); loading = false;
                 if ((ActionKind)kind.SelectedIndex == ActionKind.Monitor && String.IsNullOrEmpty(m.MonitorId)) Edited();
             } catch (Exception ex) { if (!IsDisposed) monitorStatus.Text = "Detection failed: " + ex.Message; }
-            finally { scanning = false; if (!IsDisposed) detect.Enabled = true; }
+            finally { scanning = false; if (!IsDisposed) { detect.Enabled = true; RunConfigurationHealthCheck(); } }
         }
         void MarkDirty() { dirty = true; Text = "KiWeave *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); if (!isPreview) { draftTimer.Stop(); draftTimer.Start(); } }
         void SetFeedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Color.FromArgb(255, 151, 153) : muted; }
@@ -452,6 +453,7 @@ namespace FunctionRowRemapper
         }
         bool Save()
         {
+            if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before saving.", true); return false; }
             if (isPreview) { SetFeedback("Design preview only. Nothing was saved or activated.", false); return true; }
             if ((functionPage.Visible && simpleKind.SelectedIndex == 6 && ReferenceEquals(specificKind.SelectedItem, ChooseAction)) ||
                 (customPage.Visible && customHotkeyView.Visible && customSimpleKind.SelectedIndex == 3 && ReferenceEquals(customSpecificKind.SelectedItem, ChooseAction))) {
@@ -501,6 +503,15 @@ namespace FunctionRowRemapper
         {
             for (int i = 0; i < 12; i++) try { ConfigStore.Validate(draft.Mappings[i], true); } catch (Exception ex) { SetFeedback("Check F" + (i + 1) + ": " + ex.Message, true); return; }
             foreach (var layer in draft.Layers) for (int i = 0; i < 12; i++) try { ConfigStore.Validate(layer.Mappings[i], true); } catch (Exception ex) { SetFeedback("Check " + layer.Name + " F" + (i + 1) + ": " + ex.Message, true); return; }
+        }
+        void RunConfigurationHealthCheck()
+        {
+            if (isPreview) return;
+            Configuration configuration = draft.Copy(); ProfileCollection profileCopy = profiles.Copy(); DdcMonitor[] monitorCopy = detected == null ? new DdcMonitor[0] : detected.ToArray();
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate {
+                ConfigurationHealthReport report = ConfigurationHealth.Scan(configuration, profileCopy, monitorCopy);
+                Ui(delegate { healthReport = report; if (report.HasWarnings) SetFeedback("Configuration health: " + report.Summary, true); });
+            });
         }
         void TestAction(Mapping mapping)
         {
@@ -649,6 +660,7 @@ namespace FunctionRowRemapper
         void RunAutomaticUpdateCheck()
         {
             if (!preferences.NetworkAccess || !preferences.CheckUpdates) return;
+            RunConfigurationHealthCheck();
             UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null) { if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag); } }));
         }
         void OpenDataFolder()
@@ -688,11 +700,16 @@ namespace FunctionRowRemapper
             if (MessageBox.Show(this, "A full backup contains your mappings, action targets, arguments, URLs, profiles, and preferences. Keep it private if any action contains personal or secret information.\n\nCreate the backup?", "Back up KiWeave", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
             try {
                 using (var d = new SaveFileDialog { Filter = "KiWeave backup|*.keyweave", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".keyweave", DefaultExt = "keyweave", AddExtension = true })
-                    if (d.ShowDialog(this) == DialogResult.OK) { BackupBundle.Save(d.FileName, saved, profiles, preferences, Startup.Enabled); SetFeedback("Full backup created. PowerToys shortcuts were recorded as a read-only inventory.", false); }
+                    if (d.ShowDialog(this) == DialogResult.OK) {
+                        string review = BackupPrivacy.Review(BackupBundle.Serialize(saved, profiles, preferences, Startup.Enabled));
+                        if (MessageBox.Show(this, "Privacy review\r\n\r\n" + review + "\r\n\r\nCreate this private backup?", "Review backup privacy", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+                        BackupBundle.Save(d.FileName, saved, profiles, preferences, Startup.Enabled); SetFeedback("Full backup created. PowerToys shortcuts were recorded as a read-only inventory.", false);
+                    }
             } catch (Exception ex) { SetFeedback("Backup failed: " + ex.Message, true); }
         }
         void ImportBackup(object sender, EventArgs e)
         {
+            if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before restoring a backup.", true); return; }
             if (dirty) { SetFeedback("Save or discard your edits before restoring a backup.", true); return; }
             using (var d = new OpenFileDialog { Filter = "KiWeave backup|*.keyweave", CheckFileExists = true }) {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
@@ -721,6 +738,7 @@ namespace FunctionRowRemapper
         }
         void OpenHistory()
         {
+            if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before restoring history.", true); return; }
             if (dirty) { SetFeedback("Save or discard your edits before restoring history.", true); return; }
             using (var dialog = new ConfigurationHistoryForm(saved, profiles, preferences, Startup.Enabled)) {
                 if (dialog.ShowDialog(this) != DialogResult.OK || dialog.SelectedEntry == null) return;
@@ -742,6 +760,7 @@ namespace FunctionRowRemapper
 
         internal void OpenProfiles()
         {
+            if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before changing profiles.", true); return; }
             if (dirty) { SetFeedback("Save or discard the current edits before switching profiles.", true); return; }
             Configuration defaultConfiguration = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration();
             using (var dialog = new ProfileManagerForm(profiles, draft, defaultConfiguration)) if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedProfile != null) {
@@ -912,7 +931,24 @@ namespace FunctionRowRemapper
         }
         void OpenPrivacyCenter()
         {
-            using (var dialog = new PrivacyCenterForm(preferences.NetworkAccess, BuildSafeDiagnostics())) dialog.ShowDialog(this);
+            using (var dialog = new PrivacyCenterForm(preferences.NetworkAccess, BuildSafeDiagnostics(), healthReport)) dialog.ShowDialog(this);
+        }
+        void OpenIntegrationHealth()
+        {
+            using (var dialog = new IntegrationHealthForm(detected == null ? 0 : detected.Length, healthReport)) dialog.ShowDialog(this);
+        }
+        void OpenFirstPartyExtensions()
+        {
+            using (var dialog = new FirstPartyExtensionsForm(this)) dialog.ShowDialog(this);
+        }
+        void ToggleReadOnlyMode()
+        {
+            bool next = !readOnlyMode;
+            string prompt = next ? "Lock KiWeave editing? Active mappings will keep running, but editor controls, imports, restores, and saving will be disabled until you unlock them." : "Unlock KiWeave editing? Configuration changes and saving will be available again.";
+            if (MessageBox.Show(this, prompt, next ? "Lock editing" : "Unlock editing", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            readOnlyMode = next; functionPage.Enabled = !readOnlyMode; customPage.Enabled = !readOnlyMode; saveChangesButton.Enabled = !readOnlyMode;
+            if (readOnlyButton != null) readOnlyButton.Text = readOnlyMode ? "Unlock editing" : "Lock editing";
+            SetFeedback(readOnlyMode ? "Read-only mode is active. Mappings continue running; editing is locked." : "Editing unlocked.", false);
         }
         string BuildSafeDiagnostics()
         {
@@ -933,6 +969,7 @@ namespace FunctionRowRemapper
                 "Automatic profiles: " + (preferences.AutomaticProfiles ? "yes" : "no") + "\r\n" +
                 "Master network access: " + (preferences.NetworkAccess ? "allowed" : "blocked") + "\r\n" +
                 "Update checks: " + (preferences.CheckUpdates ? "yes" : "no") + "\r\n" +
+                "Configuration health: " + (healthReport.HasWarnings ? healthReport.Findings.Length + " issue(s)" : "clear") + "\r\n" +
                 "Recent private-safe log entries: " + AppLog.RecentCount() + "\r\n" +
                 "Unsaved edits: " + (dirty ? "yes" : "no") + "\r\n";
             return report;

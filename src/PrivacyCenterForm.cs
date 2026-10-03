@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace FunctionRowRemapper
@@ -36,11 +37,13 @@ namespace FunctionRowRemapper
     internal sealed class PrivacyCenterForm : Form
     {
         readonly string diagnostics;
+        readonly ConfigurationHealthReport health;
         readonly Label storage = UiStyle.Text("", 9, false);
 
-        internal PrivacyCenterForm(bool networkEnabled, string safeDiagnostics)
+        internal PrivacyCenterForm(bool networkEnabled, string safeDiagnostics, ConfigurationHealthReport healthReport = null)
         {
             diagnostics = safeDiagnostics ?? "";
+            health = healthReport ?? ConfigurationHealthReport.Empty;
             Text = "KiWeave privacy center"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             ClientSize = new Size(880, 650); MinimumSize = new Size(760, 570); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; Controls.Add(scroll);
@@ -51,6 +54,16 @@ namespace FunctionRowRemapper
             root.Controls.Add(Card("Network access", networkEnabled ? "Allowed by your master setting" : "Blocked by your master setting",
                 networkEnabled ? Color.FromArgb(127, 214, 169) : Color.FromArgb(236, 174, 105),
                 "When allowed, only two features can use the network:\r\n• GitHub release checks, when update checks are also enabled\r\n• HTTP actions, only when you physically trigger their saved mapping\r\n\r\nPowerToys, profiles, layers, backups, diagnostics, DDC/CI, and ordinary actions stay local."));
+
+            root.Controls.Add(Card("Administrator context", Program.IsElevated() ? "KiWeave is running elevated" : "KiWeave is running as a standard user",
+                Program.IsElevated() ? Color.FromArgb(255, 191, 112) : Color.FromArgb(127, 214, 169),
+                "The normal KiWeave window stays non-admin. The master network switch and administrator tools request a separate UAC-approved helper or console only when you choose them. Scripts, Python, commands, webhooks, and arbitrary actions cannot request elevation."));
+
+            var healthCard = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 0, 0, 16), Padding = new Padding(22) };
+            var healthStack = UiStyle.Stack(); healthCard.Controls.Add(healthStack); healthStack.Controls.Add(UiStyle.Text("Configuration health", 15, true));
+            var healthState = UiStyle.Text(health.Summary, 10, true); healthState.ForeColor = health.HasWarnings ? Color.FromArgb(255, 191, 112) : Color.FromArgb(127, 214, 169); healthStack.Controls.Add(healthState);
+            string healthBody = health.HasWarnings ? String.Join("\r\n", health.Findings.Select(f => "• " + f.Title + ": " + f.Detail)) : "The scan checked saved mappings, profiles, layers, sequences, conditions, file targets, and selected monitors without running anything.";
+            healthStack.Controls.Add(UiStyle.Text(healthBody, 9, false)); root.Controls.Add(healthCard);
 
             var data = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 0, 0, 16), Padding = new Padding(22) };
             var dataStack = UiStyle.Stack(); data.Controls.Add(dataStack); dataStack.Controls.Add(UiStyle.Text("Local data", 15, true));

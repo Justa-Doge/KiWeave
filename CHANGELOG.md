@@ -7,6 +7,8 @@
 
 ## 1.0.0-beta.3 (local development)
 
+- Added the first-party Extensions page with installed/featured browsing, local search, per-extension enable/disable controls, Windhawk-inspired layout attribution, and detailed status/permission/compatibility dialogs.
+- Added stable first-party integration IDs so Discord, Spotify, OBS, PowerToys, Stream Deck, and Controller + MIDI settings remain local and existing mappings are preserved when an extension is disabled.
 - Discord authorization can persist across KiWeave launches through an encrypted Windows-account refresh token. Access tokens remain memory-only; Disconnect/Forget authorization removes the local token.
 - KiWeave silently refreshes authorization and reconnects Discord IPC when network access is allowed and Discord is open. No token is included in backups, diagnostics, logs, or Git.
 

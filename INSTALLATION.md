@@ -36,12 +36,13 @@ Tray use defaults to on. It is stored separately in `%LOCALAPPDATA%\KiWeave\pref
 From PowerShell 7 in the source folder:
 
 ```powershell
-.\build.ps1
 .\install.ps1
 ```
+
+`install.ps1` is the single PowerShell install entry point. If `bin\KiWeave.exe` is missing, it builds KiWeave and the red `UninstallKiWeave.exe` first, then installs both and creates the normal and Safe Mode Start Menu shortcuts. The uninstaller stays in the install folder instead of appearing in Windows search. You can still pass `-SourceExe` to install a different local build (such as a private test build).
 
 Exit the running remapper before installing an update. The installer script copies the compiled executable to the per-user Programs folder, verifies its hash, creates/verifies both the normal and Safe Mode Start-menu shortcuts, and migrates this app's existing startup entry if one exists. It does not overwrite mapping or preference files. A previous installed executable is backed up when applicable. On first launch, legacy Function Row Remapper data is copied into `%LOCALAPPDATA%\KiWeave` without deleting the old recovery copy.
 
 ## Remove
 
-Untick Start with Windows in Settings, then click **Exit**. Delete the normal and **KiWeave Safe Mode** Start-menu shortcuts and `%LOCALAPPDATA%\Programs\KiWeave`. Optionally remove `%LOCALAPPDATA%\KiWeave` to delete saved mappings and preferences. If necessary, remove only the `KiWeave` value from `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+Run the red `%LOCALAPPDATA%\Programs\KiWeave\UninstallKiWeave.exe` directly from the install folder. It removes the app, shortcuts, and startup entry while preserving mappings, profiles, backups, and preferences. To remove saved data too, delete `%LOCALAPPDATA%\KiWeave` separately.

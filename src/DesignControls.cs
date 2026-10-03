@@ -8,8 +8,24 @@ namespace FunctionRowRemapper
 {
     internal sealed class DesignListView : ListView
     {
+        [DllImport("user32.dll")]
+        static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+        static extern IntPtr GetWindowLongPtr64(IntPtr hwnd, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+        static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
+        const int GwlStyle = -16, WsHscroll = 0x00100000, WsVscroll = 0x00200000;
         internal DesignListView() { DoubleBuffered = true; }
-        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e); Design.DarkNative(this);
+            try {
+                ShowScrollBar(Handle, 3, false);
+                long style = GetWindowLongPtr64(Handle, GwlStyle).ToInt64();
+                style &= ~(WsHscroll | WsVscroll);
+                SetWindowLongPtr64(Handle, GwlStyle, new IntPtr(style));
+            } catch { }
+        }
     }
 
     internal static class Design
@@ -217,6 +233,13 @@ namespace FunctionRowRemapper
     {
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
+        [DllImport("user32.dll")]
+        static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+        static extern IntPtr GetWindowLongPtr64(IntPtr hwnd, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+        static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
+        const int GwlStyle = -16, WsHscroll = 0x00100000, WsVscroll = 0x00200000;
 
         internal DesignScrollPanel()
         {
@@ -229,6 +252,23 @@ namespace FunctionRowRemapper
         {
             base.OnHandleCreated(e);
             try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
+            HideScrollBars();
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            base.OnLayout(e);
+            HideScrollBars();
+        }
+
+        void HideScrollBars()
+        {
+            if (IsHandleCreated) try {
+                ShowScrollBar(Handle, 3, false);
+                long style = GetWindowLongPtr64(Handle, GwlStyle).ToInt64();
+                style &= ~(WsHscroll | WsVscroll);
+                SetWindowLongPtr64(Handle, GwlStyle, new IntPtr(style));
+            } catch { }
         }
 
     }

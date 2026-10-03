@@ -379,6 +379,11 @@ Open command prompt|cmd.exe")) {
             AddSystem(items, "OBS: start recording", "ObsStartRecording", "OBS Studio", "Uses OBS Studio's supported command-line control and its standard install location.");
             AddSystem(items, "OBS: start streaming", "ObsStartStreaming", "OBS Studio", "Uses OBS Studio's supported command-line control and its standard install location.");
             AddSystem(items, "Open PowerToys settings", "OpenPowerToys", "PowerToys", "Opens the installed PowerToys settings window.");
+            AddSystem(items, "Administrator: Device Manager", "AdminDeviceManager", "Administrator tools", "Requests UAC approval, then opens Device Manager. KiWeave does not change devices.");
+            AddSystem(items, "Administrator: Services", "AdminServices", "Administrator tools", "Requests UAC approval, then opens Windows Services. KiWeave does not start or stop services.");
+            AddSystem(items, "Administrator: Event Viewer", "AdminEventViewer", "Administrator tools", "Requests UAC approval, then opens Event Viewer in read-only viewing mode.");
+            AddSystem(items, "Administrator: Windows Firewall", "AdminFirewall", "Administrator tools", "Requests UAC approval, then opens the advanced firewall console. KiWeave does not change rules.");
+            AddSystem(items, "Administrator: Disk Management", "AdminDiskManagement", "Administrator tools", "Requests UAC approval, then opens Disk Management. Review every destructive Windows prompt yourself.");
             return items.ToArray();
         }
         static IEnumerable<string[]> Rows(string text) { return text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().Split('|')); }
