@@ -54,7 +54,7 @@ namespace FunctionRowRemapper
 
             var data = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 0, 0, 16), Padding = new Padding(22) };
             var dataStack = UiStyle.Stack(); data.Controls.Add(dataStack); dataStack.Controls.Add(UiStyle.Text("Local data", 15, true));
-            var location = UiStyle.Text("Stored under %LOCALAPPDATA%\\FunctionRowRemapper. Full backups can contain private mappings, paths, commands, URLs, and notes.", 9, false); dataStack.Controls.Add(location);
+            var location = UiStyle.Text("Stored under %LOCALAPPDATA%\\KiWeave. Full backups can contain private mappings, paths, commands, URLs, and notes.", 9, false); dataStack.Controls.Add(location);
             storage.Text = PrivacyData.Summary(); storage.Margin = new Padding(0, 6, 0, 16); dataStack.Controls.Add(storage);
             var dataButtons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
             dataButtons.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenFolder(PrivacyData.DataFolder); }));

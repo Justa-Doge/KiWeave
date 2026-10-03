@@ -188,7 +188,7 @@ namespace FunctionRowRemapper
         internal static string TestCurrentDscInput(string module, string settingsFile) { return DscCall("test", module, ReadObject(settingsFile)); }
         static string Backup(string path)
         {
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyWeave", "PowerToysBackups");
+            string folder = Path.Combine(AppStorage.DataFolder, "PowerToysBackups");
             Directory.CreateDirectory(folder);
             string target = Path.Combine(folder, Path.GetFileName(Path.GetDirectoryName(path)) + "-" + Path.GetFileName(path) + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmssfff") + ".bak");
             File.Copy(path, target, false); return target;

@@ -50,7 +50,7 @@ namespace FunctionRowRemapper
 
             var recovery = Card("Restore or preserve your setup"); var recoveryStack = (TableLayoutPanel)recovery.Controls[0];
             recoveryStack.Controls.Add(UiStyle.Text("Restore a reviewed full backup or a local history snapshot. KiWeave creates a rollback folder before replacing active files.", 9, false));
-            var recoveryButtons = Buttons(); recoveryButtons.Controls.Add(UiStyle.Button("Restore backup", RestoreBackup, true)); recoveryButtons.Controls.Add(UiStyle.Button("Undo and history", OpenHistory));
+            var recoveryButtons = Buttons(); recoveryButtons.Controls.Add(UiStyle.Button("Restore backup", RestoreBackup, true)); recoveryButtons.Controls.Add(UiStyle.Button("Restore known-good", RestoreKnownGood)); recoveryButtons.Controls.Add(UiStyle.Button("Undo and history", OpenHistory));
             backupButton = UiStyle.Button("Back up readable setup", ExportBackup); recoveryButtons.Controls.Add(backupButton); recoveryStack.Controls.Add(recoveryButtons); stack.Controls.Add(recovery);
 
             var inspect = Card("Inspect without activating anything"); var inspectStack = (TableLayoutPanel)inspect.Controls[0];
@@ -116,6 +116,18 @@ namespace FunctionRowRemapper
                 try { PreserveReadableState("safe mode history restore"); string rollback = BackupBundle.Restore(entry.Backup); ReloadState(); MessageBox.Show(this, "History restored without activating mappings.\n\nRollback folder: " + rollback, "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Information); }
                 catch (Exception ex) { MessageBox.Show(this, "History was not restored. " + ex.Message, "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Error); ReloadState(); }
             }
+        }
+
+        void RestoreKnownGood(object sender, EventArgs e)
+        {
+            if (!File.Exists(RecoveryStore.KnownGoodPath)) { MessageBox.Show(this, "No known-good recovery copy exists yet. KiWeave creates one after a mapping save is validated and applied successfully.", "Known-good recovery", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            try {
+                var backup = BackupBundle.Load(RecoveryStore.KnownGoodPath);
+                string prompt = BackupBundle.Describe(backup) + "\n\nThis is the last setup KiWeave saved and applied successfully. Restore it without activating mappings? A rollback folder is created first.";
+                if (MessageBox.Show(this, prompt, "Restore known-good setup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                PreserveReadableState("safe mode known good restore"); string rollback = BackupBundle.Restore(backup); ReloadState();
+                MessageBox.Show(this, "Known-good setup restored without activating mappings.\n\nRollback folder: " + rollback, "Known-good recovery", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            } catch (Exception ex) { MessageBox.Show(this, "The known-good setup was not restored. " + ex.Message, "Known-good recovery", MessageBoxButtons.OK, MessageBoxIcon.Error); ReloadState(); }
         }
 
         void PreserveReadableState(string reason) { if (state.FullyReadable) try { ConfigurationHistory.Capture(ConfigurationHistory.DefaultFolder, reason, state.Configuration, state.Profiles, state.Preferences, state.Startup, ConfigurationHistory.Limit); } catch (Exception ex) { AppLog.Record("SafeModeHistory", ex); } }

@@ -9,6 +9,33 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
+    internal static class AppStorage
+    {
+        internal static string DataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave"); } }
+        internal static string LegacyDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FunctionRowRemapper"); } }
+        internal static string LegacyBrandDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyWeave"); } }
+        internal static void MigrateLegacy()
+        {
+            MigrateLegacy(LegacyDataFolder, DataFolder);
+            CopyDirectoryIfMissing(Path.Combine(LegacyBrandDataFolder, "PowerToysBackups"), Path.Combine(DataFolder, "PowerToysBackups"));
+        }
+        internal static void MigrateLegacy(string legacyDataFolder, string dataFolder)
+        {
+            if (!Directory.Exists(legacyDataFolder) || String.Equals(dataFolder, legacyDataFolder, StringComparison.OrdinalIgnoreCase)) return;
+            Directory.CreateDirectory(dataFolder);
+            foreach (string name in new[] { "config.json", "config.json.bak", "profiles.json", "profiles.json.bak", "preferences.json", "preferences.json.bak", "first-run.seen" }) CopyIfMissing(Path.Combine(legacyDataFolder, name), Path.Combine(dataFolder, name));
+            foreach (string name in new[] { "Backups", "History", "Drafts", "Logs" }) CopyDirectoryIfMissing(Path.Combine(legacyDataFolder, name), Path.Combine(dataFolder, name));
+            string marker = Path.Combine(dataFolder, ".migrated-from-function-row-remapper"); if (!File.Exists(marker)) File.WriteAllText(marker, DateTime.UtcNow.ToString("o"));
+        }
+        static void CopyIfMissing(string source, string destination) { if (File.Exists(source) && !File.Exists(destination)) { Directory.CreateDirectory(Path.GetDirectoryName(destination)); File.Copy(source, destination, false); } }
+        static void CopyDirectoryIfMissing(string source, string destination)
+        {
+            if (!Directory.Exists(source)) return; Directory.CreateDirectory(destination);
+            foreach (string directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories)) Directory.CreateDirectory(destination + directory.Substring(source.Length));
+            foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories)) CopyIfMissing(file, destination + file.Substring(source.Length));
+        }
+    }
+
     public enum ActionKind { PassThrough, Unbound, SendKey, SendShortcut, Media, Application, FileOrFolder, WindowsShortcut, Command, Monitor, Python, LockThenSleep, Sequence, SystemAction, HttpRequest, Conditional }
 
     public sealed class Mapping
@@ -139,7 +166,7 @@ namespace FunctionRowRemapper
     public static class ConfigStore
     {
         public const int MaxBytes = 65536;
-        public static string DefaultPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FunctionRowRemapper", "config.json"); } }
+        public static string DefaultPath { get { return Path.Combine(AppStorage.DataFolder, "config.json"); } }
         public static void Validate(Mapping m, bool checkExists)
         {
             if (m == null || !Enum.IsDefined(typeof(ActionKind), m.Kind)) throw new ArgumentException("Unknown action type.");

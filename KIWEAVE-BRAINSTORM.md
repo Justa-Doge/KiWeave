@@ -21,6 +21,10 @@ Privacy is a product requirement, not an optional mode. KiWeave should work full
 - Temporary, reviewed shortcut capture for custom hotkeys and key/shortcut actions.
 - Bounded local undo history with redacted comparisons and deliberate restore.
 - Readable conditional actions for foreground/running applications, with an explicit fallback and no background monitoring.
+- Global mapping search across profiles, layers, keys, hotkeys, sequences, conditions, and private target text, with redacted result labels and direct editor navigation.
+- Crash-safe local draft recovery with preview, restore-to-editor, discard, and private export.
+- A Safe Mode-accessible last-known-good recovery backup after a verified successful save.
+- Portable ZIP packaging that keeps KiWeave self-contained without an installer.
 
 ## Highest-priority next features
 
@@ -63,7 +67,7 @@ Do not record general typing, save key history, or write pressed keys to logs. N
 
 ### 3. Better profile switching (core controls implemented locally)
 
-- Custom profile colors and icons.
+- Optional custom profile images stored locally. Custom images are deliberately excluded from configuration exports and `.keyweave` backups; missing images fall back to the built-in profile appearance.
 - [x] A clear active-profile badge.
 - [x] “Why is this profile active?” explanation.
 - [x] Faster tray profile selection and status controls.
@@ -71,7 +75,7 @@ Do not record general typing, save key history, or write pressed keys to logs. N
 - [x] A temporary session-only “pin this profile” mode.
 - [x] Profile activation from F-key mappings or custom hotkeys.
 
-### 4. Visual macro builder
+### 4. Visual macro builder (core builder already available)
 
 Expand the current sequence editor into a timeline-style builder with:
 
@@ -211,7 +215,7 @@ Packs should be reviewable before import, must never contain hidden executable c
 - Highlight newly introduced network access and executable behavior.
 - Importing must never execute, register, enable, or contact anything by itself.
 
-### 8. Portable mode
+### 8. Portable mode (packaging implemented)
 
 - Allow an explicit portable mode that keeps configuration beside the executable rather than in AppData.
 - Make the active storage mode and folder obvious.
@@ -232,12 +236,15 @@ Packs should be reviewable before import, must never contain hidden executable c
 - [x] Rollback snapshots before replacement and a warned, deliberate restart into normal mode.
 - [ ] A future known-good recovery snapshot kept beside the existing Backups area.
 
-### 10. Mapping search in the existing interface
+### 10. Mapping search in the existing interface (implemented locally)
 
 - Integrate global mapping search into the existing action library, profile manager, or another current workspace instead of creating an unnecessary standalone page.
 - Search across base mappings, layers, custom hotkeys, profiles, conditions, commands, paths, applications, URLs, and PowerToys references.
 - Open the selected result directly in its existing editor.
 - Redact private target details from copied search results unless the user deliberately reveals them.
+- [x] Search across Default and custom profiles, base and modifier layers, function keys, custom hotkeys, conditions, sequences, apps, paths, and action text.
+- [x] Keep private targets searchable locally without displaying them in result labels.
+- [x] Open the selected result in the existing function-key or custom-hotkey editor.
 
 ### 11. Tray quick actions
 
@@ -284,12 +291,15 @@ Privacy is a core product boundary, not a cosmetic settings section.
 - For sequences, summarize each step and total configured wait time.
 - The information view must never execute, validate through side effects, open a URL, or contact an endpoint.
 
-### 16. Crash-safe draft recovery
+### 16. Crash-safe draft recovery (implemented locally)
 
 - Save bounded local recovery drafts separately from the active configuration.
 - After an unexpected exit, offer to preview, restore, discard, or export the draft.
 - Never activate a recovered draft until the user reviews and saves it.
 - Exclude raw key history and unrelated application state from recovery files.
+- [x] Save a bounded private recovery draft only after an unsaved edit.
+- [x] Preview, restore into the editor without activation, discard, export, or decide later.
+- [x] Remove the draft after a deliberate save or discard.
 
 ### 17. Verifiable community action packs
 
@@ -338,12 +348,15 @@ Privacy is a core product boundary, not a cosmetic settings section.
 - Highlight sequences whose effect depends on focus, external applications, or hardware.
 - Keep cancellation behavior separate until an interaction can be designed that is difficult to trigger accidentally.
 
-### 23. Emergency recovery backup
+### 23. Emergency recovery backup (implemented locally)
 
 - Maintain one known-good local recovery configuration independently of ordinary undo history.
 - Store it inside the existing Backups folder or directly beside that folder, never in a hidden unrelated location.
 - Let Safe Mode preview and restore it without first loading active mappings or installing hooks.
 - Replace the known-good copy only after a verified successful save and startup, with clear retention rules.
+- [x] Keep `known-good.keyweave` in the existing Backups folder.
+- [x] Replace it only after validation, persistence, live-engine apply, hotkey registration, and startup-setting completion.
+- [x] Preview and restore it from Safe Mode with a rollback folder and no action activation.
 
 ### 24. Official-release authenticity and self-integrity
 
@@ -431,7 +444,7 @@ Dropped because timing-based behavior can feel inconsistent with modifiers, game
 1. Finish modifier-layer tray polish and physical keyboard acceptance testing.
 2. Profile colors, icons, and active-profile explanation.
 3. Stronger conflict/safety center.
-4. Visual macro builder.
+4. Finish visual macro-builder polish only where it improves the existing builder.
 5. Action packs and reviewed imports.
 6. Additional integrations.
 7. Cross-platform backend.

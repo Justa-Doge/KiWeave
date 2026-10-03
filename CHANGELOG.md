@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-beta.2
+
+- Renamed the actual application identity to KiWeave: `KiWeave.exe`, KiWeave install/data folders, Start-menu entries, startup value, mutexes, manifest, project, tests, and release packaging.
+- Added non-destructive migration from the legacy Function Row Remapper data folder. Existing KiWeave files always win and the legacy folder remains untouched as a recovery copy.
+- Added global mapping search across Default and custom profiles, base and modifier layers, function keys, custom hotkeys, conditions, sequences, apps, paths, and actions, with direct editor navigation and private targets hidden from result labels.
+- Added crash-safe private drafts after unsaved edits, with local preview, restore-to-editor, discard, export, and no automatic activation.
+- Added a last-known-good private backup after a mapping save validates and successfully reaches the running engine, plus reviewed restoration from Safe Mode with rollback.
+- Automatic update checks now run at launch and every 12 hours while KiWeave remains open, still respecting both the master network switch and update-check preference and never downloading automatically.
+- Added experimental Discord OAuth/IPC voice controls with session-only authorization, automatic reconnect, and focused-app-independent mute/deafen actions. Discord voice control may remain unavailable until the KiWeave Discord application is public/approved; the existing Discord shortcut fallback remains available.
+
 ## 1.0.0-beta.1
 
 - Added privacy-first Safe Mode through Shift-at-launch and a separate installed recovery shortcut. It loads no keyboard hook, global hotkeys, mapped actions, automatic profiles, integrations, tray mode, or network features.

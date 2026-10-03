@@ -13,17 +13,17 @@ namespace FunctionRowRemapper
     internal static class Startup
     {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string Name = "FunctionRowRemapper";
+        const string Name = "KiWeave", LegacyName = "FunctionRowRemapper";
         public static bool Enabled {
-            get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && k.GetValue(Name) != null; }
+            get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && (k.GetValue(Name) != null || k.GetValue(LegacyName) != null); }
         }
         public static bool IsCurrent { get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && String.Equals(k.GetValue(Name) as string, "\"" + Application.ExecutablePath + "\" --tray", StringComparison.OrdinalIgnoreCase); } }
         public static void Set(bool enabled)
         {
             if (!enabled && !Enabled) return;
             using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) {
-                if (enabled) k.SetValue(Name, "\"" + Application.ExecutablePath + "\" --tray", RegistryValueKind.String);
-                else k.DeleteValue(Name, false);
+                if (enabled) { k.SetValue(Name, "\"" + Application.ExecutablePath + "\" --tray", RegistryValueKind.String); k.DeleteValue(LegacyName, false); }
+                else { k.DeleteValue(Name, false); k.DeleteValue(LegacyName, false); }
             }
         }
     }
@@ -76,6 +76,8 @@ namespace FunctionRowRemapper
         readonly ToolStripMenuItem trayWhyProfile = new ToolStripMenuItem("Why this profile?");
         readonly ToolStripMenuItem trayPinProfile = new ToolStripMenuItem("Pin current profile");
         readonly System.Windows.Forms.Timer statusTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        readonly System.Windows.Forms.Timer draftTimer = new System.Windows.Forms.Timer { Interval = 750 };
+        readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = UpdateChecker.CheckIntervalMilliseconds };
         readonly bool startInTray;
         readonly bool isPreview;
         readonly bool showWelcome;
@@ -134,7 +136,11 @@ namespace FunctionRowRemapper
             loading = false;
             SetupTray(); UpdateStatus();
             statusTimer.Tick += delegate { CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
+            draftTimer.Tick += delegate { draftTimer.Stop(); SaveRecoveryDraft(); };
+            updateTimer.Tick += delegate { RunAutomaticUpdateCheck(); };
+            UpdateAutomaticCheckTimer();
             Shown += delegate {
+                OfferDraftRecovery();
                 DetectMonitors();
                 if (initialError != null) SetFeedback(initialError, true);
                 else CheckMissingTargets();
@@ -414,7 +420,7 @@ namespace FunctionRowRemapper
             } catch (Exception ex) { if (!IsDisposed) monitorStatus.Text = "Detection failed: " + ex.Message; }
             finally { scanning = false; if (!IsDisposed) detect.Enabled = true; }
         }
-        void MarkDirty() { dirty = true; Text = "KiWeave *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); }
+        void MarkDirty() { dirty = true; Text = "KiWeave *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); if (!isPreview) { draftTimer.Stop(); draftTimer.Start(); } }
         void SetFeedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Color.FromArgb(255, 151, 153) : muted; }
         void BrowseTarget(object sender, EventArgs e)
         {
@@ -457,6 +463,8 @@ namespace FunctionRowRemapper
                 dirty = false; Text = "KiWeave";
                 try { if (startup.Checked != Startup.Enabled || (startup.Checked && !Startup.IsCurrent)) Startup.Set(startup.Checked); }
                 catch (Exception ex) { dirty = true; SetFeedback("Mappings saved, but startup setting failed: " + ex.Message, true); return false; }
+                RecoveryStore.DeleteDraft();
+                try { RecoveryStore.SaveKnownGoodCurrent(); } catch (Exception ex) { AppLog.Record("KnownGoodRecovery", ex); }
                 SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
             } catch (Exception ex) { SetFeedback("Could not save: " + ex.Message, true); return false; }
         }
@@ -604,6 +612,7 @@ namespace FunctionRowRemapper
                 UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next;
                 NetworkPolicy.Enabled = next.NetworkAccess;
                 checkUpdates.Enabled = next.NetworkAccess;
+                UpdateAutomaticCheckTimer();
                 if (!next.AutomaticProfiles) { automaticProfileActive = false; UpdateStatus(); }
                 SetFeedback(next.NetworkAccess ? "Settings updated. Approved network features may connect when triggered." : "Network access blocked. Local remapping remains available.", false);
             } catch (Exception ex) {
@@ -630,6 +639,12 @@ namespace FunctionRowRemapper
                 if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag);
                 SetFeedback("KiWeave " + tag + " is available.", false);
             }));
+        }
+        void UpdateAutomaticCheckTimer() { updateTimer.Enabled = !isPreview && preferences.NetworkAccess && preferences.CheckUpdates; }
+        void RunAutomaticUpdateCheck()
+        {
+            if (!preferences.NetworkAccess || !preferences.CheckUpdates) return;
+            UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null) { if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag); } }));
         }
         void OpenDataFolder()
         {
@@ -825,6 +840,55 @@ namespace FunctionRowRemapper
             catch (Exception ex) { SetFeedback("Conflict scan could not read Default: " + ex.Message, true); return; }
             using (var dialog = new ConflictCenterForm(defaults, profiles)) if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedIssue != null) OpenConflictIssue(dialog.SelectedIssue);
         }
+        void OpenMappingSearch()
+        {
+            Configuration defaults;
+            try { defaults = String.Equals(currentProfile, "Default", StringComparison.OrdinalIgnoreCase) ? draft.Copy() : (File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration()); }
+            catch (Exception ex) { SetFeedback("Mapping search could not read Default: " + ex.Message, true); return; }
+            ProfileCollection searchableProfiles = profiles.Copy();
+            if (!String.Equals(currentProfile, "Default", StringComparison.OrdinalIgnoreCase)) {
+                var active = searchableProfiles.Find(currentProfile); if (active != null) try { ProfileStore.SetEffectiveConfiguration(searchableProfiles, active, draft, defaults); } catch { }
+            }
+            using (var dialog = new MappingSearchForm(defaults, searchableProfiles)) if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedResult != null) OpenMappingSearchResult(dialog.SelectedResult);
+        }
+        void OpenMappingSearchResult(MappingSearchResult result)
+        {
+            if (!String.Equals(result.Profile, currentProfile, StringComparison.OrdinalIgnoreCase)) {
+                if (dirty) { SetFeedback("Save or discard the current edits before opening a result from another profile.", true); return; }
+                if (!ActivateProfile(result.Profile, true, false)) return;
+            }
+            if (result.CustomIndex >= 0) { SelectPage(1); SelectCustomSection(false); if (result.CustomIndex < draft.CustomHotkeys.Length) LoadCustomEditor(result.CustomIndex); }
+            else if (result.FunctionIndex >= 0) { SelectPage(0); selectedLayer = result.LayerIndex >= 0 && result.LayerIndex < draft.Layers.Length ? result.LayerIndex : -1; RefreshLayerView(); PopulateList(); LoadEditor(Math.Min(11, result.FunctionIndex)); }
+            SetFeedback("Opened " + result.Location + ".", false);
+        }
+        void SaveRecoveryDraft()
+        {
+            if (isPreview || !dirty) return;
+            try {
+                Configuration defaults = String.Equals(currentProfile, "Default", StringComparison.OrdinalIgnoreCase) ? saved.Copy() : (File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration());
+                RecoveryStore.SaveDraft(defaults, profiles, preferences, Startup.Enabled, currentProfile, draft);
+            } catch (Exception ex) { AppLog.Record("DraftRecovery", ex); }
+        }
+        void OfferDraftRecovery()
+        {
+            if (isPreview || dirty) return;
+            KeyWeaveBackup recovery; string profile;
+            try { if (!RecoveryStore.TryLoadDraft(out recovery, out profile)) return; }
+            catch (Exception ex) { AppLog.Record("DraftRecoveryRead", ex); return; }
+            Configuration defaults; try { defaults = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration(); } catch { defaults = new Configuration(); }
+            using (var dialog = new DraftRecoveryForm(recovery, profile, defaults, profiles, preferences, Startup.Enabled)) {
+                dialog.ShowDialog(this);
+                if (dialog.Choice == DraftRecoveryChoice.Discard) { RecoveryStore.DeleteDraft(); SetFeedback("Recovery draft discarded. Saved mappings were unchanged.", false); return; }
+                if (dialog.Choice != DraftRecoveryChoice.Restore) return;
+            }
+            try {
+                profiles = recovery.Profiles.Copy(); currentProfile = profile;
+                draft = String.Equals(profile, "Default", StringComparison.OrdinalIgnoreCase) ? recovery.Configuration.Copy() : profiles.Resolve(profile, recovery.Configuration);
+                selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(0);
+                if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
+                MarkDirty(); UpdateStatus(); SetFeedback("Recovered the private draft into the editor. Review it, then Save changes to activate it.", false);
+            } catch (Exception ex) { SetFeedback("The recovery draft could not be opened: " + ex.Message, true); }
+        }
         void OpenConflictIssue(ConflictIssue issue)
         {
             if (issue.Area == ConflictArea.Profiles || !String.Equals(issue.ProfileName, currentProfile, StringComparison.OrdinalIgnoreCase)) { OpenProfiles(); return; }
@@ -867,9 +931,10 @@ namespace FunctionRowRemapper
             if (e.CloseReason == CloseReason.UserClosing && dirty) {
                 DialogResult r = MessageBox.Show(this, "Save your edited mappings before exiting?", "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) { e.Cancel = true; exitRequested = false; return; }
+                if (r == DialogResult.No) RecoveryStore.DeleteDraft();
             }
-            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose();
+            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
     }
 }

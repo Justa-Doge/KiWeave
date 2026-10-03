@@ -23,6 +23,7 @@ namespace FunctionRowRemapper
         [STAThread] static int Main(string[] args)
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            AppStorage.MigrateLegacy();
             if (args.Contains("--interactive")) { using (var f = new MainForm(false, true)) Application.Run(f); return 0; }
             string configBefore = File.ReadAllText(ConfigStore.DefaultPath);
             using (var f = new MainForm(false, true)) {
@@ -61,7 +62,7 @@ namespace FunctionRowRemapper
             var inheritedProfile = new KeyWeaveProfile { Name = "Gaming", Applications = new[] { "game.exe" }, InheritFrom = "Default", OverrideKeys = new[] { "F2" }, Configuration = profileDefault.Copy() };
             inheritedProfile.Configuration.Mappings[1] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
             using (var f = new ProfileManagerForm(new ProfileCollection { Profiles = new[] { inheritedProfile } }, inheritedProfile.Configuration, profileDefault)) { Prepare(f); Capture(f, "profiles-inheritance"); f.Size = f.MinimumSize; Capture(f, "profiles-inheritance-minimum"); f.Close(); }
-            using (var f = new PrivacyCenterForm(false, "KiWeave diagnostics\r\nVersion: 1.0.0-beta.1\r\nMaster network access: blocked\r\n")) { Prepare(f); Capture(f, "privacy-center"); f.Size = f.MinimumSize; Capture(f, "privacy-center-minimum"); f.Close(); }
+            using (var f = new PrivacyCenterForm(false, "KiWeave diagnostics\r\nVersion: 1.0.0-beta.2\r\nMaster network access: blocked\r\n")) { Prepare(f); Capture(f, "privacy-center"); f.Size = f.MinimumSize; Capture(f, "privacy-center-minimum"); f.Close(); }
             using (var f = new LiveKeyTesterForm(null, () => "Default", true)) { Prepare(f); Capture(f, "live-key-tester"); f.Size = f.MinimumSize; Capture(f, "live-key-tester-minimum"); f.Close(); }
             var conflictConfig = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Win+L", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } }, new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" } } } };
             var conflictPowerToys = new[] { new PowerToysShortcut { Module = "ColorPicker", Action = "Activation", Chord = "Ctrl+Alt+K", ModuleEnabled = true } };
@@ -84,6 +85,10 @@ namespace FunctionRowRemapper
             var conditionPreview = new ConditionalRule { Condition = ConditionKind.ForegroundApplication, Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }, Otherwise = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+M" } };
             using (var f = new ConditionalActionForm(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(conditionPreview) })) { Prepare(f); Capture(f, "conditional"); f.Size = f.MinimumSize; Capture(f, "conditional-minimum"); f.Close(); }
             using (var f = new SafeModeForm()) { Prepare(f); Capture(f, "safe-mode"); f.Size = f.MinimumSize; Capture(f, "safe-mode-minimum"); var safeScroll = Field<DesignScrollPanel>(f, "scroll"); safeScroll.AutoScrollPosition = new Point(0, safeScroll.VerticalScroll.Maximum); Application.DoEvents(); Capture(f, "safe-mode-minimum-scrolled"); f.Close(); }
+            var searchConfig = new Configuration(); searchConfig.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }; searchConfig.CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+S" } } };
+            using (var f = new MappingSearchForm(searchConfig, new ProfileCollection())) { Prepare(f); Capture(f, "mapping-search"); f.Size = f.MinimumSize; Capture(f, "mapping-search-minimum"); f.Close(); }
+            var recoveryPreview = new KeyWeaveBackup { Configuration = searchConfig, Profiles = new ProfileCollection(), Preferences = new UserPreferences(), StartWithWindows = false, CreatedUtc = DateTime.UtcNow.AddMinutes(-3) };
+            using (var f = new DraftRecoveryForm(recoveryPreview, "Default", new Configuration(), new ProfileCollection(), new UserPreferences(), false)) { Prepare(f); Capture(f, "draft-recovery"); f.Size = f.MinimumSize; Capture(f, "draft-recovery-minimum"); f.Close(); }
             using (var f = new ActionPickerForm(true)) {
                 Prepare(f); Field<TextBox>(f, "search").Text = "clipboard"; Capture(f, "search");
                 var list = Field<ListBox>(f, "results");

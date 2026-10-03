@@ -171,7 +171,7 @@ namespace FunctionRowRemapper
             AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);
             AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
             AddSetting(left, networkAccess, "Allow network access", "Master switch for GitHub update checks and user-triggered HTTP actions. Local remapping stays available when off.", ToggleBackgroundPreference);
-            AddSetting(left, checkUpdates, "Check for updates on launch", "Quietly checks public GitHub releases. Offline checks are ignored.", ToggleBackgroundPreference);
+            AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
 
             var tools = Card(); columns.Controls.Add(tools, 1, 0);
             var right = UiStyle.Stack(); tools.Controls.Add(right);
@@ -185,6 +185,7 @@ namespace FunctionRowRemapper
             var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             help.Controls.Add(UiStyle.Button("Welcome guide", delegate { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); }));
             help.Controls.Add(UiStyle.Button("Privacy center", delegate { OpenPrivacyCenter(); }, true));
+            help.Controls.Add(UiStyle.Button("Find mappings", delegate { OpenMappingSearch(); }, true));
             help.Controls.Add(UiStyle.Button("Live key tester", delegate { OpenLiveKeyTester(); }));
             help.Controls.Add(UiStyle.Button("Conflict center", delegate { OpenConflictCenter(); }));
             help.Controls.Add(UiStyle.Button("Undo and history", delegate { OpenHistory(); }));
@@ -192,6 +193,7 @@ namespace FunctionRowRemapper
             var folders = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             folders.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenDataFolder(); }));
             folders.Controls.Add(UiStyle.Button("Open log folder", delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } })); right.Controls.Add(folders);
+            right.Controls.Add(UiStyle.Button("Discord connection", delegate { using (var dialog = new DiscordConnectionForm(this)) dialog.ShowDialog(this); }));
             right.Controls.Add(UiStyle.Button("About KiWeave", delegate { using (var about = new AboutForm()) about.ShowDialog(this); }));
         }
 

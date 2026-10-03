@@ -1,8 +1,8 @@
 #define MyAppName "KiWeave"
-#define MyAppVersion "1.0.0-beta.1"
+#define MyAppVersion "1.0.0-beta.2"
 #define MyAppPublisher "Justa-Doge"
 #define MyAppURL "https://github.com/Justa-Doge/KeyWeave"
-#define MyAppExeName "FunctionRowRemapper.exe"
+#define MyAppExeName "KiWeave.exe"
 
 [Setup]
 AppId={{A0C164B8-4A2B-4E4C-92AC-5A11CF6AE7F6}
@@ -12,7 +12,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={localappdata}\Programs\FunctionRowRemapper
+DefaultDirName={localappdata}\Programs\KiWeave
 DefaultGroupName=KiWeave
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -43,6 +43,25 @@ Name: "{autoprograms}\KiWeave Safe Mode"; Filename: "{app}\{#MyAppExeName}"; Par
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch KiWeave"; Flags: nowait postinstall skipifsilent
 
+[InstallDelete]
+Type: files; Name: "{autoprograms}\Function Row Remapper.lnk"
+
 [UninstallDelete]
-; User mappings and profiles under LocalAppData\FunctionRowRemapper are intentionally preserved.
-Type: files; Name: "{app}\FunctionRowRemapper.previous.exe"
+; User mappings and profiles under LocalAppData\KiWeave are intentionally preserved.
+Type: files; Name: "{app}\KiWeave.previous.exe"
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ExistingValue: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'FunctionRowRemapper', ExistingValue) or
+       RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'KiWeave', ExistingValue) then
+    begin
+      RegWriteStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'KiWeave', '"' + ExpandConstant('{app}\{#MyAppExeName}') + '" --tray');
+      RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'FunctionRowRemapper');
+    end;
+  end;
+end;

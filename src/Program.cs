@@ -15,7 +15,7 @@ namespace FunctionRowRemapper
         internal static bool SafeModeRequested(string[] args, bool shiftHeld) { string[] values = args ?? new string[0]; if (Array.IndexOf(values, "--normal-mode") >= 0) return false; return shiftHeld || Array.IndexOf(values, "--safe-mode") >= 0; }
         internal static Icon AppIcon()
         {
-            using (var stream = typeof(Program).Assembly.GetManifestResourceStream("FunctionRowRemapper.AppIcon"))
+            using (var stream = typeof(Program).Assembly.GetManifestResourceStream("KiWeave.AppIcon"))
             using (var icon = new Icon(stream)) return (Icon)icon.Clone();
         }
         internal static Icon TrayIcon()
@@ -28,9 +28,10 @@ namespace FunctionRowRemapper
         [STAThread]
         static void Main(string[] args)
         {
+            try { AppStorage.MigrateLegacy(); } catch (Exception ex) { AppLog.Record("Legacy data migration", ex); }
             bool safeMode = SafeModeRequested(args, (GetAsyncKeyState((int)Keys.ShiftKey) & 0x8000) != 0), restartNormally = false;
-            bool created; string wakeName = @"Local\FunctionRowRemapper-Show-" + Environment.UserName;
-            using (var mutex = new Mutex(true, @"Local\FunctionRowRemapper-" + Environment.UserName, out created)) {
+            bool created; string wakeName = @"Local\KiWeave-Show-" + Environment.UserName;
+            using (var mutex = new Mutex(true, @"Local\KiWeave-" + Environment.UserName, out created)) {
                 if (!created) {
                     if (safeMode) { MessageBox.Show("Exit the running KiWeave session before starting Safe Mode. Safe Mode never runs beside active hooks or hotkeys.", "KiWeave Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                     try {

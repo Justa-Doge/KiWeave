@@ -292,6 +292,7 @@ namespace FunctionRowRemapper
                 Reject(() => ShortcutCapture.Normalize(false, false, false, false, (int)Keys.A, true));
                 Reject(() => ShortcutCapture.Normalize(true, true, false, false, (int)Keys.Delete, true));
             });
+            Test("Automatic update cadence is twelve hours", delegate { Assert(UpdateChecker.CheckIntervalMilliseconds == 43200000, "interval"); });
             Test("Custom hotkeys and Python scripts round-trip", delegate { var c = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+P", Action = new Mapping { Kind = ActionKind.Python, Target = Path.Combine(scratch, "hello.py"), Arguments = "--fast", WorkingDirectory = scratch } }, new CustomHotkey { Shortcut = "Shift+Win+L", Action = new Mapping { Kind = ActionKind.LockThenSleep } } } }; string json = ConfigStore.Serialize(c); var loaded = ConfigStore.Parse(json); Assert(json.Contains("\"version\": 3") && loaded.CustomHotkeys[0].Action.Kind == ActionKind.Python && loaded.CustomHotkeys[1].Action.Kind == ActionKind.LockThenSleep, "v3"); });
             Test("Action sequences preserve order and waits", delegate { var steps = new[] { new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" } }, new SequenceStep { WaitMilliseconds = 750 }, new SequenceStep { Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } } }; string text = SequenceCodec.Serialize(steps); var parsed = SequenceCodec.Parse(text); Assert(parsed.Count == 3 && parsed[1].WaitMilliseconds == 750 && parsed[2].Action.Target == "VolumeMute", "sequence"); });
             Test("Conditional actions round-trip with strict local rules", delegate {
@@ -488,6 +489,36 @@ namespace FunctionRowRemapper
                 string comparison = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = first, Profiles = profiles, Preferences = preferences, StartWithWindows = false }, third, profiles, preferences, true);
                 Assert(comparison.Contains("F1") && comparison.Contains("Start with Windows") && !comparison.Contains("private") && !comparison.Contains("secret.exe"), "safe comparison");
             });
+            Test("Global mapping search covers profiles, layers, hotkeys and nested actions without displaying private targets", delegate {
+                var defaults = new Configuration(); defaults.Mappings[0] = new Mapping { Kind = ActionKind.Application, Target = @"C:\private\secret-tool.exe" };
+                defaults.Layers = new[] { new ModifierLayer { Name = "Media", ActivationKey = "CapsLock" } }; defaults.Layers[0].Mappings[1] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
+                defaults.CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(new ConditionalRule { Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+M" }, Otherwise = new Mapping { Kind = ActionKind.Unbound } }) } } };
+                var gaming = new KeyWeaveProfile { Name = "Gaming", Configuration = defaults.Copy() }; gaming.Configuration.Mappings[2] = new Mapping { Kind = ActionKind.Media, Target = "MediaPlayPause" };
+                var index = MappingSearchIndex.Build(defaults, new ProfileCollection { Profiles = new[] { gaming } });
+                Assert(MappingSearchIndex.Filter(index, "secret-tool").Count == 2, "private target search");
+                Assert(index.All(x => !x.Location.Contains("secret-tool") && !x.Action.Contains("secret-tool")), "private target displayed");
+                Assert(MappingSearchIndex.Filter(index, "Media F2 mute").Count == 2, "layer search");
+                Assert(MappingSearchIndex.Filter(index, "Discord Ctrl+Shift+M").Count == 2, "nested condition search");
+                Assert(MappingSearchIndex.Filter(index, "Gaming Base F3").Count == 1, "profile search");
+            });
+            Test("Crash recovery draft stays private, preserves profile context and never activates itself", delegate {
+                string folder = Path.Combine(scratch, "draft-recovery"), path = Path.Combine(folder, "draft.keyweave"), meta = Path.Combine(folder, "profile.txt");
+                var defaults = new Configuration(); var edited = defaults.Copy(); edited.Mappings[0] = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+S" };
+                var profiles = new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Work", Configuration = defaults.Copy() } } };
+                RecoveryStore.SaveDraft(path, meta, defaults, profiles, new UserPreferences { NetworkAccess = false }, false, "Work", edited);
+                KeyWeaveBackup recovered; string profile; Assert(RecoveryStore.TryLoadDraft(path, meta, out recovered, out profile), "draft missing");
+                Assert(profile == "Work" && recovered.Profiles.Resolve("Work", recovered.Configuration).Mappings[0].Target == "Ctrl+Shift+S", "draft/profile context");
+                Assert(!recovered.Configuration.Enabled && !recovered.Preferences.NetworkAccess && recovered.PowerToys.Length == 0, "draft gained active/network/integration state");
+            });
+            Test("KiWeave data migration copies legacy state without overwriting newer files", delegate {
+                string legacy = Path.Combine(scratch, "legacy-data"), current = Path.Combine(scratch, "kiweave-data"); Directory.CreateDirectory(legacy); Directory.CreateDirectory(current);
+                File.WriteAllText(Path.Combine(legacy, "config.json"), "legacy"); File.WriteAllText(Path.Combine(legacy, "preferences.json"), "legacy prefs"); File.WriteAllText(Path.Combine(current, "preferences.json"), "new prefs");
+                Directory.CreateDirectory(Path.Combine(legacy, "History")); File.WriteAllText(Path.Combine(legacy, "History", "one.keyweave"), "history");
+                AppStorage.MigrateLegacy(legacy, current);
+                Assert(File.ReadAllText(Path.Combine(current, "config.json")) == "legacy", "config not migrated");
+                Assert(File.ReadAllText(Path.Combine(current, "preferences.json")) == "new prefs", "newer preferences overwritten");
+                Assert(File.Exists(Path.Combine(current, "History", "one.keyweave")) && File.Exists(Path.Combine(current, ".migrated-from-function-row-remapper")), "folders/marker missing");
+            });
             Test("Private-safe log excludes exception messages and rotates", delegate {
                 string path = Path.Combine(scratch, "keyweave.log"), secret = "https://example.invalid/private-token";
                 AppLog.Write(path, "Test component", new InvalidOperationException(secret)); string text = File.ReadAllText(path);
@@ -550,8 +581,8 @@ namespace FunctionRowRemapper
                 dispatcher.Execute(new Mapping { Kind = ActionKind.SystemAction, Target = "DiscordMute" });
                 Assert(sink.Keys.Count == 2 && sink.Keys[0].Last() == (int)Keys.MediaPlayPause && sink.Keys[1].Last() == (int)Keys.M, "integration shortcut routing");
             });
-            Test("Release version metadata is 1.0.0 beta 1", delegate {
-                Assert(UpdateChecker.CurrentVersion == "1.0.0-beta.1" && typeof(Program).Assembly.GetName().Version.ToString() == "1.0.0.0", "version mismatch");
+            Test("Release version metadata is 1.0.0 beta 2", delegate {
+                Assert(UpdateChecker.CurrentVersion == "1.0.0-beta.2" && typeof(Program).Assembly.GetName().Version.ToString() == "1.0.0.0", "version mismatch");
             });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }

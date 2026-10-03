@@ -36,8 +36,8 @@ namespace FunctionRowRemapper
             if (name == "CenterWindow") { CenterForegroundWindow(); return; }
             if (name == "ToggleAlwaysOnTop") { ToggleAlwaysOnTop(); return; }
             if (name == "CycleAudioOutput") { AudioDevices.CycleDefaultOutput(); return; }
-            if (name == "DiscordMute") { sink.Send(Shortcuts.Parse("Ctrl+Shift+M", false)); return; }
-            if (name == "DiscordDeafen") { sink.Send(Shortcuts.Parse("Ctrl+Shift+D", false)); return; }
+            if (name == "DiscordMute") { if (!DiscordIntegration.TryToggleVoice("mute")) sink.Send(Shortcuts.Parse("Ctrl+Shift+M", false)); return; }
+            if (name == "DiscordDeafen") { if (!DiscordIntegration.TryToggleVoice("deaf")) sink.Send(Shortcuts.Parse("Ctrl+Shift+D", false)); return; }
             if (name == "SpotifyPlayPause") { sink.Send(Shortcuts.Parse("MediaPlayPause", true)); return; }
             if (name == "SpotifyNext") { sink.Send(Shortcuts.Parse("MediaNextTrack", true)); return; }
             if (name == "SpotifyPrevious") { sink.Send(Shortcuts.Parse("MediaPreviousTrack", true)); return; }

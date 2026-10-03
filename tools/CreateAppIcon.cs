@@ -67,7 +67,7 @@ internal static class CreateAppIcon
         using(var bmp=Render(512)) bmp.Save(Path.Combine(root,"assets","app-icon.png"),ImageFormat.Png);
         using(var preview=new Bitmap(760,360)) using(var g=Graphics.FromImage(preview)) {
             g.Clear(Color.FromArgb(24,24,32)); using(var bmp=Render(288)) g.DrawImageUnscaled(bmp,24,32);
-            using(var font=new Font("Segoe UI",16,FontStyle.Regular)) using(var b=new SolidBrush(Color.FromArgb(238,232,250))) g.DrawString("Function Row Remapper",font,b,343,54);
+            using(var font=new Font("Segoe UI",16,FontStyle.Regular)) using(var b=new SolidBrush(Color.FromArgb(238,232,250))) g.DrawString("KiWeave",font,b,343,54);
             int x=349; foreach(int size in new[]{16,24,32,48,64}) { using(var bmp=Render(size)) g.DrawImageUnscaled(bmp,x,146+(64-size)/2); x+=size+25; }
             using(var font=new Font("Segoe UI",10)) using(var b=new SolidBrush(Color.FromArgb(155,146,179))) g.DrawString("16 / 24 / 32 / 48 / 64 px",font,b,349,240);
             preview.Save(Path.Combine(root,"assets","app-icon-preview.png"),ImageFormat.Png);

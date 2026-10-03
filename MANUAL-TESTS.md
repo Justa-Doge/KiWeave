@@ -33,9 +33,9 @@
 - [ ] In Safe Mode, review recovery status, redacted diagnostics, Privacy Center, and the data folder. Export a private backup, open Undo and history without restoring, then close Safe Mode. Verify the active configuration files are byte-for-byte unchanged.
 - [ ] With a disposable test backup, confirm Safe Mode shows its summary and asks before restore. Cancel once and verify no changes. If deliberately testing restore, verify a rollback folder is created and mappings remain inactive until **Restart normally** is separately confirmed.
 
-Use the installed Start menu/Search entry or `bin/FunctionRowRemapper.exe`. The **Keep running in tray** setting controls close behavior; **Exit** always quits. Test close/reopen with tray on, then close with tray off; startup with tray off must remain visible.
+Use the installed Start menu/Search entry or `bin/KiWeave.exe`. The **Keep running in tray** setting controls close behavior; **Exit** always quits. Test close/reopen with tray on, then close with tray off; startup with tray off must remain visible.
 
-For the DDC update, use `bin/FunctionRowRemapper.exe`. Detection and real monitor write/restore tests passed on the SE2426HG; see [DDC-CI.md](DDC-CI.md). Also verify:
+For the DDC update, use `bin/KiWeave.exe`. Detection and real monitor write/restore tests passed on the SE2426HG; see [DDC-CI.md](DDC-CI.md). Also verify:
 
 - [ ] Map a spare key to Monitor (DDC/CI) / monitor-volume down with a 1% step, Save, and press it physically. Verify hardware volume changes and the key's original action is suppressed.
 - [ ] Hold the key briefly; adjustments should repeat without a long queue of changes after release. Restore the desired volume afterward.

@@ -1,6 +1,6 @@
 # DDC/CI monitor controls
 
-Run **bin/FunctionRowRemapper.exe**. Select a function key, choose **Monitor (DDC/CI)**, select the detected monitor and action, set the adjustment step, and Save. Existing media actions still control Windows audio; monitor-volume actions control the display's hardware audio level.
+Run **bin/KiWeave.exe**. Select a function key, choose **Monitor (DDC/CI)**, select the detected monitor and action, set the adjustment step, and Save. Existing media actions still control Windows audio; monitor-volume actions control the display's hardware audio level.
 
 Supported actions are brightness up/down (VCP 0x10), contrast up/down (0x12), and monitor-volume up/down (0x62). The step is 1–20% of the control's reported maximum, rounded to at least one unit and clamped to 0–maximum. Hold the function key to repeat. No input switching, monitor power-off, raw VCP commands, or firmware changes are exposed.
 
@@ -39,7 +39,7 @@ The physical F-key-to-DDC path still needs a hands-on test. Choose a spare key, 
 ## Diagnostics
 
 ```powershell
-.\bin\FunctionRowRemapper.Tests.exe --ddc-detect
+.\bin\KiWeave.Tests.exe --ddc-detect
 ```
 
 This command only reads monitors. The optional `--ddc-hardware` test deliberately decreases each supported control by one raw unit, reads it back, restores its original value in a finally block, and verifies restoration. Run it only when a brief settings change is appropriate. It does not replace a physical-key acceptance check.

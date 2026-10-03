@@ -1,10 +1,10 @@
 # KiWeave
 
-Current development build: **1.0.0-beta.1**. This is a public beta checkpoint, not the final 1.0 release.
+Current development build: **1.0.0-beta.2**. This is a beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
 
 A Windows tray app for turning F1 through F12 and custom global hotkeys into personal actions, profiles, app integrations, and automations. Remapping works offline; an optional background check looks for newer versions on GitHub.
 
-Previously called Function Row Remapper. The visible app and tray now use **KiWeave**; the executable, storage path, and internal project names remain `FunctionRowRemapper` for compatibility with existing installations and saved mappings.
+Previously called Function Row Remapper. The application is now fully installed as **KiWeave**, including `KiWeave.exe`, its Start-menu entries, startup identity, install folder, and `%LOCALAPPDATA%\KiWeave` data folder. Existing Function Row Remapper data is copied forward without overwriting newer KiWeave files; the old folder is left untouched as a recovery copy.
 
 ## License and credit
 
@@ -44,11 +44,11 @@ Open **Settings → Undo and history** to review the last 20 local snapshots cre
 
 Open **More → Profiles** to copy the current mappings into a named profile. A profile contains its own twelve base function keys, modifier layers, custom hotkeys, sequences, and enabled state. A profile may remain independent or inherit unchanged behavior from Default or another profile; KiWeave stores an explicit override mask, follows later base-profile changes for everything else, and rejects missing bases or inheritance loops. Add process names such as `obs64.exe`, `Discord.exe`, or `Spotify.exe` to switch automatically while that application is in front. An application can belong to only one profile. Automatic switching pauses while the KiWeave window is open or has unsaved edits.
 
-Profiles can also be selected manually from the tray menu. The header badge and tray menu show the active profile; clicking the badge or **Active: ... · Why?** explains whether it was selected manually, matched an app rule, restored, or pinned. **Pin current profile for this session** pauses automatic switching until it is resumed or KiWeave exits, without changing saved preferences. Profile actions appear in both mapping editors and activate plus pin the chosen profile, so an F-key or custom hotkey can switch modes without immediately being overridden by the foreground-app rule. The original `config.json` remains the **Default** profile, so existing installations upgrade without converting or moving their configuration. Additional profiles are stored in `%LOCALAPPDATA%\FunctionRowRemapper\profiles.json`, with an atomic-save backup beside it.
+Profiles can also be selected manually from the tray menu. The header badge and tray menu show the active profile; clicking the badge or **Active: ... · Why?** explains whether it was selected manually, matched an app rule, restored, or pinned. **Pin current profile for this session** pauses automatic switching until it is resumed or KiWeave exits, without changing saved preferences. Profile actions appear in both mapping editors and activate plus pin the chosen profile, so an F-key or custom hotkey can switch modes without immediately being overridden by the foreground-app rule. The original `config.json` remains the **Default** profile. Additional profiles are stored in `%LOCALAPPDATA%\KiWeave\profiles.json`, with an atomic-save backup beside it.
 
 ## Windows and app integrations
 
-The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available.
+The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 2 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
 
 **Call an HTTP endpoint** performs an eight-second GET when its body is empty or a JSON POST when a body is supplied. It is intended for local dashboards, webhooks, and Stream Deck-style tools. The URL cannot contain embedded credentials. HTTP actions contact the configured server only when their assigned key is pressed and the master network switch is on; KiWeave does not send them automatically.
 
@@ -68,7 +68,7 @@ PowerToys remains the owner of these shortcuts; KiWeave does not register them a
 
 For modules supported by the installed `PowerToys.DSC.exe`, you can edit the key combination and optionally enable an off module using **Save in PowerToys**. KiWeave first backs up the original PowerToys settings under `%LOCALAPPDATA%\KiWeave\PowerToysBackups`, rejects a stale or conflicting edit, applies it through PowerToys' configuration tool, then checks the saved result. If PowerToys does not activate it immediately, restart PowerToys yourself; KiWeave does not restart it. Modules without supported configuration, and Keyboard Manager's remap rules, appear read-only; use **Open PowerToys Settings** to edit those. This integration does not claim to control every PowerToys action or bypass Windows-reserved shortcuts.
 
-Run **bin/FunctionRowRemapper.exe**, or use the installed **Function Row Remapper** entry in Windows Search. See [INSTALLATION.md](INSTALLATION.md) for installation, the **Keep running in tray** setting, and removal instructions.
+Run **bin/KiWeave.exe**, or use the installed **KiWeave** entry in Windows Search. See [INSTALLATION.md](INSTALLATION.md) for installation, the **Keep running in tray** setting, and removal instructions.
 
 ## Update notifications
 
@@ -88,7 +88,7 @@ Safe Mode validates the saved configuration, profiles, and preferences without a
 
 Safe Mode will not run beside an existing normal KiWeave process. Exit the running app first so recovery cannot coexist with active hooks or registered hotkeys.
 
-Run `./build.ps1` from PowerShell 7 first, then open **bin/FunctionRowRemapper.exe**. No installer, account, scripting runtime, or administrator access is needed. You can copy that one executable to a permanent local folder. This x64 build uses the Windows .NET Framework 4.x runtime; it is not a bundled .NET runtime or an ARM64 build. Intended for Windows 10/11 x64; tested on one Windows 11 machine only.
+Run `./build.ps1` from PowerShell 7 first, then open **bin/KiWeave.exe**. No installer, account, scripting runtime, or administrator access is needed. You can copy that one executable to a permanent local folder. This x64 build uses the Windows .NET Framework 4.x runtime; it is not a bundled .NET runtime or an ARM64 build. Intended for Windows 10/11 x64; tested on one Windows 11 machine only.
 
 First-run defaults are **all keys Pass through, remapping off, and Windows startup off**. A blue F icon appears in the notification area. If another copy is running, use that icon to open it.
 
@@ -140,7 +140,7 @@ Configuration is human-readable JSON: version 1 for original actions, version 2 
 
 Saving at least one custom hotkey uses version 3 and adds a `customHotkeys` section. Adding a modifier layer uses version 4 and adds a `layers` section while preserving the base mappings and custom hotkeys. A custom hotkey must include at least one modifier so ordinary typing cannot be captured. Windows-reserved or already-used combinations are reported when you save.
 
-`%LOCALAPPDATA%\FunctionRowRemapper\config.json`
+`%LOCALAPPDATA%\KiWeave\config.json`
 
 Saves write and flush a temporary file in the same directory, then atomically replace the current file. `config.json.bak` retains the previous saved version. A corrupt existing file is not overwritten just by opening the app; the app opens with safe defaults and an error. You can inspect or restore the backup while the app is closed.
 
@@ -154,7 +154,7 @@ Imports never execute commands, enable remapping, or change startup. Review all 
 
 Open the bottom-left **Settings** page and tick **Start with Windows**. The change applies immediately and creates only the per-user startup value:
 
-`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run\FunctionRowRemapper`
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run\KiWeave`
 
 The value is the quoted executable path followed by `--tray`. Untick it to remove the value immediately. Startup is separate from the imported/exported mapping JSON so an import cannot enable persistence. Place the executable in its permanent folder before enabling startup. If you move it later, toggle the setting off and on from the new location to update the entry.
 
@@ -187,11 +187,11 @@ From this project directory in PowerShell 7 (`pwsh`, already available on this m
 
 ```powershell
 .\build.ps1
-.\bin\FunctionRowRemapper.Tests.exe --native
-.\bin\FunctionRowRemapper.Tests.exe --ddc-detect
+.\bin\KiWeave.Tests.exe --native
+.\bin\KiWeave.Tests.exe --ddc-detect
 ```
 
-Close the running remapper before rebuilding. The script uses the built-in 64-bit C# compiler at `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, without downloading dependencies or changing script execution policy. It compiles the application and tests and runs the non-hook suite. Windows PowerShell 5 on this computer blocks .ps1 files under its existing policy; the verified build used PowerShell 7. No policy change is required to run the compiled app. `FunctionRowRemapper.csproj` is also supplied for Visual Studio/MSBuild with the .NET Framework 4.8 targeting pack.
+Close the running remapper before rebuilding. The script uses the built-in 64-bit C# compiler at `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, without downloading dependencies or changing script execution policy. It compiles the application and tests and runs the non-hook suite. Windows PowerShell 5 on this computer blocks .ps1 files under its existing policy; the verified build used PowerShell 7. No policy change is required to run the compiled app. `KiWeave.csproj` is also supplied for Visual Studio/MSBuild with the .NET Framework 4.8 targeting pack.
 
 The build defaults to `bin`. `Ddc.cs` implements detection and the Windows dxva2 monitor operations, with scoped physical-monitor handles and a separate monitor dispatcher. `UserPreferences.cs` stores tray, update-check, and automatic-profile preferences separately from mappings, while the Windows startup choice remains in the per-user Run key.
 
@@ -208,7 +208,7 @@ Microsoft references: [LowLevelKeyboardProc](https://learn.microsoft.com/en-us/w
 1. Untick Start with Windows in Settings.
 2. Exit the app from its window or tray menu.
 3. Delete the executable/project folder when no longer needed.
-4. Optionally delete `%LOCALAPPDATA%\FunctionRowRemapper` to remove configuration and backup files.
+4. Optionally delete `%LOCALAPPDATA%\KiWeave` to remove configuration and backup files. A migrated legacy `%LOCALAPPDATA%\FunctionRowRemapper` folder may remain as a recovery copy until you deliberately remove it.
 
 If the executable has already been removed, delete only the named `FunctionRowRemapper` value from the per-user Run key above. Do not delete the Run key itself. There is no service, driver, scheduled task, or system-wide keyboard setting to uninstall.
 
