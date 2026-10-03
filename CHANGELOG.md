@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0-beta.3.5
+## 1.0.0-beta.2.5
 
 - Applied the dark native theme consistently to list, text, combo, and scrollable controls so scrollbars match KiWeave's dark panels.
 - Kept the private KiWeave-only state checker out of the release source.
