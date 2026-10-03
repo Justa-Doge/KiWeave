@@ -16,16 +16,30 @@ namespace FunctionRowRemapper
 {
     internal static class DiscordIntegration
     {
-        // Public application id only. No Discord secret or token is ever written to disk.
+        // Public application id only. The refresh token is encrypted with the
+        // current Windows account and kept out of configs, backups, logs, and Git.
         internal const string ClientId = "1555947532616597595";
         internal const string RedirectUri = "http://127.0.0.1:46721/callback/";
         static readonly object Gate = new object();
         static DiscordIpcClient client;
         static string accessToken = "";
+        static string refreshToken = LoadRefreshToken();
+        static bool restoring;
         static System.Threading.Timer reconnectTimer;
 
         internal static bool Connected { get { lock (Gate) return client != null && client.IsConnected; } }
-        internal static string Status { get { lock (Gate) return Connected ? "Connected for this session" : "Not connected"; } }
+        internal static bool HasAuthorization { get { lock (Gate) return !String.IsNullOrEmpty(refreshToken) || Connected; } }
+        internal static string Status { get { lock (Gate) return Connected ? "Connected" : (String.IsNullOrEmpty(refreshToken) ? "Not connected" : "Authorized; waiting for Discord"); } }
+
+        internal static void Start(bool networkAllowed)
+        {
+            lock (Gate) { if (networkAllowed) StartReconnectMonitorLocked(); }
+        }
+
+        internal static void SetNetworkAccess(bool enabled)
+        {
+            lock (Gate) { if (enabled) StartReconnectMonitorLocked(); }
+        }
 
         internal static string CreateAuthorizationUrl(out string state, out string verifier)
         {
@@ -57,15 +71,21 @@ namespace FunctionRowRemapper
                     byte[] htmlBytes = Encoding.UTF8.GetBytes(html); context.Response.ContentType = "text/html"; context.Response.ContentLength64 = htmlBytes.Length; using (Stream stream = context.Response.OutputStream) stream.Write(htmlBytes, 0, htmlBytes.Length);
                     if (!String.Equals(returnedState, state, StringComparison.Ordinal) || String.IsNullOrEmpty(code)) throw new InvalidOperationException(String.IsNullOrEmpty(error) ? "Discord returned an invalid authorization response." : "Discord authorization was declined: " + error);
                     status("Exchanging the short-lived authorization code...");
-                    string token = await ExchangeCode(code, verifier).ConfigureAwait(true);
-                    var next = new DiscordIpcClient(token); next.Connect();
-                    lock (Gate) { if (client != null) client.Dispose(); client = next; accessToken = token; StartReconnectMonitorLocked(); }
-                    status("Connected to Discord for this KiWeave session."); return true;
+                    TokenSet tokens = await Task.Run(() => ExchangeCode(code, verifier)).ConfigureAwait(true);
+                    var next = new DiscordIpcClient(tokens.AccessToken); next.Connect();
+                    lock (Gate) { if (client != null) client.Dispose(); client = next; accessToken = tokens.AccessToken; if (!String.IsNullOrEmpty(tokens.RefreshToken)) refreshToken = tokens.RefreshToken; SaveRefreshTokenLocked(); StartReconnectMonitorLocked(); }
+                    status("Connected to Discord. Authorization will be reused on this Windows account."); return true;
                 } finally { listener.Stop(); }
             }
         }
 
-        static async Task<string> ExchangeCode(string code, string verifier)
+        sealed class TokenSet
+        {
+            internal string AccessToken;
+            internal string RefreshToken;
+        }
+
+        static TokenSet ExchangeCode(string code, string verifier)
         {
             // KiWeave targets .NET Framework 4.8, but some Windows installations
             // still inherit an older ServicePointManager default. Discord requires
@@ -73,14 +93,26 @@ namespace FunctionRowRemapper
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             string body = "client_id=" + Uri.EscapeDataString(ClientId) + "&grant_type=authorization_code&code=" + Uri.EscapeDataString(code) +
                 "&redirect_uri=" + Uri.EscapeDataString(RedirectUri) + "&code_verifier=" + Uri.EscapeDataString(verifier);
-            var request = (HttpWebRequest)WebRequest.Create("https://discord.com/api/oauth2/token"); request.Method = "POST"; request.ContentType = "application/x-www-form-urlencoded"; request.UserAgent = "KiWeave/1.0";
+            return PostToken(body);
+        }
+
+        static TokenSet RefreshAccessToken(string token)
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            string body = "client_id=" + Uri.EscapeDataString(ClientId) + "&grant_type=refresh_token&refresh_token=" + Uri.EscapeDataString(token);
+            return PostToken(body);
+        }
+
+        static TokenSet PostToken(string body)
+        {
+            var request = (HttpWebRequest)WebRequest.Create("https://discord.com/api/oauth2/token"); request.Method = "POST"; request.ContentType = "application/x-www-form-urlencoded"; request.UserAgent = "KiWeave/1.0"; request.Timeout = 8000; request.ReadWriteTimeout = 8000;
             byte[] bytes = Encoding.UTF8.GetBytes(body); request.ContentLength = bytes.Length;
-            using (Stream stream = await request.GetRequestStreamAsync().ConfigureAwait(true)) await stream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(true);
-            using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(true)) using (var reader = new StreamReader(response.GetResponseStream())) {
-                var data = new JavaScriptSerializer().DeserializeObject(await reader.ReadToEndAsync().ConfigureAwait(true)) as Dictionary<string, object>;
-                string token = data == null || !data.ContainsKey("access_token") ? "" : data["access_token"] as string;
-                if (String.IsNullOrEmpty(token)) throw new InvalidOperationException("Discord did not return an access token. Public Client/PKCE may not be enabled yet.");
-                return token;
+            using (Stream stream = request.GetRequestStream()) stream.Write(bytes, 0, bytes.Length);
+            using (var response = (HttpWebResponse)request.GetResponse()) using (var reader = new StreamReader(response.GetResponseStream())) {
+                var data = new JavaScriptSerializer().DeserializeObject(reader.ReadToEnd()) as Dictionary<string, object>;
+                string access = data == null || !data.ContainsKey("access_token") ? "" : data["access_token"] as string;
+                if (String.IsNullOrEmpty(access)) throw new InvalidOperationException("Discord did not return an access token. Public Client/PKCE may not be enabled yet.");
+                return new TokenSet { AccessToken = access, RefreshToken = data.ContainsKey("refresh_token") ? data["refresh_token"] as string : "" };
             }
         }
 
@@ -103,7 +135,13 @@ namespace FunctionRowRemapper
         {
             lock (Gate)
             {
-                if (String.IsNullOrEmpty(accessToken) || Connected || !DiscordDesktopIsRunning()) return;
+                if (!NetworkPolicy.Enabled || restoring || Connected || !DiscordDesktopIsRunning() || (String.IsNullOrEmpty(accessToken) && String.IsNullOrEmpty(refreshToken))) return;
+                if (String.IsNullOrEmpty(accessToken) && !String.IsNullOrEmpty(refreshToken)) {
+                    restoring = true;
+                    try { TokenSet tokens = RefreshAccessToken(refreshToken); accessToken = tokens.AccessToken; if (!String.IsNullOrEmpty(tokens.RefreshToken)) refreshToken = tokens.RefreshToken; SaveRefreshTokenLocked(); }
+                    catch { accessToken = ""; return; }
+                    finally { restoring = false; }
+                }
                 ReconnectLocked(1200);
             }
         }
@@ -125,6 +163,28 @@ namespace FunctionRowRemapper
         internal static void Disconnect()
         {
             lock (Gate) { if (reconnectTimer != null) { reconnectTimer.Dispose(); reconnectTimer = null; } if (client != null) client.Dispose(); client = null; accessToken = ""; }
+        }
+
+        internal static void ForgetAuthorization()
+        {
+            lock (Gate) { Disconnect(); refreshToken = ""; DeleteRefreshTokenLocked(); }
+        }
+
+        static string TokenPath { get { return Path.Combine(AppStorage.DataFolder, "discord.refresh.dpapi"); } }
+        static string LoadRefreshToken()
+        {
+            try { if (!File.Exists(TokenPath)) return ""; byte[] protectedBytes = File.ReadAllBytes(TokenPath); return Encoding.UTF8.GetString(ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser)); }
+            catch { return ""; }
+        }
+        static void SaveRefreshTokenLocked()
+        {
+            if (String.IsNullOrEmpty(refreshToken)) return;
+            try { Directory.CreateDirectory(AppStorage.DataFolder); string temp = TokenPath + ".tmp"; File.WriteAllBytes(temp, ProtectedData.Protect(Encoding.UTF8.GetBytes(refreshToken), null, DataProtectionScope.CurrentUser)); File.Copy(temp, TokenPath, true); File.Delete(temp); }
+            catch { }
+        }
+        static void DeleteRefreshTokenLocked()
+        {
+            try { if (File.Exists(TokenPath)) File.Delete(TokenPath); } catch { }
         }
 
         static string RandomText(int bytes)
@@ -198,16 +258,19 @@ namespace FunctionRowRemapper
 
     internal sealed class DiscordConnectionForm : Form
     {
-        readonly Label status = new Label(); readonly Button connect;
+        readonly Label status = new Label(); readonly Button connect; readonly Button forget;
         internal DiscordConnectionForm(IWin32Window owner) {
             Text = "KiWeave - Discord connection"; Icon = Program.AppIcon(); StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(560, 250); MinimumSize = new Size(560, 250); BackColor = Color.FromArgb(24, 24, 32); ForeColor = UiStyle.Ink;
-            var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root); root.Controls.Add(UiStyle.Text("Discord connection", 18, true)); root.Controls.Add(UiStyle.Text("Connects only this KiWeave session. Tokens stay in memory and are discarded when KiWeave exits.", 9, false));
+            var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root); root.Controls.Add(UiStyle.Text("Discord connection", 18, true)); root.Controls.Add(UiStyle.Text("Authorizes once, then reuses an encrypted refresh token for this Windows account. Access tokens stay in memory.", 9, false));
             status.Text = DiscordIntegration.Status; status.AutoSize = true; status.ForeColor = UiStyle.Muted; status.Margin = new Padding(0, 18, 0, 18); root.Controls.Add(status);
-            connect = UiStyle.Button("Connect Discord", delegate { Connect(owner); }, true); root.Controls.Add(connect); root.Controls.Add(UiStyle.Text("Beta: Discord voice control may remain unavailable until the KiWeave Discord app is public/approved. Tokens stay local and in memory only.", 8.5f, false));
+            var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
+            connect = UiStyle.Button("Connect Discord", delegate { Connect(owner); }, true); buttons.Controls.Add(connect);
+            forget = UiStyle.Button("Forget authorization", delegate { DiscordIntegration.ForgetAuthorization(); status.Text = DiscordIntegration.Status; forget.Enabled = DiscordIntegration.HasAuthorization; }, false); forget.Enabled = DiscordIntegration.HasAuthorization; buttons.Controls.Add(forget);
+            root.Controls.Add(buttons); root.Controls.Add(UiStyle.Text("Authorization is encrypted for this Windows account and reused across KiWeave launches. Beta voice control may remain unavailable until the KiWeave Discord app is public/approved.", 8.5f, false));
         }
         async void Connect(IWin32Window owner)
         {
-            try { connect.Enabled = false; bool ok = await DiscordIntegration.ConnectInteractive(owner, text => BeginInvoke((Action)(() => status.Text = text))); status.Text = ok ? DiscordIntegration.Status : "Not connected"; } catch (Exception ex) { status.Text = ex.Message; MessageBox.Show(this, ex.Message, "Discord connection", MessageBoxButtons.OK, MessageBoxIcon.Information); } finally { connect.Enabled = true; }
+            try { connect.Enabled = false; bool ok = await DiscordIntegration.ConnectInteractive(owner, text => BeginInvoke((Action)(() => status.Text = text))); status.Text = ok ? DiscordIntegration.Status : "Not connected"; forget.Enabled = DiscordIntegration.HasAuthorization; } catch (Exception ex) { status.Text = ex.Message; MessageBox.Show(this, ex.Message, "Discord connection", MessageBoxButtons.OK, MessageBoxIcon.Information); } finally { connect.Enabled = true; }
         }
     }
 }

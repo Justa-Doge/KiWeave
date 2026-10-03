@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-beta.3 (local development)
+
+- Discord authorization can persist across KiWeave launches through an encrypted Windows-account refresh token. Access tokens remain memory-only; Disconnect/Forget authorization removes the local token.
+- KiWeave silently refreshes authorization and reconnects Discord IPC when network access is allowed and Discord is open. No token is included in backups, diagnostics, logs, or Git.
+
 ## 1.0.0-beta.2
 
 - Renamed the actual application identity to KiWeave: `KiWeave.exe`, KiWeave install/data folders, Start-menu entries, startup value, mutexes, manifest, project, tests, and release packaging.

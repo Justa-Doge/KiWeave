@@ -108,6 +108,7 @@ namespace FunctionRowRemapper
             try { preferences = UserPreferences.Load(UserPreferences.DefaultPath); }
             catch (Exception ex) { preferences = new UserPreferences { UseTray = false }; initialError = "Tray preference could not be loaded; the window will stay accessible. " + ex.Message; }
             NetworkPolicy.Enabled = preferences.NetworkAccess;
+            DiscordIntegration.Start(NetworkPolicy.Enabled);
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
@@ -611,6 +612,7 @@ namespace FunctionRowRemapper
             try {
                 UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next;
                 NetworkPolicy.Enabled = next.NetworkAccess;
+                DiscordIntegration.SetNetworkAccess(NetworkPolicy.Enabled);
                 checkUpdates.Enabled = next.NetworkAccess;
                 UpdateAutomaticCheckTimer();
                 if (!next.AutomaticProfiles) { automaticProfileActive = false; UpdateStatus(); }
