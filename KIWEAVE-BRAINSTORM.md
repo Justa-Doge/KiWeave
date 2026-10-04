@@ -535,8 +535,8 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 65. User-selectable notification severity.
 66. Privacy-dashboard export history. (implemented locally)
 67. Local audit trail with automatic redaction (implemented locally).
-68. Experimental-feature kill switch.
-69. Separate developer mode for test actions.
+68. Experimental-feature kill switch. (implemented locally)
+69. Separate developer mode for test actions. (implemented locally)
 70. Signed community action-pack repository.
 71. Action-pack version compatibility checks.
 72. Profile import merge mode.

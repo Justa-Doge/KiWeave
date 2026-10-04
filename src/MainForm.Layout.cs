@@ -204,6 +204,8 @@ namespace FunctionRowRemapper
             AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);
             AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
             AddSetting(left, networkAccess, "Allow network access", "Administrator approval is required. Master switch for GitHub update checks and user-triggered HTTP actions; local remapping stays available when off.", ToggleBackgroundPreference);
+            AddSetting(left, experimentalFeatures, "Allow experimental actions", "Master kill switch for HTTP, command/script, Python, and monitor actions. Ordinary remapping remains available when this is off.", ToggleFeatureFlag);
+            AddSetting(left, developerMode, "Developer mode", "Enables explicit one-shot Test action buttons. It does not enable anything silently.", ToggleFeatureFlag);
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
             notifyUpdates.Checked = notificationPreferences.Updates; AddSetting(left, notifyUpdates, "Show update notifications", "Keep GitHub checks enabled but silence the tray popup when a newer release is found.", ToggleNotificationPreference);
             notifyHealth.Checked = notificationPreferences.Health; AddSetting(left, notifyHealth, "Show health warnings", "Show local configuration-health findings in the status area.", ToggleNotificationPreference);

@@ -65,7 +65,7 @@ namespace FunctionRowRemapper
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;
-        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
+        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
@@ -73,6 +73,7 @@ namespace FunctionRowRemapper
         readonly ToolTip tips = new ToolTip();
         UserPreferences preferences;
         NotificationPreferences notificationPreferences;
+        FeatureFlags featureFlags;
         bool exitRequested;
         readonly Label editorTitle = new DesignLabel(), hint = new DesignLabel(), status = new DesignLabel(), feedback = new DesignLabel(), targetLabel = new DesignLabel(), argumentsLabel = new DesignLabel(), workingLabel = new DesignLabel();
         readonly Button browse = new DesignButton(), folder = new DesignButton(), workBrowse = new DesignButton();
@@ -119,6 +120,7 @@ namespace FunctionRowRemapper
             catch (Exception ex) { preferences = new UserPreferences { UseTray = false }; initialError = "Tray preference could not be loaded; the window will stay accessible. " + ex.Message; }
             UiStyle.ApplyTheme(preferences.Theme);
             notificationPreferences = NotificationPreferences.Load();
+            featureFlags = FeatureFlags.Load();
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
@@ -150,6 +152,7 @@ namespace FunctionRowRemapper
             checkUpdates.Checked = preferences.CheckUpdates;
             automaticProfiles.Checked = preferences.AutomaticProfiles;
             networkAccess.Checked = preferences.NetworkAccess;
+            experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode;
             checkUpdates.Enabled = preferences.NetworkAccess;
             try { startup.Checked = Startup.Enabled; } catch (Exception ex) { initialError = "Cannot read startup setting: " + ex.Message; }
             loading = false;
@@ -633,6 +636,7 @@ namespace FunctionRowRemapper
         }
         void TestAction(Mapping mapping)
         {
+            if (!featureFlags.DeveloperMode) { SetFeedback("Test actions are disabled until Developer mode is enabled in Settings.", true); return; }
             if (mapping == null || mapping.Kind == ActionKind.PassThrough || mapping.Kind == ActionKind.Unbound) { SetFeedback("Choose an action with an observable result before testing.", true); return; }
             try { ConfigStore.Validate(mapping, true); }
             catch (Exception ex) { SetFeedback("Cannot test this action: " + ex.Message, true); return; }
@@ -754,6 +758,12 @@ namespace FunctionRowRemapper
                 loading = true; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; loading = false;
                 SetFeedback("Could not save settings: " + ex.Message, true);
             }
+        }
+        void ToggleFeatureFlag(object sender, EventArgs e)
+        {
+            if (loading || isPreview) return;
+            try { featureFlags.ExperimentalEnabled = experimentalFeatures.Checked; featureFlags.DeveloperMode = developerMode.Checked; featureFlags.Save(); SetFeedback("Feature safety settings saved.", false); }
+            catch (Exception ex) { loading = true; experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode; loading = false; SetFeedback("Feature safety settings could not be saved: " + ex.Message, true); }
         }
         void ToggleNotificationPreference(object sender, EventArgs e)
         {
