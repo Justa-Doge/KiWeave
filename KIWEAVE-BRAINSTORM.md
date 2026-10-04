@@ -542,7 +542,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 72. Profile import merge mode. (implemented locally)
 73. Profile conflict-resolution wizard. (implemented locally)
 74. Keyboard-layout change detection. (implemented locally)
-75. Per-Windows-user profiles.
+75. Per-Windows-user profiles. (implemented locally)
 76. Multi-monitor-specific mappings.
 77. Remote-desktop-aware profiles.
 78. VM-aware profile switching.

@@ -34,7 +34,7 @@ namespace FunctionRowRemapper
             add.MinimumSize = new Size(104, 42); remove.MinimumSize = new Size(78, 42); add.Padding = remove.Padding = new Padding(8);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 0), WrapContents = false }; buttons.Controls.Add(add); buttons.Controls.Add(remove); leftRows.Controls.Add(buttons, 0, 1);
             var right = new DesignCard { Dock = DockStyle.Fill }; root.Controls.Add(right, 1, 0); var stack = UiStyle.Stack(); right.Controls.Add(stack);
-            stack.Controls.Add(UiStyle.Text("Profiles", 20, true)); stack.Controls.Add(UiStyle.Text("Switch layouts manually or assign apps for automatic switching.", 9, false));
+            stack.Controls.Add(UiStyle.Text("Profiles", 20, true)); stack.Controls.Add(UiStyle.Text("Switch layouts manually or assign apps for automatic switching. Profiles are private to the current Windows user and stored under that user's local KiWeave data folder.", 9, false));
             stack.Controls.Add(UiStyle.Field("Profile name", name));
             stack.Controls.Add(UiStyle.Field("Accent color (optional #RRGGBB)", accent));
             stack.Controls.Add(UiStyle.Field("Icon label (optional, up to 4 characters)", icon));

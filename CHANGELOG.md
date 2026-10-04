@@ -73,3 +73,4 @@
 - 2026-10-03: Conflict Center now includes a visual layer map showing base F-keys, each layer's hold key, and duplicate hold-key warnings. Build passed 118 checks.
 - 2026-10-03: Added optional keyboard-layout IDs to profiles. Automatic profile switching now uses a matching local layout profile when no foreground-app rule matches; build passed 119 checks.
 - 2026-10-03: Audited the roadmap against current source and marked already-verified shipped items for profile snapshots, test previews, shortcut reference, reconnect controls, rollback, action-pack compatibility/merge, and first-party extensions/theme polish. No behavior change; the remaining open items are still tracked.
+- 2026-10-03: Made per-Windows-user profile scope explicit in the profile editor and added a read-only display-topology status to Integration Health for monitor-specific mapping review. Build passed 120 checks; multi-monitor mapping policy remains tracked separately.
