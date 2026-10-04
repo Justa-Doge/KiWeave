@@ -543,7 +543,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 73. Profile conflict-resolution wizard. (implemented locally)
 74. Keyboard-layout change detection. (implemented locally)
 75. Per-Windows-user profiles. (implemented locally)
-76. Multi-monitor-specific mappings.
+76. Multi-monitor-specific mappings. (implemented locally)
 77. Remote-desktop-aware profiles.
 78. VM-aware profile switching.
 79. Controller and MIDI input support: read physical controllers through Windows.Gaming.Input/Game Input, read MIDI through Windows MIDI Services, and keep virtual-gamepad output as a separately reviewed optional backend rather than making the archived ViGEmBus driver a default dependency.

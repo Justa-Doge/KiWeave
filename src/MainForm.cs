@@ -1098,7 +1098,7 @@ namespace FunctionRowRemapper
         }
         void OpenIntegrationHealth()
         {
-            using (var dialog = new IntegrationHealthForm(detected, healthReport)) dialog.ShowDialog(this);
+            using (var dialog = new IntegrationHealthForm(detected, healthReport, saved)) dialog.ShowDialog(this);
         }
         void OpenFirstPartyExtensions()
         {

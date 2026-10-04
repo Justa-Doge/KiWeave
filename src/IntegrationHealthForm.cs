@@ -11,12 +11,14 @@ namespace FunctionRowRemapper
     {
         readonly DdcMonitor[] monitors;
         readonly ConfigurationHealthReport health;
+        readonly Configuration configuration;
         readonly TableLayoutPanel rows = new TableLayoutPanel();
 
         internal IntegrationHealthForm(int detectedMonitors, ConfigurationHealthReport report) : this(Enumerable.Range(0, Math.Max(0, detectedMonitors)).Select(i => new DdcMonitor { Id = "preview-" + i, Name = "Preview monitor", Codes = new byte[0] }).ToArray(), report) { }
-        internal IntegrationHealthForm(DdcMonitor[] detectedMonitors, ConfigurationHealthReport report)
+        internal IntegrationHealthForm(DdcMonitor[] detectedMonitors, ConfigurationHealthReport report) : this(detectedMonitors, report, new Configuration()) { }
+        internal IntegrationHealthForm(DdcMonitor[] detectedMonitors, ConfigurationHealthReport report, Configuration sourceConfiguration)
         {
-            monitors = detectedMonitors ?? new DdcMonitor[0]; health = report ?? ConfigurationHealthReport.Empty;
+            monitors = detectedMonitors ?? new DdcMonitor[0]; health = report ?? ConfigurationHealthReport.Empty; configuration = sourceConfiguration == null ? new Configuration() : sourceConfiguration.Copy();
             Text = "KiWeave integrations"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             ClientSize = new Size(700, 620); MinimumSize = new Size(620, 500); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; scroll.EnableKeyboardFocus(); Controls.Add(scroll);
@@ -39,6 +41,7 @@ namespace FunctionRowRemapper
             Add("Keyboard layout", KeyboardLayoutDrift.Snapshot() + " · " + KeyboardLayoutDrift.Observe(), "Reads the active Windows keyboard layout identifier and warns when it differs from the last local observation.");
             Add("Session context", SessionAwareness.CurrentDescription(), "Read-only context used to explain automatic profile switching; KiWeave does not change remote-session or virtual-machine settings.");
             Add("Display topology", MonitorTopology.Describe(), "Reads the current Windows display layout so monitor-specific actions can be reviewed against connected screens.");
+            Add("Monitor mappings", MonitorMappingScope.Describe(configuration), "Lists only redacted monitor identifiers referenced by saved mappings; it never writes hardware settings from this page.");
             rows.ResumeLayout(true);
         }
         void AddHeader(string name, string status, string explanation)
