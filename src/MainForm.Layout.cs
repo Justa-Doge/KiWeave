@@ -208,6 +208,7 @@ namespace FunctionRowRemapper
             notifyUpdates.Checked = notificationPreferences.Updates; AddSetting(left, notifyUpdates, "Show update notifications", "Keep GitHub checks enabled but silence the tray popup when a newer release is found.", ToggleNotificationPreference);
             notifyHealth.Checked = notificationPreferences.Health; AddSetting(left, notifyHealth, "Show health warnings", "Show local configuration-health findings in the status area.", ToggleNotificationPreference);
             notifySafety.Checked = notificationPreferences.Safety; AddSetting(left, notifySafety, "Show safety warnings", "Allow non-destructive safety notices such as action failures and emergency pauses.", ToggleNotificationPreference);
+            notificationSeverity.Items.Clear(); notificationSeverity.Items.AddRange(new object[] { "All", "Warnings and above", "Critical only" }); notificationSeverity.SelectedItem = notificationPreferences.Severity; UiStyle.Combo(notificationSeverity); notificationSeverity.SelectedIndexChanged += ToggleNotificationPreference; left.Controls.Add(UiStyle.Field("Notification severity", notificationSeverity));
             historyRetention.Value = Math.Max(historyRetention.Minimum, Math.Min(historyRetention.Maximum, preferences.HistoryRetention));
             historyRetention.ValueChanged += delegate { ToggleBackgroundPreference(null, EventArgs.Empty); };
 

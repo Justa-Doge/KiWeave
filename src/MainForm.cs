@@ -64,6 +64,7 @@ namespace FunctionRowRemapper
         Button customBrowse;
         readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
+        readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
         Button hideToTray;
         readonly ToolTip tips = new ToolTip();
@@ -134,7 +135,7 @@ namespace FunctionRowRemapper
             }
             try {
                 engine = new KeyboardEngine(RequestProfileActivation);
-                engine.Error += message => Ui(delegate { AppLog.Record("Mapped action failed"); if (notificationPreferences.Safety) SetFeedback(message, true); if (preferences.UseTray && notificationPreferences.Safety) tray.ShowBalloonTip(4000, "Action could not run", message, ToolTipIcon.Warning); });
+                engine.Error += message => Ui(delegate { AppLog.Record("Mapped action failed"); if (notificationPreferences.Safety && notificationPreferences.AllowsWarning) SetFeedback(message, true); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(4000, "Action could not run", message, ToolTipIcon.Warning); });
                 engine.EmergencyDisabled += () => Ui(EmergencyOff);
                 engine.Apply(saved);
             } catch (Exception ex) { saved.Enabled = draft.Enabled = false; initialError = ex.Message; }
@@ -467,7 +468,7 @@ namespace FunctionRowRemapper
             loading = true; enabled.Checked = false; loading = false; saved.Enabled = draft.Enabled = false;
             try { CaptureHistory("emergency bypass"); PersistCurrent(saved); SetFeedback("Emergency bypass activated. Remapping is off. Release any held function keys.", false); }
             catch (Exception ex) { SetFeedback("Remapping is off, but the preference could not be saved: " + ex.Message, true); }
-            UpdateStatus(); if (preferences.UseTray && notificationPreferences.Safety) tray.ShowBalloonTip(3000, "Remapping is off", "Emergency bypass activated.", ToolTipIcon.Info);
+            UpdateStatus(); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(3000, "Remapping is off", "Emergency bypass activated.", ToolTipIcon.Info);
         }
         bool Save()
         {
@@ -561,7 +562,7 @@ namespace FunctionRowRemapper
             Configuration configuration = draft.Copy(); ProfileCollection profileCopy = profiles.Copy(); DdcMonitor[] monitorCopy = detected == null ? new DdcMonitor[0] : detected.ToArray();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate {
                 ConfigurationHealthReport report = ConfigurationHealth.Scan(configuration, profileCopy, monitorCopy);
-                Ui(delegate { healthReport = report; if (report.HasWarnings && notificationPreferences.Health) SetFeedback("Configuration health: " + report.Summary, true); });
+                Ui(delegate { healthReport = report; if (report.HasWarnings && notificationPreferences.Health && notificationPreferences.AllowsWarning) SetFeedback("Configuration health: " + report.Summary, true); });
             });
         }
         void TestAction(Mapping mapping)
@@ -691,7 +692,7 @@ namespace FunctionRowRemapper
         void ToggleNotificationPreference(object sender, EventArgs e)
         {
             if (loading || isPreview || notificationPreferences == null) return;
-            notificationPreferences.Updates = notifyUpdates.Checked; notificationPreferences.Health = notifyHealth.Checked; notificationPreferences.Safety = notifySafety.Checked;
+            notificationPreferences.Updates = notifyUpdates.Checked; notificationPreferences.Health = notifyHealth.Checked; notificationPreferences.Safety = notifySafety.Checked; notificationPreferences.Severity = notificationSeverity.SelectedItem == null ? "All" : notificationSeverity.SelectedItem.ToString();
             try { notificationPreferences.Save(); SetFeedback("Notification preferences saved.", false); }
             catch (Exception ex) { SetFeedback("Notification preferences could not be saved: " + ex.Message, true); }
         }
