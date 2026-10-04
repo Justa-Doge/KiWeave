@@ -106,6 +106,7 @@ namespace FunctionRowRemapper
         public void Execute(Mapping m) { Execute(m, () => true); }
         public void Execute(Mapping m, Func<bool> stillActive)
         {
+            ActionExplanation.Record(m, "action dispatcher");
             if (!FeatureFlags.Load().ExperimentalEnabled && FeatureFlags.IsExperimental(m)) throw new InvalidOperationException("Experimental actions are disabled in Settings.");
             ConfigStore.Validate(m, true);
             if (m.Kind == ActionKind.Monitor) { monitors.Apply(m, stillActive); return; }

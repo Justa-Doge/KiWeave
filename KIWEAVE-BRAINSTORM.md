@@ -496,7 +496,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 29. Portable-mode improvements with explicit data-location controls. (implemented locally)
 30. Windows notification preferences for updates, health, and safety warnings. (implemented locally)
 31. Custom tray-menu profile switching. (implemented locally)
-32. Local “why did this action run?” explanations without key-history logging.
+32. Local “why did this action run?” explanations without key-history logging. (implemented locally)
 33. Dry-run mode for sequences and imported packs. (implemented locally)
 34. Per-integration permission toggles beneath the master network policy. (implemented locally)
 35. Backup privacy scan before export.

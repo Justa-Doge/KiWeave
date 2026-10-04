@@ -627,6 +627,10 @@ namespace FunctionRowRemapper
             using (var dialog = new OpenFileDialog { Filter = "Supported scripts|*.py;*.ps1;*.cmd;*.bat;*.js;*.lua;*.rb;*.ahk|All files|*.*", CheckFileExists = true, Title = "Open a script for review" })
                 if (dialog.ShowDialog(this) == DialogResult.OK) try { ScriptWorkspace.Open(dialog.FileName); SetFeedback("Opened the script in VS Code or your default editor. KiWeave did not execute it.", false); } catch (Exception ex) { SetFeedback("The script could not be opened: " + ex.Message, true); }
         }
+        void ShowActionExplanation()
+        {
+            MessageBox.Show(this, ActionExplanation.Latest, "Why did this action run?", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
         void EnablePortableData(object sender, EventArgs e)
         {
             if (AppStorage.IsPortable) { SetFeedback("Portable data mode is already active. Restart KiWeave to use the portable folder.", false); return; }

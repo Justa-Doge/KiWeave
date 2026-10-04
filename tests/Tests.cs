@@ -638,6 +638,11 @@ namespace FunctionRowRemapper
                 var first = BackupReminder.Inspect(folder, DateTime.UtcNow, null); var recent = BackupReminder.Inspect(folder, DateTime.UtcNow, DateTime.UtcNow.AddDays(-2));
                 Assert(first.ShouldNotify && first.OldestAgeDays >= 30 && !recent.ShouldNotify && recent.Message.Contains("days old"), "backup reminder cadence");
             });
+            Test("Action explanation retains only the latest redacted decision", delegate {
+                ActionExplanation.Record(new Mapping { Kind = ActionKind.SendKey, Target = "R" }, "test input");
+                string text = ActionExplanation.Latest;
+                Assert(text.Contains("test input") && text.Contains("Action: R") && text.Contains("No key history"), "latest action explanation");
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }
