@@ -17,7 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Uninstaller icon generator build failed.' }
 & $uninstallerIconGenerator $projectDir
 if ($LASTEXITCODE -ne 0) { throw 'Uninstaller icon generation failed.' }
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $projectDir 'src') -Filter '*.cs' | ForEach-Object FullName)
-$references = @('/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll')
+$references = @('/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll','/r:System.Security.dll')
 & $compiler /nologo /target:winexe /platform:x64 /optimize+ /warn:4 "/win32manifest:$projectDir\app.manifest" "/win32icon:$iconPath" "/resource:$iconPath,KiWeave.AppIcon" "/out:$binDir\KiWeave.exe" $references $sources
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
 $uninstallerReferences = @('/r:System.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll')

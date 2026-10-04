@@ -643,6 +643,11 @@ namespace FunctionRowRemapper
                 string text = ActionExplanation.Latest;
                 Assert(text.Contains("test input") && text.Contains("Action: R") && text.Contains("No key history"), "latest action explanation");
             });
+            Test("Secret vault expands protected references without exporting values", delegate {
+                string name = "test-secret-" + Guid.NewGuid().ToString("N"); SecretVault.Save(name, "sensitive-value");
+                Assert(SecretVault.Expand("prefix-{vault:" + name + "}") == "prefix-sensitive-value" && !ActionPackStore.Serialize(new ActionPack { Id = "vault-test", Name = "Vault test", Configuration = new Configuration(), Profiles = new ProfileCollection() }).Contains("sensitive-value"), "vault expansion/export boundary");
+                SecretVault.Delete(name);
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }

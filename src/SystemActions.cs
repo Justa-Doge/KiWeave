@@ -96,7 +96,7 @@ namespace FunctionRowRemapper
         {
             NetworkPolicy.Require();
             var request = (HttpWebRequest)WebRequest.Create(mapping.Target); request.Timeout = 8000; request.ReadWriteTimeout = 8000; request.UserAgent = "KiWeave/1.0";
-            byte[] body = Encoding.UTF8.GetBytes(mapping.Arguments ?? ""); request.Method = body.Length == 0 ? "GET" : "POST";
+            byte[] body = Encoding.UTF8.GetBytes(SecretVault.Expand(mapping.Arguments ?? "")); request.Method = body.Length == 0 ? "GET" : "POST";
             if (body.Length > 0) { request.ContentType = "application/json; charset=utf-8"; request.ContentLength = body.Length; using (var stream = request.GetRequestStream()) stream.Write(body, 0, body.Length); }
             using (var response = (HttpWebResponse)request.GetResponse()) if ((int)response.StatusCode >= 400) throw new InvalidOperationException("HTTP action returned " + (int)response.StatusCode + ".");
         }
