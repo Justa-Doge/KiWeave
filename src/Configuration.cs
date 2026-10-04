@@ -171,6 +171,14 @@ namespace FunctionRowRemapper
                 throw new ArgumentException("Ctrl+Alt+Delete is reserved by Windows and cannot be sent.");
             return result.ToArray();
         }
+        // A single uppercase letter is a request for the shifted character,
+        // not merely the unshifted virtual key (which Windows would type lower-case).
+        public static int[] ParseSendKey(string text)
+        {
+            int[] keys = Parse(text, true);
+            if (!String.IsNullOrEmpty(text) && text.Length == 1 && text[0] >= 'A' && text[0] <= 'Z') return new[] { (int)Keys.Shift, keys[0] };
+            return keys;
+        }
     }
 
     public static class ConfigStore

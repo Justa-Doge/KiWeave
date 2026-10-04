@@ -117,7 +117,7 @@ namespace FunctionRowRemapper
             if (m.Kind == ActionKind.LockThenSleep) { if (Native.LockWorkStation()) { Thread.Sleep(750); Native.SetSuspendState(false, false, false); } return; }
             if (m.Kind == ActionKind.Sequence) { foreach (var step in SequenceCodec.Parse(m.Target)) { if (!stillActive()) return; if (step.IsWait) Thread.Sleep(step.WaitMilliseconds); else Execute(step.Action, stillActive); } return; }
             if (m.Kind == ActionKind.SendKey || m.Kind == ActionKind.SendShortcut || m.Kind == ActionKind.Media) {
-                sink.Send(Shortcuts.Parse(m.Target, m.Kind != ActionKind.SendShortcut)); return;
+                sink.Send(m.Kind == ActionKind.SendKey ? Shortcuts.ParseSendKey(m.Target) : Shortcuts.Parse(m.Target, m.Kind != ActionKind.SendShortcut)); return;
             }
             sink.Launch(BuildLaunch(m));
         }
@@ -162,6 +162,7 @@ namespace FunctionRowRemapper
         public event Action<KeyDiagnostic> KeyObserved;
         public bool Installed { get { return installed; } }
         public bool Enabled { get { return Volatile.Read(ref config).Enabled; } }
+        public string ActiveLayerName { get { return machine.ActiveLayerName(Volatile.Read(ref config)); } }
         public KeyboardEngine() : this(new WindowsActionSink(), false) { }
         internal KeyboardEngine(Action<string> profileActivation) : this(new WindowsActionSink(profileActivation), false) { }
         // Test-only injection seam. The shipping application never enables it.
