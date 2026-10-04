@@ -17,7 +17,7 @@
   <ItemGroup>
     <EmbeddedResource Include="app.ico"><LogicalName>KiWeave.AppIcon</LogicalName></EmbeddedResource>
     <Compile Include="src\AssemblyInfo.cs" />
-    <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" />
+    <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" /><Compile Include="src\NotificationPreferences.cs" />
     <Compile Include="src\PowerToysIntegration.cs" /><Compile Include="src\PowerToysPanel.cs" />
     <Compile Include="src\FirstPartyExtensions.cs" />
     <Compile Include="src\ActionPacks.cs" />
