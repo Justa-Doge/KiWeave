@@ -43,14 +43,14 @@ namespace FunctionRowRemapper
                 !(d["useTray"] is bool) || !(d["checkUpdates"] is bool) || !(d["automaticProfiles"] is bool) || !(d["networkAccess"] is bool)))
                 throw new ArgumentException("Invalid preferences. Expected version 5 settings.");
             if (version == 5) {
-                if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
+                if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
                 if (!(d["customAccent"] is string) || ((string)d["customAccent"]).Length > 7 || ((string)d["customAccent"]).Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch((string)d["customAccent"], "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException("Invalid custom accent color.");
                 return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"] };
             }
             if (version != 6 || d.Count != 8 || !d.ContainsKey("useTray") || !d.ContainsKey("checkUpdates") || !d.ContainsKey("automaticProfiles") || !d.ContainsKey("networkAccess") || !d.ContainsKey("theme") || !d.ContainsKey("customAccent") || !d.ContainsKey("historyRetention") ||
                 !(d["useTray"] is bool) || !(d["checkUpdates"] is bool) || !(d["automaticProfiles"] is bool) || !(d["networkAccess"] is bool) || !(d["historyRetention"] is int) || (int)d["historyRetention"] < 5 || (int)d["historyRetention"] > 100)
                 throw new ArgumentException("Invalid preferences. Expected version 6 settings.");
-            if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
+            if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
             if (!(d["customAccent"] is string) || ((string)d["customAccent"]).Length > 7 || ((string)d["customAccent"]).Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch((string)d["customAccent"], "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException("Invalid custom accent color.");
             return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"], HistoryRetention = (int)d["historyRetention"] };
         }
