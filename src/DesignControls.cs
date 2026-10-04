@@ -218,8 +218,10 @@ namespace FunctionRowRemapper
         {
             DrawMode = DrawMode.OwnerDrawFixed; DropDownStyle = ComboBoxStyle.DropDownList; FlatStyle = FlatStyle.Flat;
             ItemHeight = 32; IntegralHeight = true; MaxDropDownItems = 9; BackColor = UiStyle.Input; ForeColor = UiStyle.Ink;
+            AccessibleRole = AccessibleRole.ComboBox;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         }
+        protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); if (!String.IsNullOrWhiteSpace(Text)) AccessibleName = Text; }
         public override Size GetPreferredSize(Size proposedSize) { return new Size(base.GetPreferredSize(proposedSize).Width, Math.Max(40, ItemHeight + 8)); }
         protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); ItemHeight = Math.Max(32, Font.Height + 14); }
         protected override void OnSelectedIndexChanged(EventArgs e) { base.OnSelectedIndexChanged(e); Invalidate(); }
@@ -280,6 +282,7 @@ namespace FunctionRowRemapper
         {
             DrawMode = DrawMode.OwnerDrawFixed; ItemHeight = 30; BorderStyle = BorderStyle.None;
             BackColor = UiStyle.Surface; ForeColor = UiStyle.Ink; IntegralHeight = false;
+            AccessibleRole = AccessibleRole.List;
         }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
         protected override void OnDrawItem(DrawItemEventArgs e)
