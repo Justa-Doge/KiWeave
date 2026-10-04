@@ -535,9 +535,15 @@ namespace FunctionRowRemapper
                 try {
                     ActionPack pack = ActionPackStore.Load(d.FileName);
                     using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; }
+                    bool importProfiles = false;
+                    if (pack.Profiles != null && pack.Profiles.Profiles.Length > 0) {
+                        string profileMessage = "This action pack contains " + pack.Profiles.Profiles.Length + " profile" + (pack.Profiles.Profiles.Length == 1 ? "" : "s") + ".\r\n\r\nReplace the current local profiles with the reviewed pack profiles? Choosing No keeps your current profiles.";
+                        importProfiles = MessageBox.Show(this, profileMessage, "Action-pack profiles", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+                        if (importProfiles) { ProfileStore.Validate(pack.Profiles, false); CaptureHistory("action pack profiles"); ProfileStore.Save(ProfileStore.DefaultPath, pack.Profiles); profiles = pack.Profiles.Copy(); currentProfile = "Default"; pinnedProfile = ""; automaticProfileActive = false; RefreshTrayProfiles(); }
+                    }
                     pack.Configuration.Enabled = saved.Enabled; draft = pack.Configuration.Copy(); selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                     if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
-                    MarkDirty(); SetFeedback("Action pack staged for review. Nothing was executed or activated.", false); CheckMissingTargets();
+                    MarkDirty(); SetFeedback(importProfiles ? "Action pack mappings staged and reviewed profiles imported. Nothing was executed.": "Action pack staged for review. Nothing was executed or activated.", false); CheckMissingTargets();
                 } catch (Exception ex) { SetFeedback("Action-pack import rejected; current mappings are unchanged. " + ex.Message, true); }
             }
         }
