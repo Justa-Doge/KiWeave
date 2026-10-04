@@ -92,6 +92,7 @@ namespace FunctionRowRemapper
         readonly bool isPreview;
         readonly bool showWelcome;
         KeyboardEngine engine;
+        StreamDeckBridge streamDeckBridge;
         readonly ActionDispatcher customDispatcher;
         readonly System.Collections.Generic.Dictionary<int, CustomHotkey> registeredHotkeys = new System.Collections.Generic.Dictionary<int, CustomHotkey>();
         Configuration saved, draft;
@@ -157,6 +158,7 @@ namespace FunctionRowRemapper
             try { startup.Checked = Startup.Enabled; } catch (Exception ex) { initialError = "Cannot read startup setting: " + ex.Message; }
             loading = false;
             SetupTray(); UpdateStatus();
+            if (FirstPartyExtensionCatalog.IsEnabled("streamdeck")) streamDeckBridge = new StreamDeckBridge(command => Ui(delegate { if (command == "show-settings") ShowSettings(); else if (command.StartsWith("activate-profile:", StringComparison.Ordinal)) RequestProfileActivation(command.Substring("activate-profile:".Length)); }));
             statusTimer.Tick += delegate { CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
             scheduleTimer.Tick += delegate { CheckScheduledProfile(); }; scheduleTimer.Start();
             draftTimer.Tick += delegate { draftTimer.Stop(); SaveRecoveryDraft(); };
@@ -1188,6 +1190,7 @@ namespace FunctionRowRemapper
         }
         void OnClosing(object sender, FormClosingEventArgs e)
         {
+            if (streamDeckBridge != null) { streamDeckBridge.Dispose(); streamDeckBridge = null; }
             if (e.CloseReason == CloseReason.UserClosing && preferences.UseTray && !exitRequested) { e.Cancel = true; Hide(); return; }
             if (e.CloseReason == CloseReason.UserClosing && dirty) {
                 DialogResult r = MessageBox.Show(this, "Save your edited mappings before exiting?", "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);

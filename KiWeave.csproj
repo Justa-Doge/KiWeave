@@ -37,6 +37,7 @@
     <Compile Include="src\MonitorMappingScope.cs" />
     <Compile Include="src\HardwareInputInventory.cs" />
     <Compile Include="src\ActionPackSignatures.cs" />
+    <Compile Include="src\StreamDeckBridge.cs" />
     <Compile Include="src\BackupPrivacyForm.cs" />
     <Compile Include="src\AudioDrift.cs" />
     <Compile Include="src\StartupGuard.cs" />
