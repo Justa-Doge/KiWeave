@@ -85,3 +85,4 @@
 - 2026-10-03: Added local Stable/Beta/Alpha update-channel preferences. GitHub release checks now filter and compare prerelease tags by the selected channel; default behavior remains Stable and network access stays opt-in. Local build passed 127 checks.
 - 2026-10-03: Added a Settings explanation panel for the latest dispatched action. It retains only one redacted in-memory explanation and explicitly avoids key-history logging; local build passed 128 checks.
 - 2026-10-03: Added a Windows-account-protected local secrets vault. HTTP bodies can reference `{vault:name}`; values stay encrypted locally and are excluded from action-pack/config exports. Local build passed 129 checks.
+- 2026-10-03: Added opt-in MIDI note/CC triggers. The local editor maps a MIDI event to an existing saved function-row action, uses native Windows MIDI input without drivers, and stores no MIDI history; controller/Game Input support remains open. Local build passed 130 checks.

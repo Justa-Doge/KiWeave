@@ -94,6 +94,7 @@ namespace FunctionRowRemapper
         readonly bool showWelcome;
         KeyboardEngine engine;
         StreamDeckBridge streamDeckBridge;
+        MidiTriggerService midiTriggerService;
         readonly ActionDispatcher customDispatcher;
         readonly System.Collections.Generic.Dictionary<int, CustomHotkey> registeredHotkeys = new System.Collections.Generic.Dictionary<int, CustomHotkey>();
         Configuration saved, draft;
@@ -159,6 +160,7 @@ namespace FunctionRowRemapper
             try { startup.Checked = Startup.Enabled; } catch (Exception ex) { initialError = "Cannot read startup setting: " + ex.Message; }
             loading = false;
             SetupTray(); UpdateStatus();
+            try { var midiTriggers = MidiTriggerStore.Load(); if (midiTriggers.Count > 0) midiTriggerService = new MidiTriggerService(midiTriggers, key => Ui(delegate { if (key >= 1 && key <= 12 && engine != null) { try { customDispatcher.Execute(saved.Mappings[key - 1]); } catch (Exception ex) { SetFeedback("MIDI trigger failed: " + ex.Message, true); } } })); } catch (Exception ex) { initialError = "MIDI triggers are unavailable: " + ex.Message; }
             if (FirstPartyExtensionCatalog.IsEnabled("streamdeck")) streamDeckBridge = new StreamDeckBridge(command => Ui(delegate { if (command == "show-settings") ShowSettings(); else if (command.StartsWith("activate-profile:", StringComparison.Ordinal)) RequestProfileActivation(command.Substring("activate-profile:".Length)); }));
             statusTimer.Tick += delegate { CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
             scheduleTimer.Tick += delegate { CheckScheduledProfile(); }; scheduleTimer.Start();
@@ -1219,8 +1221,8 @@ namespace FunctionRowRemapper
                 if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) { e.Cancel = true; exitRequested = false; return; }
                 if (r == DialogResult.No) RecoveryStore.DeleteDraft();
             }
-            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); scheduleTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
+            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); scheduleTimer.Stop(); tray.Visible = false; tray.Dispose(); if (midiTriggerService != null) midiTriggerService.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); scheduleTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { if (midiTriggerService != null) midiTriggerService.Dispose(); if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); scheduleTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
     }
 }

@@ -648,6 +648,12 @@ namespace FunctionRowRemapper
                 Assert(SecretVault.Expand("prefix-{vault:" + name + "}") == "prefix-sensitive-value" && !ActionPackStore.Serialize(new ActionPack { Id = "vault-test", Name = "Vault test", Configuration = new Configuration(), Profiles = new ProfileCollection() }).Contains("sensitive-value"), "vault expansion/export boundary");
                 SecretVault.Delete(name);
             });
+            Test("MIDI trigger matching is bounded and channel-aware", delegate {
+                var note = new MidiTrigger { Message = "NoteOn", Channel = 1, Number = 60, MinimumValue = 10, FunctionKey = 3 };
+                Assert(note.Matches(0x91, 60, 10) && !note.Matches(0x90, 60, 10) && !note.Matches(0x91, 61, 100), "note trigger match");
+                var cc = new MidiTrigger { Message = "ControlChange", Channel = 0, Number = 7, MinimumValue = 64 };
+                Assert(cc.Matches(0xB0, 7, 64) && !cc.Matches(0x90, 7, 127), "cc trigger match");
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }
