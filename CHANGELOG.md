@@ -66,3 +66,4 @@
 - 2026-10-03: Added private restore-point notes as local `.note` sidecars beside history snapshots. Notes stay out of backups and exports, can be edited from Undo and history, and are bounded to 500 characters. Build passed 111 checks.
 - 2026-10-03: Added a guided app-path migration assistant. It previews and stages root-folder replacements across base mappings, layers, custom hotkeys, sequences, and conditional actions without saving or executing anything automatically. Build passed 112 checks.
 - 2026-10-03: Added temporary shortcut suspension by focused app. Settings stores up to 32 normalized process names locally; matching apps receive normal function/layer keys while KiWeave stays active. Build passed 113 checks.
+- 2026-10-03: Added a local Release readiness checklist in Settings covering configuration/profile validation, writable local storage, network posture, experimental-action controls, and Safe Mode availability. Build passed 114 checks.

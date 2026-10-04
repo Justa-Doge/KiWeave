@@ -547,7 +547,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 77. Remote-desktop-aware profiles.
 78. VM-aware profile switching.
 79. Controller and MIDI input support: read physical controllers through Windows.Gaming.Input/Game Input, read MIDI through Windows MIDI Services, and keep virtual-gamepad output as a separately reviewed optional backend rather than making the archived ViGEmBus driver a default dependency.
-80. Final release-readiness and security checklist before 1.0.0.
+80. Final release-readiness and security checklist before 1.0.0. (implemented locally)
 81. Stream Deck integration: a KiWeave plugin with declarative action buttons, profile switching, shortcut status, and safe local IPC. Use Elgato's official SDK/WebSocket plugin model, keep secrets out of the plugin, and never execute arbitrary plugin-provided code.
 82. Script workspace: open selected `.py`, `.ps1`, `.cmd`, `.bat`, `.js`, `.lua`, and other explicitly supported script files in VS Code when available, with a safe fallback to the user-selected editor. Opening a script never executes it; execution remains opt-in, visibly labeled, and subject to language/path validation and import quarantine. (implemented locally)
 83. First-party Extensions page: browse KiWeave-maintained integrations and declarative action packs from the official release source, showing version, permissions, supported KiWeave version, maturity, integrity state, and local-data impact before installation. No arbitrary extension code, silent downloads, or hidden network permissions.
