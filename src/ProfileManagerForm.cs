@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -42,10 +43,10 @@ namespace FunctionRowRemapper
             stack.Controls.Add(UiStyle.Text("Inherited profiles follow their base until you intentionally change a mapping, layer, enabled state, or custom-hotkey set.", 8.5f, false));
             feedback.AutoSize = true; feedback.ForeColor = UiStyle.Muted; feedback.Margin = new Padding(0, 12, 0, 10); stack.Controls.Add(feedback);
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false };
-            var save = UiStyle.Button("Save details", delegate { SaveDetails(); }); var duplicate = UiStyle.Button("Duplicate", delegate { DuplicateSelected(); });
+            var save = UiStyle.Button("Save details", delegate { SaveDetails(); }); var duplicate = UiStyle.Button("Duplicate", delegate { DuplicateSelected(); }); var snapshots = UiStyle.Button("Open snapshots", delegate { OpenSnapshots(); });
             var use = UiStyle.Button("Use profile", delegate { UseSelected(); }, true); var close = UiStyle.Button("Close", delegate { DialogResult = DialogResult.Cancel; Close(); });
-            save.MinimumSize = new Size(90, 42); duplicate.MinimumSize = new Size(82, 42); use.MinimumSize = new Size(92, 42); close.MinimumSize = new Size(70, 42);
-            save.Padding = duplicate.Padding = use.Padding = close.Padding = new Padding(8); actions.Controls.Add(save); actions.Controls.Add(duplicate); actions.Controls.Add(use); actions.Controls.Add(close); stack.Controls.Add(actions);
+            save.MinimumSize = new Size(90, 42); duplicate.MinimumSize = new Size(82, 42); snapshots.MinimumSize = new Size(110, 42); use.MinimumSize = new Size(92, 42); close.MinimumSize = new Size(70, 42);
+            save.Padding = duplicate.Padding = snapshots.Padding = use.Padding = close.Padding = new Padding(8); actions.Controls.Add(save); actions.Controls.Add(duplicate); actions.Controls.Add(snapshots); actions.Controls.Add(use); actions.Controls.Add(close); stack.Controls.Add(actions);
             RefreshList(); if (list.Items.Count > 0) list.SelectedIndex = 0;
         }
         void RefreshList()
@@ -67,6 +68,11 @@ namespace FunctionRowRemapper
             int number = 1; string candidate; do candidate = "Profile " + number++; while (profiles.Find(candidate) != null);
             var p = new KeyWeaveProfile { Name = candidate, Configuration = current.Copy() };
             profiles.Profiles = profiles.Profiles.Concat(new[] { p }).ToArray(); RefreshList(); list.SelectedItem = p; feedback.Text = "Added a copy of the mappings currently in the editor.";
+        }
+        void OpenSnapshots()
+        {
+            var p = list.SelectedItem as KeyWeaveProfile; if (p == null) { feedback.Text = "Choose a profile first."; return; }
+            try { Directory.CreateDirectory(ProfileSnapshots.Folder(p.Name)); System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ProfileSnapshots.Folder(p.Name)) { UseShellExecute = true }); } catch (Exception ex) { feedback.Text = "Snapshots could not be opened: " + ex.Message; }
         }
         void RemoveSelected()
         {
