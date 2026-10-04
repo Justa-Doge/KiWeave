@@ -58,3 +58,4 @@
 - Added a bottom-left Settings page for startup, tray behavior, automatic profiles, update checks, backups, diagnostics, logs, and app information.
 - 2026-10-03: Added read-only keyboard-layout drift detection to Integration Health. KiWeave records only the active layout name/identifier fingerprint and reports changes since the last local observation. Commit `6b5f662`; build passed 107 checks.
 - 2026-10-03: Import review now supports selective staging of individual non-default base-key, modifier-layer, and custom-hotkey actions. Unchecked actions become pass-through or are omitted before the reviewed import reaches the editor; build passed 107 checks.
+- 2026-10-03: Privacy Center now reports bounded redacted activity history, records configuration/action-pack/backup exports, and offers a confirmation-gated clear action. Build passed 107 checks.

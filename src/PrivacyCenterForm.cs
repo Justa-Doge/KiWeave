@@ -31,6 +31,7 @@ namespace FunctionRowRemapper
                 "Undo history: " + Size(history) + "\r\n" +
                 "PowerToys safety backups: " + Size(powerToys) + "\r\n" +
                 "Private-safe logs: " + Size(AppLog.TotalBytes()) + "\r\n" +
+                "Redacted activity history: " + AuditTrail.Read().Count + " event(s)\r\n" +
                 reminder + "\r\n" +
                 "Cache: none";
         }
@@ -84,6 +85,7 @@ namespace FunctionRowRemapper
             var dataButtons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
             dataButtons.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenFolder(PrivacyData.DataFolder); }));
             dataButtons.Controls.Add(UiStyle.Button("Clear local logs", delegate { ClearLogs(); }));
+            dataButtons.Controls.Add(UiStyle.Button("Clear activity history", delegate { ClearActivity(); }));
             dataButtons.Controls.Add(UiStyle.Button("Clear undo history", delegate { ClearHistory(); }));
             dataButtons.Controls.Add(UiStyle.Button("Clear recovery draft", delegate { ClearDraft(); })); dataStack.Controls.Add(dataButtons); root.Controls.Add(data);
 
@@ -123,6 +125,11 @@ namespace FunctionRowRemapper
             if (MessageBox.Show(this, "Delete KiWeave's local undo/history snapshots? Active mappings, profiles, backups, and preferences will not be changed.", "Clear undo history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             try { if (Directory.Exists(ConfigurationHistory.DefaultFolder)) foreach (string file in Directory.GetFiles(ConfigurationHistory.DefaultFolder, "*.keyweave")) File.Delete(file); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "Undo history was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information); }
             catch (Exception ex) { MessageBox.Show(this, "Undo history could not be cleared: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+        void ClearActivity()
+        {
+            if (MessageBox.Show(this, "Delete KiWeave's redacted local activity history? This does not change mappings, profiles, backups, or preferences.", "Clear activity history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            AuditTrail.Clear(); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "Redacted activity history was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         void ClearDraft()
         {

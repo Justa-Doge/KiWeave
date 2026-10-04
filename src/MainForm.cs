@@ -561,7 +561,7 @@ namespace FunctionRowRemapper
             try {
                 ConfigStore.Validate(draft, false);
                 using (var d = new SaveFileDialog { Filter = "JSON configuration|*.json", FileName = "function-row.json", DefaultExt = "json", AddExtension = true })
-                    if (d.ShowDialog(this) == DialogResult.OK) { ConfigStore.Save(d.FileName, draft); SetFeedback("Exported your draft mappings. Export does not activate changes or change Windows startup.", false); }
+                    if (d.ShowDialog(this) == DialogResult.OK) { ConfigStore.Save(d.FileName, draft); AuditTrail.Record("configuration-export"); SetFeedback("Exported your draft mappings. Export does not activate changes or change Windows startup.", false); }
             } catch (Exception ex) { SetFeedback("Export failed: " + ex.Message, true); }
         }
         void Import(object sender, EventArgs e)
@@ -589,7 +589,7 @@ namespace FunctionRowRemapper
                 ConfigStore.Validate(draft, false);
                 var pack = new ActionPack { Id = "local.kiweave-pack", Name = "KiWeave local action pack", Publisher = "Local user", Description = "Exported from this KiWeave setup.", Configuration = draft.Copy(), Profiles = profiles.Copy() };
                 using (var d = new SaveFileDialog { Filter = "KiWeave action pack|*.kiweavepack", FileName = "kiweave-action-pack.kiweavepack", DefaultExt = "kiweavepack", AddExtension = true })
-                    if (d.ShowDialog(this) == DialogResult.OK) { ActionPackStore.Save(d.FileName, pack); SetFeedback("Exported a declarative action pack. It contains no scripts or command actions.", false); }
+                    if (d.ShowDialog(this) == DialogResult.OK) { ActionPackStore.Save(d.FileName, pack); AuditTrail.Record("action-pack-export"); SetFeedback("Exported a declarative action pack. It contains no scripts or command actions.", false); }
             } catch (Exception ex) { SetFeedback("Action-pack export failed: " + ex.Message, true); }
         }
         void ImportActionPack(object sender, EventArgs e)
@@ -836,7 +836,7 @@ namespace FunctionRowRemapper
                     if (d.ShowDialog(this) == DialogResult.OK) {
                         string review = BackupPrivacy.Review(BackupBundle.Serialize(saved, profiles, preferences, Startup.Enabled));
                         if (MessageBox.Show(this, "Privacy review\r\n\r\n" + review + "\r\n\r\nCreate this private backup?", "Review backup privacy", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
-                        BackupBundle.Save(d.FileName, saved, profiles, preferences, Startup.Enabled); SetFeedback("Full backup created. PowerToys shortcuts were recorded as a read-only inventory.", false);
+                        BackupBundle.Save(d.FileName, saved, profiles, preferences, Startup.Enabled); AuditTrail.Record("backup-export"); SetFeedback("Full backup created. PowerToys shortcuts were recorded as a read-only inventory.", false);
                     }
             } catch (Exception ex) { SetFeedback("Backup failed: " + ex.Message, true); }
         }

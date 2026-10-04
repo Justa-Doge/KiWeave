@@ -533,7 +533,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 63. Safe startup after repeated crashes (implemented locally).
 64. Automatic rollback after failed configuration activation.
 65. User-selectable notification severity.
-66. Privacy-dashboard export history.
+66. Privacy-dashboard export history. (implemented locally)
 67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch.
 69. Separate developer mode for test actions.
