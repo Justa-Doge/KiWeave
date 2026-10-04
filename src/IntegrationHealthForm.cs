@@ -42,6 +42,7 @@ namespace FunctionRowRemapper
             Add("Session context", SessionAwareness.CurrentDescription(), "Read-only context used to explain automatic profile switching; KiWeave does not change remote-session or virtual-machine settings.");
             Add("Display topology", MonitorTopology.Describe(), "Reads the current Windows display layout so monitor-specific actions can be reviewed against connected screens.");
             Add("Monitor mappings", MonitorMappingScope.Describe(configuration), "Lists only redacted monitor identifiers referenced by saved mappings; it never writes hardware settings from this page.");
+            Add("Controller / MIDI", HardwareInputInventory.Describe(), "Read-only capability discovery. KiWeave does not install drivers, create virtual devices, or capture input from this status page.");
             rows.ResumeLayout(true);
         }
         void AddHeader(string name, string status, string explanation)

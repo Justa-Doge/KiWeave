@@ -35,6 +35,7 @@
     <Compile Include="src\KeyboardLayoutProfiles.cs" />
     <Compile Include="src\MonitorTopology.cs" />
     <Compile Include="src\MonitorMappingScope.cs" />
+    <Compile Include="src\HardwareInputInventory.cs" />
     <Compile Include="src\BackupPrivacyForm.cs" />
     <Compile Include="src\AudioDrift.cs" />
     <Compile Include="src\StartupGuard.cs" />
