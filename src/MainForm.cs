@@ -137,7 +137,7 @@ namespace FunctionRowRemapper
             RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(0);
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             if (preview) {
-                loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = Startup.Enabled;
+                loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = Startup.Enabled;
                 Text = "KiWeave - Design preview"; hideToTray.Enabled = false; status.Text = "Editor preview"; loading = false; return;
             }
             try {
