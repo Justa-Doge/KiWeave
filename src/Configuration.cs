@@ -386,6 +386,20 @@ namespace FunctionRowRemapper
             if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Configuration exceeds 64 KB.");
             return Parse(File.ReadAllText(path, Encoding.UTF8));
         }
+        public static string MigrationPreview(string path)
+        {
+            string json = File.ReadAllText(path, Encoding.UTF8); JsonSyntax.Check(json);
+            var root = new JavaScriptSerializer().DeserializeObject(json) as Dictionary<string, object>;
+            if (root == null || !(root.ContainsKey("version")) || !(root["version"] is int)) throw new ArgumentException("Configuration version is missing or invalid.");
+            int version = (int)root["version"];
+            if (version >= 4) return "This configuration is already at the current format. No migration is needed.";
+            if (version < 1 || version > 4) throw new ArgumentException("Unsupported configuration version.");
+            var changes = new List<string> { "The original file will remain untouched.", "The twelve function-key mappings and enabled state will be preserved." };
+            if (version < 2) changes.Add("Monitor mappings, if present, will use the version 2 monitor fields.");
+            if (version < 3) changes.Add("Custom hotkeys will be added as an empty collection.");
+            if (version < 4) changes.Add("Modifier layers will be added as an empty collection.");
+            return "Version " + version + " will be read into the current format:\r\n• " + String.Join("\r\n• ", changes.ToArray());
+        }
         public static void Save(string path, Configuration c)
         {
             string text = Serialize(c); string dir = Path.GetDirectoryName(Path.GetFullPath(path)); Directory.CreateDirectory(dir);

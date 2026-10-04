@@ -507,6 +507,8 @@ namespace FunctionRowRemapper
             using (var d = new OpenFileDialog { Filter = "JSON configuration|*.json", CheckFileExists = true }) {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
+                    string migration = ConfigStore.MigrationPreview(d.FileName);
+                    if (!migration.StartsWith("This configuration is already", StringComparison.Ordinal) && MessageBox.Show(this, migration + "\r\n\r\nContinue to preview the imported configuration?", "Migration preview", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                     Configuration imported = ConfigStore.Load(d.FileName);
                     using (var review = new ImportReviewForm(imported, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Import cancelled. Your editor and active mappings are unchanged.", false); return; }
                     // Imported enabled state never changes the live toggle, and imports cannot add startup entries.
