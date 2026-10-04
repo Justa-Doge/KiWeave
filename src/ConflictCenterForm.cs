@@ -13,6 +13,7 @@ namespace FunctionRowRemapper
         public ConflictSeverity Severity;
         public ConflictArea Area;
         public string Title = "", Detail = "", Winner = "", ProfileName = "Default";
+        public string Suggestion = "";
         public int CustomHotkeyIndex = -1;
         public override string ToString() { return Severity.ToString().ToUpperInvariant() + "  ·  " + Title; }
     }
@@ -64,7 +65,17 @@ namespace FunctionRowRemapper
                     if (layer != null) issues.Add(new ConflictIssue { Severity = ConflictSeverity.Critical, Area = ConflictArea.CustomHotkeys, ProfileName = scope.Key, CustomHotkeyIndex = i, Title = chord + " ends with the " + layer.Name + " layer key", Detail = "The shortcut and modifier layer depend on the same physical key in the " + scope.Key + " profile.", Winner = "The low-level layer rule wins and suppresses the key before the global hotkey can activate." });
                 }
             }
+            foreach (var issue in issues) issue.Suggestion = SuggestionFor(issue);
             return issues.OrderBy(x => x.Severity).ThenBy(x => x.ProfileName).ThenBy(x => x.Title).ToList();
+        }
+        static string SuggestionFor(ConflictIssue issue)
+        {
+            if (issue == null) return "Review the affected rule before changing anything.";
+            if (issue.Area == ConflictArea.Profiles) return "Assign each foreground application to one profile, or remove the duplicate app rule.";
+            if (issue.Title.IndexOf("PowerToys", StringComparison.OrdinalIgnoreCase) >= 0) return "Choose a different chord in KiWeave or PowerToys so only one global shortcut claims it.";
+            if (issue.Title.IndexOf("Windows", StringComparison.OrdinalIgnoreCase) >= 0) return "Choose a non-system chord; Windows may keep ownership of this shortcut.";
+            if (issue.Title.IndexOf("layer key", StringComparison.OrdinalIgnoreCase) >= 0) return "Choose a chord that does not end with the active layer key, or change the layer key.";
+            return "Open the relevant editor and review the conflicting shortcut before saving.";
         }
         static string ProfileDifference(string first, string second, Configuration defaults, ProfileCollection profiles)
         {
@@ -104,7 +115,7 @@ namespace FunctionRowRemapper
         readonly ProfileCollection profiles;
         readonly IEnumerable<PowerToysShortcut> suppliedPowerToys;
         readonly ListBox list = new DesignListBox();
-        readonly Label summary = new DesignLabel(), title = new DesignLabel(), detail = new DesignLabel(), winner = new DesignLabel();
+        readonly Label summary = new DesignLabel(), title = new DesignLabel(), detail = new DesignLabel(), winner = new DesignLabel(), suggestion = new DesignLabel();
         readonly Button open;
         public ConflictIssue SelectedIssue { get { return list.SelectedItem as ConflictIssue; } }
 
@@ -127,6 +138,7 @@ namespace FunctionRowRemapper
             title.AutoSize = true; title.Font = new Font("Segoe UI", 16, FontStyle.Bold); title.ForeColor = UiStyle.Ink; title.Margin = new Padding(0, 0, 0, 16); details.Controls.Add(title);
             detail.AutoSize = true; detail.MaximumSize = new Size(430, 0); detail.ForeColor = UiStyle.Ink; detail.Margin = new Padding(0, 0, 0, 20); details.Controls.Add(detail);
             var wins = UiStyle.Text("What wins", 9, true); details.Controls.Add(wins); winner.AutoSize = true; winner.MaximumSize = new Size(430, 0); winner.ForeColor = UiStyle.Muted; details.Controls.Add(winner);
+            var suggest = UiStyle.Text("Suggested fix", 9, true); suggest.Margin = new Padding(0, 18, 0, 0); details.Controls.Add(suggest); suggestion.AutoSize = true; suggestion.MaximumSize = new Size(430, 0); suggestion.ForeColor = UiStyle.Blue; details.Controls.Add(suggestion);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 0) };
             buttons.Controls.Add(UiStyle.Button("Close", delegate { Close(); })); open = UiStyle.Button("Open relevant area", delegate { if (SelectedIssue != null) { DialogResult = DialogResult.OK; Close(); } }, true); buttons.Controls.Add(open);
             buttons.Controls.Add(UiStyle.Button("Refresh", delegate { RefreshScan(); })); root.Controls.Add(buttons, 0, 2); RefreshScan();
@@ -136,9 +148,9 @@ namespace FunctionRowRemapper
             var issues = suppliedPowerToys == null ? ConflictScanner.Scan(defaultConfiguration, profiles) : ConflictScanner.Scan(defaultConfiguration, profiles, suppliedPowerToys); list.Items.Clear(); list.Items.AddRange(issues.Cast<object>().ToArray());
             int critical = issues.Count(x => x.Severity == ConflictSeverity.Critical), warnings = issues.Count(x => x.Severity == ConflictSeverity.Warning);
             summary.Text = issues.Count == 0 ? "All clear. No known conflicts were found." : issues.Count + " finding" + (issues.Count == 1 ? "" : "s") + "  •  " + critical + " critical  •  " + warnings + " warning" + (warnings == 1 ? "" : "s");
-            if (list.Items.Count > 0) list.SelectedIndex = 0; else { title.Text = "No known conflicts"; detail.Text = "KiWeave did not find duplicate application rules, layer-key collisions, Windows-owned shortcuts, or active PowerToys overlaps."; winner.Text = "Nothing needs attention."; open.Enabled = false; }
+            if (list.Items.Count > 0) list.SelectedIndex = 0; else { title.Text = "No known conflicts"; detail.Text = "KiWeave did not find duplicate application rules, layer-key collisions, Windows-owned shortcuts, or active PowerToys overlaps."; winner.Text = "Nothing needs attention."; suggestion.Text = ""; open.Enabled = false; }
         }
-        void ShowSelected() { var issue = SelectedIssue; open.Enabled = issue != null; if (issue == null) return; title.Text = issue.Title; detail.Text = issue.Detail; winner.Text = issue.Winner; }
+        void ShowSelected() { var issue = SelectedIssue; open.Enabled = issue != null; if (issue == null) return; title.Text = issue.Title; detail.Text = issue.Detail; winner.Text = issue.Winner; suggestion.Text = issue.Suggestion; }
         void DrawIssue(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0) return; var issue = (ConflictIssue)list.Items[e.Index]; bool selected = (e.State & DrawItemState.Selected) != 0;

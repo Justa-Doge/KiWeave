@@ -423,6 +423,7 @@ namespace FunctionRowRemapper
                 Assert(CollisionSimulator.Simulate("Ctrl+Alt+K", defaults, profiles, pt).Contains("PowerToys"), "collision simulation");
                 Assert(issues.Any(x => x.Title.Contains("more than one profile") && x.Winner.Contains("First wins")), "profile ownership");
                 Assert(!report.Contains("secret.cmd") && !report.Contains(@"C:\private"), "private target leaked");
+                Assert(issues.All(x => !String.IsNullOrWhiteSpace(x.Suggestion)), "conflict suggestions missing");
             });
             Test("Profiles reject duplicate app ownership", delegate {
                 var collection = new ProfileCollection { Profiles = new[] {
