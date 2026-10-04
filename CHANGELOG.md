@@ -92,3 +92,4 @@
 - 2026-10-03: Added a safe text-only localization layer with a local English/Spanish preference, malformed-file fallback, and centralized translation hooks for generated labels and buttons. Local build passed 133 checks; broader string coverage remains tracked.
 - 2026-10-03: Added opt-in encrypted full backups protected to the current Windows account, with `.keyweave.enc` restore support and no plaintext payload on disk. Ordinary backups remain unchanged; local build passed 134 checks.
 - 2026-10-03: Expanded the Spanish translation dictionary across Settings, recovery, diagnostics, mapping, and integration labels while preserving English fallback for unknown strings. Local build remained at 134 passing checks.
+- 2026-10-03: Added a safe Windows Game Input API capability probe to Integration Health. Unsupported runtimes fall back cleanly to the tested XInput backend; no virtual devices or drivers are installed. Local build passed 135 checks.
