@@ -64,6 +64,7 @@ namespace FunctionRowRemapper
         Button customBrowse;
         readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
+        readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
         Button hideToTray;
         readonly ToolTip tips = new ToolTip();
         UserPreferences preferences;
@@ -652,7 +653,7 @@ namespace FunctionRowRemapper
         }
         UserPreferences NewPreferencesFromUi()
         {
-            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent };
+            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value };
         }
         void ToggleBackgroundPreference(object sender, EventArgs e)
         {

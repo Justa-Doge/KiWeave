@@ -204,6 +204,8 @@ namespace FunctionRowRemapper
             AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
             AddSetting(left, networkAccess, "Allow network access", "Administrator approval is required. Master switch for GitHub update checks and user-triggered HTTP actions; local remapping stays available when off.", ToggleBackgroundPreference);
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
+            historyRetention.Value = Math.Max(historyRetention.Minimum, Math.Min(historyRetention.Maximum, preferences.HistoryRetention));
+            historyRetention.ValueChanged += delegate { ToggleBackgroundPreference(null, EventArgs.Empty); };
 
             var tools = Card(); columns.Controls.Add(tools, 1, 0);
             var toolsScroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; tools.Controls.Add(toolsScroll);
@@ -217,7 +219,8 @@ namespace FunctionRowRemapper
             primary.Controls.Add(UiStyle.Button("Profile schedules", delegate { using (var dialog = new ProfileSchedulesForm(profiles)) dialog.ShowDialog(this); })); right.Controls.Add(primary);
             AddSettingsSection(right, "Backup and recovery");
             var backup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
-            backup.Controls.Add(UiStyle.Button("Back up everything", ExportBackup)); backup.Controls.Add(UiStyle.Button("Restore backup", ImportBackup)); right.Controls.Add(backup);
+            backup.Controls.Add(UiStyle.Button("Back up everything", ExportBackup)); backup.Controls.Add(UiStyle.Button("Restore backup", ImportBackup));
+            backup.Controls.Add(UiStyle.Field("History snapshots", historyRetention)); right.Controls.Add(backup);
             AddSettingsSection(right, "Inspect and troubleshoot");
             var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             help.Controls.Add(UiStyle.Button("Welcome guide", delegate { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); }));

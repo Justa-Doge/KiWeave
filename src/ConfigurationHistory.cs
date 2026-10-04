@@ -27,7 +27,7 @@ namespace FunctionRowRemapper
             Configuration configuration = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration();
             ProfileCollection profiles = File.Exists(ProfileStore.DefaultPath) ? ProfileStore.Load(ProfileStore.DefaultPath) : new ProfileCollection();
             UserPreferences preferences = File.Exists(UserPreferences.DefaultPath) ? UserPreferences.Load(UserPreferences.DefaultPath) : new UserPreferences();
-            return Capture(DefaultFolder, reason, configuration, profiles, preferences, Startup.Enabled, Limit);
+            return Capture(DefaultFolder, reason, configuration, profiles, preferences, Startup.Enabled, preferences.HistoryRetention);
         }
         internal static string Capture(string folder, string reason, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup, int limit)
         {
@@ -94,7 +94,7 @@ namespace FunctionRowRemapper
         internal ConfigurationHistoryForm(Configuration configuration, ProfileCollection profileCollection, UserPreferences userPreferences, bool startWithWindows) : this(configuration, profileCollection, userPreferences, startWithWindows, null) { }
         internal ConfigurationHistoryForm(Configuration configuration, ProfileCollection profileCollection, UserPreferences userPreferences, bool startWithWindows, IEnumerable<ConfigurationHistoryEntry> suppliedEntries)
         {
-            current = configuration.Copy(); profiles = profileCollection.Copy(); preferences = new UserPreferences { UseTray = userPreferences.UseTray, CheckUpdates = userPreferences.CheckUpdates, AutomaticProfiles = userPreferences.AutomaticProfiles, NetworkAccess = userPreferences.NetworkAccess }; startup = startWithWindows;
+            current = configuration.Copy(); profiles = profileCollection.Copy(); preferences = new UserPreferences { UseTray = userPreferences.UseTray, CheckUpdates = userPreferences.CheckUpdates, AutomaticProfiles = userPreferences.AutomaticProfiles, NetworkAccess = userPreferences.NetworkAccess, Theme = userPreferences.Theme, CustomAccent = userPreferences.CustomAccent, HistoryRetention = userPreferences.HistoryRetention }; startup = startWithWindows;
             Text = "KiWeave history"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink; Design.DarkTitlebar(this);
             StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(940, 650); MinimumSize = new Size(820, 570);
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), RowCount = 3 }; root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Controls.Add(root);
