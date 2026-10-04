@@ -493,7 +493,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 26. Mapping, sequence, layer, condition, and profile duplication templates.
 27. Declarative local action-pack gallery with reviewed imports. (implemented locally)
 28. Action-pack trust labels and optional signature verification. (implemented locally)
-29. Portable-mode improvements with explicit data-location controls.
+29. Portable-mode improvements with explicit data-location controls. (implemented locally)
 30. Windows notification preferences for updates, health, and safety warnings. (implemented locally)
 31. Custom tray-menu profile switching. (implemented locally)
 32. Local “why did this action run?” explanations without key-history logging.

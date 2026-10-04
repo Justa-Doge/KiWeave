@@ -11,7 +11,24 @@ namespace FunctionRowRemapper
 {
     internal static class AppStorage
     {
-        internal static string DataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave"); } }
+        internal static string DefaultDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave"); } }
+        internal static string PortableRoot { get { return Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "KiWeaveData"); } }
+        internal static string PortableMarkerPath { get { return Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "portable.mode"); } }
+        internal static bool IsPortable { get { try { return File.Exists(PortableMarkerPath); } catch { return false; } } }
+        internal static string DataFolder { get { return IsPortable ? PortableRoot : DefaultDataFolder; } }
+        internal static void EnablePortableMode()
+        {
+            Directory.CreateDirectory(PortableRoot);
+            if (Directory.Exists(DefaultDataFolder))
+                foreach (string file in Directory.GetFiles(DefaultDataFolder, "*", SearchOption.AllDirectories))
+                {
+                    string relative = file.Substring(DefaultDataFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string target = Path.Combine(PortableRoot, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    if (!File.Exists(target)) File.Copy(file, target);
+                }
+            File.WriteAllText(PortableMarkerPath, "KiWeave portable data location\r\n", Encoding.ASCII);
+        }
         internal static string ControlCommandPath { get { return Path.Combine(DataFolder, "control.command"); } }
         internal static void QueueControlCommand(string command)
         {
