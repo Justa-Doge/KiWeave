@@ -22,7 +22,7 @@
     <Compile Include="src\FirstPartyExtensions.cs" />
     <Compile Include="src\ActionPacks.cs" />
     <Compile Include="src\ProfileSchedules.cs" />
-    <Compile Include="src\Profiles.cs" /><Compile Include="src\ProfileManagerForm.cs" /><Compile Include="src\DiagnosticsForm.cs" />
+    <Compile Include="src\Profiles.cs" /><Compile Include="src\ProfileManagerForm.cs" /><Compile Include="src\ProfileSnapshots.cs" /><Compile Include="src\DiagnosticsForm.cs" />
     <Compile Include="src\ProfileStatusForm.cs" />
     <Compile Include="src\ConditionalActions.cs" /><Compile Include="src\ConditionalActionForm.cs" />
     <Compile Include="src\SafeModeForm.cs" /><Compile Include="src\RecoveryStore.cs" />

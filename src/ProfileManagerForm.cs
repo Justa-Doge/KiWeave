@@ -85,7 +85,7 @@ namespace FunctionRowRemapper
             p.Name = name.Text.Trim(); p.Accent = accent.Text.Trim(); p.Icon = icon.Text.Trim(); p.Applications = applications.Lines.Select(ProfileStore.NormalizeProcess).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             string selectedBase = inheritance.SelectedItem == null ? "" : inheritance.SelectedItem.ToString(); p.InheritFrom = selectedBase == "None (independent)" ? "" : selectedBase;
             foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, oldName, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = p.Name;
-            try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
+            try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(p, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
             catch (Exception ex) {
                 foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, p.Name, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = oldName;
                 p.Name = oldName; p.Applications = oldApps; p.InheritFrom = oldBase; p.Accent = oldAccent; p.Icon = oldIcon; p.OverrideKeys = oldOverrides; p.Configuration = oldConfiguration; feedback.Text = ex.Message; return false;
@@ -101,7 +101,7 @@ namespace FunctionRowRemapper
             var source = list.SelectedItem as KeyWeaveProfile; if (source == null) { feedback.Text = "Choose a profile first."; return; }
             int number = 2; string candidate = source.Name + " copy"; while (profiles.Find(candidate) != null) candidate = source.Name + " copy " + number++;
             var copy = source.Copy(); copy.Name = candidate; copy.Applications = new string[0]; profiles.Profiles = profiles.Profiles.Concat(new[] { copy }).ToArray();
-            try { CaptureHistory("profile duplicate"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); RefreshList(); list.SelectedItem = copy; feedback.Text = "Profile duplicated without automatic app assignments."; }
+            try { CaptureHistory("profile duplicate"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(copy, profiles); RefreshList(); list.SelectedItem = copy; feedback.Text = "Profile duplicated without automatic app assignments."; }
             catch (Exception ex) { profiles.Profiles = profiles.Profiles.Where(x => !ReferenceEquals(x, copy)).ToArray(); RefreshList(); feedback.Text = ex.Message; }
         }
         static void CaptureHistory(string reason)
