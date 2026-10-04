@@ -68,6 +68,7 @@ namespace FunctionRowRemapper
         readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), gameMode = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
+        readonly ComboBox updateChannel = new DesignComboBox();
         readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
         Button hideToTray;
         readonly ToolTip tips = new ToolTip();
@@ -175,7 +176,7 @@ namespace FunctionRowRemapper
                     DateTime lastNotice; var reminder = BackupReminder.Inspect(Path.Combine(AppStorage.DataFolder, "Backups"), DateTime.UtcNow, BackupReminder.TryReadLastNotified(out lastNotice) ? (DateTime?)lastNotice : null);
                     if (reminder.ShouldNotify && notificationPreferences.Safety && notificationPreferences.AllowsWarning) { SetFeedback(reminder.Message, true); if (preferences.UseTray) tray.ShowBalloonTip(5000, "Backup reminder", reminder.Message, ToolTipIcon.Info); BackupReminder.MarkNotified(DateTime.UtcNow); }
                 } catch { }
-                if (preferences.NetworkAccess && preferences.CheckUpdates) UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) updateNotice = new UpdateNotification(tag); }));
+                if (preferences.NetworkAccess && preferences.CheckUpdates) UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) updateNotice = new UpdateNotification(tag); }), UpdateChannels.Load());
             };
             FormClosing += OnClosing;
         }
@@ -799,6 +800,12 @@ namespace FunctionRowRemapper
             try { notificationPreferences.Save(); SetFeedback("Notification preferences saved.", false); }
             catch (Exception ex) { SetFeedback("Notification preferences could not be saved: " + ex.Message, true); }
         }
+        void ToggleUpdateChannel(object sender, EventArgs e)
+        {
+            if (loading || isPreview || updateChannel.SelectedItem == null) return;
+            try { UpdateChannels.Save(updateChannel.SelectedItem.ToString()); SetFeedback("Update channel set to " + updateChannel.SelectedItem + ".", false); }
+            catch (Exception ex) { SetFeedback("Update channel could not be saved: " + ex.Message, true); }
+        }
         void ToggleStartup(object sender, EventArgs e)
         {
             if (loading || isPreview) return;
@@ -814,17 +821,17 @@ namespace FunctionRowRemapper
             SetFeedback("Checking for a KiWeave update...", false);
             UpdateChecker.CheckNow((tag, error) => Ui(delegate {
                 if (error != null) { SetFeedback("Could not check for updates. Check your connection and try again.", true); return; }
-                if (tag == null) { SetFeedback("You're up to date. No newer public release was found.", false); return; }
+                if (tag == null) { SetFeedback("You're up to date on the " + UpdateChannels.Load() + " channel. No newer public release was found.", false); return; }
                 if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag);
                 SetFeedback("KiWeave " + tag + " is available.", false);
-            }));
+            }), UpdateChannels.Load());
         }
         void UpdateAutomaticCheckTimer() { updateTimer.Enabled = !isPreview && preferences.NetworkAccess && preferences.CheckUpdates; }
         void RunAutomaticUpdateCheck()
         {
             if (!preferences.NetworkAccess || !preferences.CheckUpdates) return;
             RunConfigurationHealthCheck();
-            UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) { if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag); } }));
+            UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) { if (updateNotice != null) updateNotice.Dispose(); updateNotice = new UpdateNotification(tag); } }), UpdateChannels.Load());
         }
         void OpenDataFolder()
         {

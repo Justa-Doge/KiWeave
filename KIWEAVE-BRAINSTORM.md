@@ -485,7 +485,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 18. Integration health dashboard with refreshable read-only status and repair guidance.
 19. Manually created redacted diagnostic bundles with a complete preview.
 20. Release checksum and package-integrity verification.
-21. Stable, beta, and alpha update-channel preferences.
+21. Stable, beta, and alpha update-channel preferences. (implemented locally)
 22. Safe localization using text-only translation files.
 23. Accessibility and keyboard-only navigation pass. (implemented locally)
 24. Live key tester improvements for suppression, translation, and layer state. (implemented locally)

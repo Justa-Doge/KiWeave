@@ -228,6 +228,8 @@ namespace FunctionRowRemapper
                 string releases = "[{\"tag_name\":\"v1.2.0\",\"draft\":false,\"prerelease\":false},{\"tag_name\":\"v9.0.0\",\"draft\":false,\"prerelease\":true},{\"tag_name\":\"v8.0.0\",\"draft\":true,\"prerelease\":false}]";
                 Assert(UpdateChecker.NewestUpdate(UpdateChecker.TagsFromReleaseJson(releases), "1.0.0") == "v1.2.0", "GitHub release parsing");
                 Assert(UpdateChecker.NewestUpdate("release refs/tags/v1.0.0\n", "1.0.0-beta.1") == "v1.0.0", "final release should supersede beta");
+                Assert(UpdateChecker.NewestUpdate("release refs/tags/v1.1.0-beta.2\nrelease refs/tags/v1.0.0\n", "1.0.0-beta.1", "Beta") == "v1.1.0-beta.2", "beta channel");
+                Assert(UpdateChecker.NewestUpdate("release refs/tags/v1.1.0-alpha.2\nrelease refs/tags/v1.0.0\n", "1.0.0", "Stable") == null, "stable excludes prerelease");
             });
             Test("PowerToys shortcut scan includes live fields and skips defaults", delegate {
                 string root = Path.Combine(scratch, "PowerToysFixture"), module = Path.Combine(root, "ColorPicker"); Directory.CreateDirectory(module);
