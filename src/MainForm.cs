@@ -604,12 +604,7 @@ namespace FunctionRowRemapper
                     using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; } else pack.Configuration = review.SelectedConfiguration;
                     bool importProfiles = false;
                     if (pack.Profiles != null && pack.Profiles.Profiles.Length > 0) {
-                        string profileMessage = "This action pack contains " + pack.Profiles.Profiles.Length + " profile" + (pack.Profiles.Profiles.Length == 1 ? "" : "s") + ".\r\n\r\nYes = replace local profiles\r\nNo = merge them as new local profiles\r\nCancel = keep current profiles";
-                        DialogResult profileChoice = MessageBox.Show(this, profileMessage, "Action-pack profiles", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
-                        if (profileChoice != DialogResult.Cancel) {
-                            ProfileCollection nextProfiles = profileChoice == DialogResult.Yes ? pack.Profiles.Copy() : ProfileCollection.Merge(profiles, pack.Profiles);
-                            ProfileStore.Validate(nextProfiles, false); CaptureHistory("action pack profiles"); ProfileStore.Save(ProfileStore.DefaultPath, nextProfiles); profiles = nextProfiles; importProfiles = true; currentProfile = "Default"; pinnedProfile = ""; automaticProfileActive = false; RefreshTrayProfiles();
-                        }
+                        using (var wizard = new ProfileConflictWizardForm(profiles, pack.Profiles)) if (wizard.ShowDialog(this) == DialogResult.OK) { ProfileCollection nextProfiles = wizard.Result; CaptureHistory("action pack profiles"); ProfileStore.Save(ProfileStore.DefaultPath, nextProfiles); profiles = nextProfiles; importProfiles = true; currentProfile = "Default"; pinnedProfile = ""; automaticProfileActive = false; RefreshTrayProfiles(); }
                     }
                     pack.Configuration.Enabled = saved.Enabled; draft = pack.Configuration.Copy(); selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                     if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
