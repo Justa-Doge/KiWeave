@@ -620,6 +620,16 @@ namespace FunctionRowRemapper
             using (var dialog = new OpenFileDialog { Filter = "Supported scripts|*.py;*.ps1;*.cmd;*.bat;*.js;*.lua;*.rb;*.ahk|All files|*.*", CheckFileExists = true, Title = "Open a script for review" })
                 if (dialog.ShowDialog(this) == DialogResult.OK) try { ScriptWorkspace.Open(dialog.FileName); SetFeedback("Opened the script in VS Code or your default editor. KiWeave did not execute it.", false); } catch (Exception ex) { SetFeedback("The script could not be opened: " + ex.Message, true); }
         }
+        void OpenPathMigration(object sender, EventArgs e)
+        {
+            var candidates = PathMigration.Find(draft); if (candidates.Count == 0) { SetFeedback("No path-bearing mappings were found in the current draft.", false); return; }
+            using (var oldDialog = new FolderBrowserDialog { Description = "Choose the old app or scripts folder" }) if (oldDialog.ShowDialog(this) == DialogResult.OK)
+                using (var newDialog = new FolderBrowserDialog { Description = "Choose the new app or scripts folder" }) if (newDialog.ShowDialog(this) == DialogResult.OK) {
+                    var preview = candidates.Where(x => x.Value.StartsWith(oldDialog.SelectedPath, StringComparison.OrdinalIgnoreCase)).Take(12).Select(x => x.Location + "\r\n  " + x.Value).ToArray(); if (preview.Length == 0) { SetFeedback("No saved paths start with that old folder.", true); return; }
+                    if (MessageBox.Show(this, "KiWeave will update " + candidates.Count(x => x.Value.StartsWith(oldDialog.SelectedPath, StringComparison.OrdinalIgnoreCase)) + " saved path value(s). Preview:\r\n\r\n" + String.Join("\r\n", preview) + (preview.Length == 12 ? "\r\n…" : "") + "\r\n\r\nStage these changes in the editor?", "Migrate app paths", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+                    int changed = PathMigration.Replace(draft, oldDialog.SelectedPath, newDialog.SelectedPath); PopulateList(); PopulateCustomList(); LoadEditor(selected); MarkDirty(); SetFeedback("Staged " + changed + " migrated path value(s). Save when you are ready.", false);
+                }
+        }
         void CheckMissingTargets()
         {
             for (int i = 0; i < 12; i++) try { ConfigStore.Validate(draft.Mappings[i], true); } catch (Exception ex) { SetFeedback("Check F" + (i + 1) + ": " + ex.Message, true); return; }

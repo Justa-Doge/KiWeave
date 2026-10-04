@@ -522,7 +522,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 52. A visual profile-inheritance tree.
 53. Modifier-layer conflict visualization.
 54. Shortcut collision simulation.
-55. App-path migration assistant.
+55. App-path migration assistant. (implemented locally)
 56. Offline documentation browser.
 57. Built-in keyboard shortcut reference.
 58. Integration-specific reconnect controls.
