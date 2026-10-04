@@ -240,6 +240,7 @@ namespace FunctionRowRemapper
             help.Controls.Add(UiStyle.Button("Diagnostics", delegate { OpenDiagnostics(); }));
             help.Controls.Add(UiStyle.Button("Support bundle", delegate { OpenSupportBundle(); })); right.Controls.Add(help);
             help.Controls.Add(UiStyle.Button("Migrate app paths", OpenPathMigration));
+            help.Controls.Add(UiStyle.Button("Suspend shortcuts by app", delegate { using (var dialog = new ShortcutSuspensionForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("Shortcut suspension list saved.", false); }));
             var scripts = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             scripts.Controls.Add(UiStyle.Button("Open script workspace", OpenScriptWorkspace)); right.Controls.Add(scripts);
             AddSettingsSection(right, "Folders and connections");

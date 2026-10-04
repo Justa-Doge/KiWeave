@@ -511,7 +511,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 41. Per-profile backup snapshots.
 42. An “Explain this shortcut” hover panel (implemented locally).
 43. Conflict auto-resolution suggestions (implemented locally).
-44. Temporary shortcut suspension by focused app.
+44. Temporary shortcut suspension by focused app. (implemented locally)
 45. Game mode with anti-cheat-safe restrictions.
 46. Hardware keyboard detection and layout profiles.
 47. Import/export redaction presets.
