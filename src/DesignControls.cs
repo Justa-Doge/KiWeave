@@ -326,35 +326,32 @@ namespace FunctionRowRemapper
 
     internal sealed class DesignScrollPanel : Panel
     {
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
+        [DllImport("user32.dll")]
+        static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
         Control content;
-        int offset;
         bool layingOut;
 
-        internal int ScrollOffset { get { return offset; } }
+        internal int ScrollOffset { get { return -AutoScrollPosition.Y; } }
 
         internal DesignScrollPanel()
         {
-            AutoScroll = false;
+            AutoScroll = true;
             BackColor = UiStyle.Surface;
-            // This container moves a real child tree rather than painting a flat
-            // bitmap. Buffered parent repaints can preserve stale bands between
-            // child-window moves, so let Windows repaint the full exposed region.
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
-            ControlAdded += delegate(object sender, ControlEventArgs e) { AttachWheel(e.Control); LayoutContent(); };
-            ControlRemoved += delegate { LayoutContent(); };
         }
 
         protected override void OnControlAdded(ControlEventArgs e)
         {
             base.OnControlAdded(e);
             if (content == null) content = e.Control;
-            AttachWheel(e.Control);
         }
 
         protected override void OnLayout(LayoutEventArgs e)
         {
-            if (layingOut) return;
-            LayoutContent();
+            base.OnLayout(e);
+            if (!layingOut) LayoutContent();
         }
 
         void LayoutContent()
@@ -367,38 +364,11 @@ namespace FunctionRowRemapper
                 content.Dock = DockStyle.None;
                 int width = Math.Max(1, ClientSize.Width - Padding.Horizontal);
                 int height = Math.Max(ClientSize.Height, content.GetPreferredSize(new Size(width, 0)).Height);
-                int max = Math.Max(0, height + Padding.Vertical - ClientSize.Height);
-                offset = Math.Max(0, Math.Min(offset, max));
-                content.SetBounds(Padding.Left, Padding.Top - offset, width, height);
+                content.SetBounds(Padding.Left, Padding.Top, width, height);
+                AutoScrollMinSize = new Size(0, height + Padding.Vertical);
+                if (IsHandleCreated) ShowScrollBar(Handle, 3, false);
             }
             finally { layingOut = false; }
-        }
-
-        void AttachWheel(Control control)
-        {
-            if (control == null) return;
-            control.MouseWheel -= ChildMouseWheel;
-            control.MouseWheel += ChildMouseWheel;
-            foreach (Control child in control.Controls) AttachWheel(child);
-            control.ControlAdded -= ChildControlAdded;
-            control.ControlAdded += ChildControlAdded;
-        }
-
-        void ChildControlAdded(object sender, ControlEventArgs e)
-        {
-            AttachWheel(e.Control);
-            LayoutContent();
-        }
-
-        void ChildMouseWheel(object sender, MouseEventArgs e)
-        {
-            ScrollBy(-(e.Delta / 3));
-        }
-
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            base.OnMouseWheel(e);
-            ScrollBy(-(e.Delta / 3));
         }
 
         protected override bool IsInputKey(Keys keyData)
@@ -410,39 +380,33 @@ namespace FunctionRowRemapper
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
-            if (e.KeyCode == Keys.PageUp) ScrollBy(-ClientSize.Height);
-            else if (e.KeyCode == Keys.PageDown) ScrollBy(ClientSize.Height);
+            if (e.KeyCode == Keys.PageUp) SetScrollOffset(ScrollOffset - ClientSize.Height);
+            else if (e.KeyCode == Keys.PageDown) SetScrollOffset(ScrollOffset + ClientSize.Height);
             else if (e.KeyCode == Keys.Home) SetScrollOffset(0);
             else if (e.KeyCode == Keys.End) ScrollToBottom();
         }
 
         internal void ScrollBy(int amount)
         {
-            if (content == null) return;
-            int max = Math.Max(0, content.Height + Padding.Vertical - ClientSize.Height);
-            SetScrollOffset(offset + amount, max);
+            SetScrollOffset(ScrollOffset + amount);
         }
 
         internal void ScrollToBottom()
         {
-            if (content == null) return;
             SetScrollOffset(Int32.MaxValue);
         }
 
         internal void SetScrollOffset(int value)
         {
-            SetScrollOffset(value, Math.Max(0, (content == null ? 0 : content.Height) + Padding.Vertical - ClientSize.Height));
+            AutoScrollPosition = new Point(0, Math.Max(0, value));
+            Invalidate(true);
         }
 
-        void SetScrollOffset(int value, int max)
+        protected override void OnHandleCreated(EventArgs e)
         {
-            int next = Math.Max(0, Math.Min(value, max));
-            if (next == offset && content != null) return;
-            offset = next;
-            LayoutContent();
-            Invalidate(true);
-            if (content != null) { content.Invalidate(true); content.Update(); }
-            Update();
+            base.OnHandleCreated(e);
+            try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
+            try { ShowScrollBar(Handle, 3, false); } catch { }
         }
 
         internal void EnableKeyboardFocus()
