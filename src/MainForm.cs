@@ -904,6 +904,10 @@ namespace FunctionRowRemapper
         {
             using (var dialog = new DiagnosticsForm(BuildSafeDiagnostics())) dialog.ShowDialog(this);
         }
+        internal void OpenSupportBundle()
+        {
+            using (var dialog = new DiagnosticsForm(BuildSupportBundle(), true)) dialog.ShowDialog(this);
+        }
         void OpenLiveKeyTester()
         {
             if (engine == null) { SetFeedback("The live key tester needs the keyboard hook, which is not available right now.", true); return; }
@@ -1046,6 +1050,26 @@ namespace FunctionRowRemapper
                 "Recent private-safe log entries: " + AppLog.RecentCount() + "\r\n" +
                 "Unsaved edits: " + (dirty ? "yes" : "no") + "\r\n";
             return report;
+        }
+        string BuildSupportBundle()
+        {
+            var report = new System.Text.StringBuilder();
+            report.AppendLine("KiWeave redacted support bundle");
+            report.AppendLine("Generated: " + DateTime.UtcNow.ToString("u"));
+            report.AppendLine("This preview is local-only. It contains no mapping targets, arguments, paths, URLs, request bodies, typed text, key history, or profile names.");
+            report.AppendLine();
+            report.Append(BuildSafeDiagnostics());
+            report.AppendLine();
+            report.AppendLine("Health findings: " + (healthReport.HasWarnings ? healthReport.Findings.Length.ToString() : "0"));
+            foreach (var finding in healthReport.Findings) report.AppendLine("- " + finding.Title + ": " + finding.Detail);
+            report.AppendLine();
+            report.AppendLine("Feature maturity summary:");
+            report.AppendLine("- Stable built-in actions: available");
+            report.AppendLine("- Experimental integrations: " + (DiscordIntegration.HasAuthorization ? "connected or authorized" : "not connected"));
+            report.AppendLine("- Hardware-dependent actions: DDC/CI monitors detected " + detected.Length);
+            report.AppendLine();
+            report.AppendLine("Integrity state: not included in this bundle by design.");
+            return report.ToString();
         }
         void OnClosing(object sender, FormClosingEventArgs e)
         {

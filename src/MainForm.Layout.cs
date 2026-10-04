@@ -226,7 +226,8 @@ namespace FunctionRowRemapper
             help.Controls.Add(UiStyle.Button("Live key tester", delegate { OpenLiveKeyTester(); }));
             help.Controls.Add(UiStyle.Button("Conflict center", delegate { OpenConflictCenter(); }));
             help.Controls.Add(UiStyle.Button("Undo and history", delegate { OpenHistory(); }));
-            help.Controls.Add(UiStyle.Button("Diagnostics", delegate { OpenDiagnostics(); })); right.Controls.Add(help);
+            help.Controls.Add(UiStyle.Button("Diagnostics", delegate { OpenDiagnostics(); }));
+            help.Controls.Add(UiStyle.Button("Support bundle", delegate { OpenSupportBundle(); })); right.Controls.Add(help);
             AddSettingsSection(right, "Folders and connections");
             var folders = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             folders.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenDataFolder(); }));
