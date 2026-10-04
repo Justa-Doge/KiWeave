@@ -508,7 +508,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 
 ## Further roadmap backlog
 
-41. Per-profile backup snapshots.
+41. Per-profile backup snapshots. (implemented locally)
 42. An “Explain this shortcut” hover panel (implemented locally).
 43. Conflict auto-resolution suggestions (implemented locally).
 44. Temporary shortcut suspension by focused app. (implemented locally)
@@ -517,29 +517,29 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 47. Import/export redaction presets. (implemented locally)
 48. Backup expiration reminders.
 49. Restore-point labels and private notes. (implemented locally)
-50. First-use action execution preview.
-51. Test-without-saving editor mode.
+50. First-use action execution preview. (implemented locally)
+51. Test-without-saving editor mode. (implemented locally)
 52. A visual profile-inheritance tree.
 53. Modifier-layer conflict visualization.
 54. Shortcut collision simulation.
 55. App-path migration assistant. (implemented locally)
 56. Offline documentation browser.
-57. Built-in keyboard shortcut reference.
-58. Integration-specific reconnect controls.
+57. Built-in keyboard shortcut reference. (implemented locally)
+58. Integration-specific reconnect controls. (implemented locally)
 59. Discord authorization-expiry warnings (implemented locally).
 60. PowerToys configuration drift detection (implemented locally).
 61. Monitor capability-change alerts (implemented locally).
 62. Audio-device availability alerts (implemented locally).
 63. Safe startup after repeated crashes (implemented locally).
-64. Automatic rollback after failed configuration activation.
+64. Automatic rollback after failed configuration activation. (implemented locally)
 65. User-selectable notification severity.
 66. Privacy-dashboard export history. (implemented locally)
 67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch. (implemented locally)
 69. Separate developer mode for test actions. (implemented locally)
 70. Signed community action-pack repository.
-71. Action-pack version compatibility checks.
-72. Profile import merge mode.
+71. Action-pack version compatibility checks. (implemented locally)
+72. Profile import merge mode. (implemented locally)
 73. Profile conflict-resolution wizard. (implemented locally)
 74. Keyboard-layout change detection. (implemented locally)
 75. Per-Windows-user profiles.
@@ -550,8 +550,8 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 80. Final release-readiness and security checklist before 1.0.0. (implemented locally)
 81. Stream Deck integration: a KiWeave plugin with declarative action buttons, profile switching, shortcut status, and safe local IPC. Use Elgato's official SDK/WebSocket plugin model, keep secrets out of the plugin, and never execute arbitrary plugin-provided code.
 82. Script workspace: open selected `.py`, `.ps1`, `.cmd`, `.bat`, `.js`, `.lua`, and other explicitly supported script files in VS Code when available, with a safe fallback to the user-selected editor. Opening a script never executes it; execution remains opt-in, visibly labeled, and subject to language/path validation and import quarantine. (implemented locally)
-83. First-party Extensions page: browse KiWeave-maintained integrations and declarative action packs from the official release source, showing version, permissions, supported KiWeave version, maturity, integrity state, and local-data impact before installation. No arbitrary extension code, silent downloads, or hidden network permissions.
-84. Modular first-party integrations: move Discord, Spotify, OBS, PowerToys, Stream Deck, MIDI, controller, and future app-specific support out of the default core experience and expose them through the first-party Extensions page. Existing mappings must migrate by stable integration IDs, disabled extensions must fail safely, and uninstalling an extension must preserve the user's mappings and notes.
-85. Extensions browsing polish: use an installed-versus-featured card layout, local search, details views, and clear permission/maturity labels. The browsing pattern is inspired by Windhawk's mod pages; KiWeave's extension model, safety rules, and attribution are its own.
-86. User theme and accent system: provide bounded live accent customization, readable preset palettes, optional Windows backdrop effects, and safe fallback behavior when a color or backdrop is unsupported.
-87. Integration recovery controls: expose per-extension health explanations and explicit reconnect controls without silently reauthorizing or changing permissions.
+83. First-party Extensions page: browse KiWeave-maintained integrations and declarative action packs from the official release source, showing version, permissions, supported KiWeave version, maturity, integrity state, and local-data impact before installation. No arbitrary extension code, silent downloads, or hidden network permissions. (implemented locally)
+84. Modular first-party integrations: move Discord, Spotify, OBS, PowerToys, Stream Deck, MIDI, controller, and future app-specific support out of the default core experience and expose them through the first-party Extensions page. Existing mappings must migrate by stable integration IDs, disabled extensions must fail safely, and uninstalling an extension must preserve the user's mappings and notes. (implemented locally)
+85. Extensions browsing polish: use an installed-versus-featured card layout, local search, details views, and clear permission/maturity labels. The browsing pattern is inspired by Windhawk's mod pages; KiWeave's extension model, safety rules, and attribution are its own. (implemented locally)
+86. User theme and accent system: provide bounded live accent customization, readable preset palettes, optional Windows backdrop effects, and safe fallback behavior when a color or backdrop is unsupported. (implemented locally)
+87. Integration recovery controls: expose per-extension health explanations and explicit reconnect controls without silently reauthorizing or changing permissions. (implemented locally)
