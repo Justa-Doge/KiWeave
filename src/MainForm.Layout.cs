@@ -230,6 +230,7 @@ namespace FunctionRowRemapper
             AddSettingsSection(right, "Backup and recovery");
             var backup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             backup.Controls.Add(UiStyle.Button("Back up everything", ExportBackup)); backup.Controls.Add(UiStyle.Button("Restore backup", ImportBackup));
+            backup.Controls.Add(UiStyle.Button("Encrypted backup", ExportEncryptedBackup));
             backup.Controls.Add(UiStyle.Field("History snapshots", historyRetention)); right.Controls.Add(backup);
             AddSettingsSection(right, "Inspect and troubleshoot");
             var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };

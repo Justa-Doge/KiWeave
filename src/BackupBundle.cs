@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Security.Cryptography;
 using System.Linq;
 using System.Web.Script.Serialization;
 
@@ -22,6 +23,7 @@ namespace FunctionRowRemapper
     {
         internal const int MaxBytes = 3 * 1024 * 1024;
         static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = MaxBytes, RecursionLimit = 32 };
+        static readonly byte[] BackupEntropy = Encoding.UTF8.GetBytes("KiWeave encrypted backup v1");
 
         internal static string Describe(KeyWeaveBackup backup)
         {
@@ -88,6 +90,15 @@ namespace FunctionRowRemapper
             Directory.CreateDirectory(dir); string temp = Path.Combine(dir, ".keyweave-" + Guid.NewGuid().ToString("N") + ".tmp");
             try { File.WriteAllText(temp, json, new UTF8Encoding(false)); if (File.Exists(full)) File.Replace(temp, full, full + ".bak", true); else File.Move(temp, full); }
             finally { if (File.Exists(temp)) File.Delete(temp); }
+        }
+        internal static void SaveEncrypted(string path, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup)
+        {
+            byte[] plain = Encoding.UTF8.GetBytes(Serialize(configuration, profiles, preferences, startup, true)); byte[] cipher = ProtectedData.Protect(plain, BackupEntropy, DataProtectionScope.CurrentUser); string full = Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(full)); File.WriteAllBytes(full, cipher);
+        }
+        internal static KeyWeaveBackup LoadEncrypted(string path)
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length > MaxBytes * 2) throw new ArgumentException("Invalid or oversized encrypted backup.");
+            try { return Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(path), BackupEntropy, DataProtectionScope.CurrentUser))); } catch (CryptographicException) { throw new ArgumentException("This encrypted backup belongs to a different Windows account or is damaged."); }
         }
 
         internal static string Restore(KeyWeaveBackup backup)

@@ -901,14 +901,21 @@ namespace FunctionRowRemapper
                     }
             } catch (Exception ex) { SetFeedback("Backup failed: " + ex.Message, true); }
         }
+        void ExportEncryptedBackup(object sender, EventArgs e)
+        {
+            if (dirty) { SetFeedback("Save or discard your edits before creating a full backup.", true); return; }
+            if (MessageBox.Show(this, "Create an encrypted full backup protected to this Windows account? It cannot be opened by another account.", "Encrypted backup", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+            try { using (var d = new SaveFileDialog { Filter = "Encrypted KiWeave backup|*.keyweave.enc", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".keyweave.enc", AddExtension = true }) if (d.ShowDialog(this) == DialogResult.OK) { BackupBundle.SaveEncrypted(d.FileName, saved, profiles, preferences, Startup.Enabled); AuditTrail.Record("encrypted-backup-export"); SetFeedback("Encrypted backup created for this Windows account.", false); } }
+            catch (Exception ex) { SetFeedback("Encrypted backup failed: " + ex.Message, true); }
+        }
         void ImportBackup(object sender, EventArgs e)
         {
             if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before restoring a backup.", true); return; }
             if (dirty) { SetFeedback("Save or discard your edits before restoring a backup.", true); return; }
-            using (var d = new OpenFileDialog { Filter = "KiWeave backup|*.keyweave", CheckFileExists = true }) {
+            using (var d = new OpenFileDialog { Filter = "KiWeave backups|*.keyweave;*.keyweave.enc|Plain KiWeave backup|*.keyweave|Encrypted KiWeave backup|*.keyweave.enc", CheckFileExists = true }) {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
-                    KeyWeaveBackup backup = BackupBundle.Load(d.FileName);
+                    KeyWeaveBackup backup = d.FileName.EndsWith(".keyweave.enc", StringComparison.OrdinalIgnoreCase) ? BackupBundle.LoadEncrypted(d.FileName) : BackupBundle.Load(d.FileName);
                     string message = BackupBundle.Describe(backup) + "\n\nThis replaces the Default mappings, profiles, tray preference, and startup preference. PowerToys is not changed. KiWeave will create a local rollback copy first.\n\nContinue?";
                     if (MessageBox.Show(this, message, "Restore KiWeave backup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                     CaptureHistory("backup restore"); string rollback = BackupBundle.Restore(backup); ApplyRestoredBackup(backup); AuditTrail.Record("backup-restore"); SetFeedback("Backup restored. Rollback copy: " + rollback, false);

@@ -478,7 +478,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 11. Import quarantine with permission and risk review before activation. (implemented locally)
 12. Emergency known-good backup beside the normal local backup folder. (implemented locally)
 13. Backup rotation and retention controls. (implemented locally)
-14. Optional encrypted full backups only if the privacy tradeoff is justified.
+14. Optional encrypted full backups only if the privacy tradeoff is justified. (implemented locally)
 15. A local secrets vault for webhook and API credentials, never included in exports. (implemented locally)
 16. Deliberate sequence cancellation with an unmistakable emergency interaction. (implemented locally)
 17. Sequence limits for runtime, repeats, launches, network requests, and hardware operations. (implemented locally)
