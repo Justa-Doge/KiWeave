@@ -537,7 +537,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch. (implemented locally)
 69. Separate developer mode for test actions. (implemented locally)
-70. Signed community action-pack repository. (detached signatures and a metadata-only signed repository-index model are implemented locally; repository hosting/publishing remains external)
+70. Signed community action-pack repository. (detached signatures, metadata-only signed repository indexes, and a publishable repository template are implemented locally; hosting/publishing remains external)
 71. Action-pack version compatibility checks. (implemented locally)
 72. Profile import merge mode. (implemented locally)
 73. Profile conflict-resolution wizard. (implemented locally)
