@@ -673,6 +673,7 @@ namespace FunctionRowRemapper
             });
             Test("Game Input capability probe is safe on unsupported runtimes", delegate {
                 string description = GameInputSupport.Describe(); Assert(!String.IsNullOrWhiteSpace(description) && (description.Contains("available") || description.Contains("unavailable")), "game input capability description");
+                ushort buttons; Assert(!GameInputSupport.TryReadButtons(-1, out buttons), "invalid game input index");
             });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }

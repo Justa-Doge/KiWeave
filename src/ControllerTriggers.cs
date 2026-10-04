@@ -31,7 +31,7 @@ namespace FunctionRowRemapper
         [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState")] static extern uint GetState(uint index, out State state);
         readonly List<ControllerTrigger> triggers; readonly Action<int> fired; readonly Thread thread; volatile bool stopping; readonly ushort[] previous = new ushort[4];
         internal ControllerTriggerService(IEnumerable<ControllerTrigger> values, Action<int> fired) { triggers = values.Select(x => x.Copy()).ToList(); this.fired = fired; if (triggers.Count == 0) return; thread = new Thread(Poll) { IsBackground = true, Name = "Controller triggers" }; thread.Start(); }
-        void Poll() { while (!stopping) { for (uint i = 0; i < 4; i++) { State state; if (GetState(i, out state) != 0) { previous[i] = 0; continue; } ushort rising = (ushort)(state.Buttons & ~previous[i]); previous[i] = state.Buttons; foreach (var t in triggers) if (t.Matches((int)i, rising)) try { fired(t.FunctionKey); } catch { } } Thread.Sleep(33); } }
+        void Poll() { while (!stopping) { for (uint i = 0; i < 4; i++) { ushort buttons; State state; if (!GameInputSupport.TryReadButtons((int)i, out buttons)) { if (GetState(i, out state) != 0) { previous[i] = 0; continue; } buttons = state.Buttons; } ushort rising = (ushort)(buttons & ~previous[i]); previous[i] = buttons; foreach (var t in triggers) if (t.Matches((int)i, rising)) try { fired(t.FunctionKey); } catch { } } Thread.Sleep(33); } }
         public void Dispose() { stopping = true; if (thread != null) thread.Join(250); }
     }
     internal sealed class ControllerTriggersForm : Form
