@@ -35,12 +35,12 @@ namespace FunctionRowRemapper
         }
         internal static Label Text(string text, float size, bool bold)
         {
-            return new DesignLabel { Text = text, AutoSize = true, Dock = DockStyle.Top, BackColor = Color.Transparent,
+            return new DesignLabel { Text = Localization.Translate(text), AutoSize = true, Dock = DockStyle.Top, BackColor = Color.Transparent,
                 ForeColor = bold ? Ink : Muted, Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular), Margin = new Padding(0, 0, 0, 8) };
         }
         internal static Button Button(string text, EventHandler action, bool primary = false)
         {
-            var b = new DesignButton { Text = text, Primary = primary }; b.Click += action; return b;
+            var b = new DesignButton { Text = Localization.Translate(text), Primary = primary }; b.Click += action; return b;
         }
         internal static TableLayoutPanel Stack()
         {
@@ -199,6 +199,7 @@ namespace FunctionRowRemapper
             var intro = UiStyle.Text("Background behavior saves as soon as you change it.", 9, false); intro.Margin = new Padding(0, 0, 0, 22); left.Controls.Add(intro);
             themeChoice.Items.Clear(); themeChoice.Items.AddRange(new object[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }); themeChoice.SelectedItem = preferences.Theme; themeChoice.SelectedIndexChanged += ThemeChanged; UiStyle.Combo(themeChoice);
             left.Controls.Add(UiStyle.Field("Theme", themeChoice));
+            languageChoice.Items.Clear(); languageChoice.Items.AddRange(Localization.Languages); languageChoice.SelectedItem = Localization.Current; UiStyle.Combo(languageChoice); languageChoice.SelectedIndexChanged += ToggleLanguage; left.Controls.Add(UiStyle.Field("Language", languageChoice));
             var accent = UiStyle.Button("Choose accent color", ChooseAccentColor); accent.Margin = new Padding(0, 0, 0, 14); left.Controls.Add(accent);
             AddSetting(left, startup, "Start with Windows", "Launch KiWeave quietly when you sign in.", ToggleStartup);
             AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);

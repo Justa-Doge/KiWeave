@@ -665,6 +665,9 @@ namespace FunctionRowRemapper
                 Assert(File.Exists(manifest) && File.Exists(plugin), "plugin bundle files");
                 string source = File.ReadAllText(plugin); Assert(source.Contains("status") && source.Contains("show-settings") && source.Contains("activate-profile") && !source.Contains("child_process"), "plugin action boundary");
             });
+            Test("Localization uses a safe text-only fallback", delegate {
+                string old = Localization.Current; try { Localization.Save("Español"); Assert(Localization.Translate("Save") == "Guardar" && Localization.Translate("Unknown label") == "Unknown label", "translation fallback"); } finally { Localization.Save(old); }
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }

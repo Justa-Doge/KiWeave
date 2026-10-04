@@ -69,6 +69,7 @@ namespace FunctionRowRemapper
         readonly ComboBox themeChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly ComboBox updateChannel = new DesignComboBox();
+        readonly ComboBox languageChoice = new DesignComboBox();
         readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
         Button hideToTray;
         readonly ToolTip tips = new ToolTip();
@@ -124,6 +125,7 @@ namespace FunctionRowRemapper
             catch (Exception ex) { preferences = new UserPreferences { UseTray = false }; initialError = "Tray preference could not be loaded; the window will stay accessible. " + ex.Message; }
             UiStyle.ApplyTheme(preferences.Theme);
             notificationPreferences = NotificationPreferences.Load();
+            Localization.Load();
             featureFlags = FeatureFlags.Load();
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
@@ -813,6 +815,12 @@ namespace FunctionRowRemapper
             if (loading || isPreview || updateChannel.SelectedItem == null) return;
             try { UpdateChannels.Save(updateChannel.SelectedItem.ToString()); SetFeedback("Update channel set to " + updateChannel.SelectedItem + ".", false); }
             catch (Exception ex) { SetFeedback("Update channel could not be saved: " + ex.Message, true); }
+        }
+        void ToggleLanguage(object sender, EventArgs e)
+        {
+            if (loading || isPreview || languageChoice.SelectedItem == null) return;
+            try { Localization.Save(languageChoice.SelectedItem.ToString()); SetFeedback("Language saved. Restart KiWeave to apply translated labels.", false); }
+            catch (Exception ex) { SetFeedback("Language could not be saved: " + ex.Message, true); }
         }
         void ToggleStartup(object sender, EventArgs e)
         {

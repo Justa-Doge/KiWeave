@@ -486,7 +486,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 19. Manually created redacted diagnostic bundles with a complete preview. (implemented locally)
 20. Release checksum and package-integrity verification.
 21. Stable, beta, and alpha update-channel preferences. (implemented locally)
-22. Safe localization using text-only translation files.
+22. Safe localization using text-only translation files. (text-only language preference and centralized label translation implemented locally; remaining untranslated strings are tracked)
 23. Accessibility and keyboard-only navigation pass. (implemented locally)
 24. Live key tester improvements for suppression, translation, and layer state. (implemented locally)
 25. Conflict explanations with suggested fixes and affected integrations. (implemented locally)
