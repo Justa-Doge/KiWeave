@@ -57,6 +57,7 @@ namespace FunctionRowRemapper
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); summary.Margin = new Padding(0, 8, 0, 0); footer.Controls.Add(summary, 0, 0);
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
             var cancel = UiStyle.Button("Cancel", delegate { DialogResult = DialogResult.Cancel; Close(); });
+            buttons.Controls.Add(UiStyle.Button("Preview dry run", delegate { ShowDryRun(); }));
             var save = UiStyle.Button("Use sequence", delegate { try { SequenceCodec.Validate(steps); SequenceCodec.Serialize(steps); DialogResult = DialogResult.OK; Close(); } catch (Exception ex) { summary.Text = ex.Message; summary.ForeColor = Color.FromArgb(255, 151, 153); } }, true);
             buttons.Controls.Add(cancel); buttons.Controls.Add(save); footer.Controls.Add(buttons, 1, 0); root.Controls.Add(footer, 0, 2); CancelButton = cancel;
             search.TextChanged += delegate { Filter(); }; actions.DoubleClick += delegate { AddAction(); }; list.DoubleClick += delegate { EditStep(); }; Filter(); RefreshList(0);
@@ -94,6 +95,16 @@ namespace FunctionRowRemapper
             list.BeginUpdate(); list.Items.Clear(); foreach (var s in steps) list.Items.Add(s); list.EndUpdate();
             if (steps.Count > 0) list.SelectedIndex = Math.Min(Math.Max(0, selected), steps.Count - 1);
             summary.ForeColor = UiStyle.Muted; summary.Text = steps.Count == 0 ? "Add an action to start your routine." : ActionInsights.Sequence(steps).Compact;
+        }
+        void ShowDryRun()
+        {
+            try {
+                SequenceCodec.Validate(steps);
+                var text = new System.Text.StringBuilder("Dry run preview\r\n\r\n");
+                for (int i = 0; i < steps.Count; i++) text.AppendLine((i + 1).ToString("00") + ". " + (steps[i].IsWait ? "Wait " + (steps[i].WaitMilliseconds / 1000d).ToString("0.###") + " seconds" : steps[i].Summary));
+                text.AppendLine(); text.AppendLine("Nothing will be executed or saved by this preview.");
+                MessageBox.Show(this, text.ToString(), "Sequence dry run", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            } catch (Exception ex) { MessageBox.Show(this, "The sequence cannot be previewed yet. " + ex.Message, "Sequence dry run", MessageBoxButtons.OK, MessageBoxIcon.Information); }
         }
         void DuplicateStep()
         {
