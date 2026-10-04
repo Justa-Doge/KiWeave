@@ -105,6 +105,15 @@ namespace FunctionRowRemapper
     internal static class AudioDevices
     {
         const int Active = 1;
+        internal static string Snapshot()
+        {
+            var enumerator = (IMMDeviceEnumerator)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"))); IMMDeviceCollection collection = null;
+            try {
+                Check(enumerator.EnumAudioEndpoints(0, Active, out collection)); uint count; Check(collection.GetCount(out count)); var ids = new string[count];
+                for (uint i = 0; i < count; i++) { IMMDevice device; Check(collection.Item(i, out device)); try { Check(device.GetId(out ids[i])); } finally { Marshal.ReleaseComObject(device); } }
+                Array.Sort(ids, StringComparer.OrdinalIgnoreCase); return String.Join("\n", ids);
+            } finally { if (collection != null) Marshal.ReleaseComObject(collection); Marshal.ReleaseComObject(enumerator); }
+        }
         internal static void CycleDefaultOutput()
         {
             var enumerator = (IMMDeviceEnumerator)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"))); IMMDeviceCollection collection = null; IMMDevice current = null;
