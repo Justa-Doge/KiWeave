@@ -62,3 +62,4 @@
 - 2026-10-03: Action-pack profile imports now use a per-profile conflict wizard with replace, import-as-new, or skip choices, followed by strict inheritance and duplicate-app validation. Build passed 107 checks.
 - 2026-10-03: Added a safe script workspace entry in Settings. Supported script files open in VS Code when available or the default editor as fallback; KiWeave never executes them from this flow. Build passed 108 checks.
 - 2026-10-03: Added persisted feature safety flags: an experimental-action kill switch for HTTP/command/Python/monitor actions and a separate Developer mode gate for one-shot Test action buttons. Ordinary remapping remains available when experimental actions are disabled. Build passed 109 checks.
+- 2026-10-03: Added read-only Remote Desktop and virtual-machine session awareness to Integration Health and automatic-profile explanations. The context is descriptive only and does not alter remote or VM settings. Build passed 110 checks.

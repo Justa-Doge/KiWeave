@@ -944,7 +944,7 @@ namespace FunctionRowRemapper
                 if (String.Equals(name, "Default", StringComparison.OrdinalIgnoreCase)) next = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration();
                 else { var profile = profiles.Find(name); if (profile == null) throw new ArgumentException("Profile not found: " + name); Configuration defaultConfiguration = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration(); next = profiles.Resolve(profile.Name, defaultConfiguration); }
                 saved = next.Copy(); draft = next.Copy(); currentProfile = name; automaticProfileActive = automatic; selectedLayer = -1; customSelected = -1;
-                if (automatic) profileReason = automaticProfileProcess.Length == 0 ? "Selected by an automatic app rule." : "Automatically matched " + automaticProfileProcess + ".";
+                if (automatic) profileReason = (automaticProfileProcess.Length == 0 ? "Selected by an automatic app rule." : "Automatically matched " + automaticProfileProcess + ".") + " Session: " + SessionAwareness.CurrentDescription() + ".";
                 if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                 if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
                 loading = true; enabled.Checked = saved.Enabled; loading = false; dirty = false; Text = "KiWeave"; UpdateStatus();
