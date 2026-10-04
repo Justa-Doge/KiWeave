@@ -47,6 +47,12 @@ namespace FunctionRowRemapper
             KeyWeaveProfile profile = Find(name); if (profile == null) throw new ArgumentException("Profile not found: " + name);
             return Resolve(profile, defaultConfiguration, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
+        internal string InheritanceTree(string name)
+        {
+            var chain = new List<string>(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase); string current = name;
+            while (!String.IsNullOrWhiteSpace(current) && !String.Equals(current, "Default", StringComparison.OrdinalIgnoreCase)) { if (!seen.Add(current)) return String.Join("  →  ", chain) + "  →  (inheritance loop)"; chain.Add(current); var profile = Find(current); if (profile == null) { chain.Add("(missing profile)"); break; } current = profile.InheritFrom; }
+            chain.Add("Default"); return String.Join("  →  ", chain);
+        }
         Configuration Resolve(KeyWeaveProfile profile, Configuration defaultConfiguration, HashSet<string> chain)
         {
             if (!chain.Add(profile.Name)) throw new ArgumentException("Profile inheritance contains a loop involving " + profile.Name + ".");

@@ -14,6 +14,7 @@ namespace FunctionRowRemapper
         readonly TextBox name = new DesignTextBox(), applications = new DesignTextBox();
         readonly TextBox accent = new DesignTextBox(), icon = new DesignTextBox();
         readonly DesignComboBox inheritance = new DesignComboBox();
+        readonly Label inheritanceTree = UiStyle.Text("", 9, false);
         readonly Label feedback = new Label();
         public KeyWeaveProfile SelectedProfile { get; private set; }
 
@@ -39,7 +40,7 @@ namespace FunctionRowRemapper
             applications.Multiline = true; applications.Height = 92; applications.ScrollBars = ScrollBars.Vertical;
             stack.Controls.Add(UiStyle.Field("Automatic apps (one process name per line)", applications));
             stack.Controls.Add(UiStyle.Text("Examples: obs64.exe, Discord.exe, Spotify.exe. KiWeave switches only while its editor is closed and has no unsaved changes.", 8.5f, false));
-            stack.Controls.Add(UiStyle.Field("Inherit unchanged mappings from", inheritance));
+            stack.Controls.Add(UiStyle.Field("Inherit unchanged mappings from", inheritance)); inheritanceTree.MaximumSize = new Size(450, 0); inheritanceTree.ForeColor = UiStyle.Blue; inheritanceTree.Margin = new Padding(0, 4, 0, 8); stack.Controls.Add(inheritanceTree);
             stack.Controls.Add(UiStyle.Text("Inherited profiles follow their base until you intentionally change a mapping, layer, enabled state, or custom-hotkey set.", 8.5f, false));
             feedback.AutoSize = true; feedback.ForeColor = UiStyle.Muted; feedback.Margin = new Padding(0, 12, 0, 10); stack.Controls.Add(feedback);
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false };
@@ -61,7 +62,7 @@ namespace FunctionRowRemapper
             string selected = p == null || String.IsNullOrWhiteSpace(p.InheritFrom) ? "None (independent)" : p.InheritFrom;
             int index = inheritance.Items.Cast<object>().Select(x => x.ToString()).ToList().FindIndex(x => String.Equals(x, selected, StringComparison.OrdinalIgnoreCase));
             inheritance.SelectedIndex = Math.Max(0, index);
-            feedback.Text = p == null ? "Choose a profile." : String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile." : "Inherits from " + p.InheritFrom + " with " + p.OverrideKeys.Length + " intentional override" + (p.OverrideKeys.Length == 1 ? "." : "s.");
+            inheritanceTree.Text = p == null ? "" : "Inheritance: " + profiles.InheritanceTree(p.Name); feedback.Text = p == null ? "Choose a profile." : String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile." : "Inherits from " + p.InheritFrom + " with " + p.OverrideKeys.Length + " intentional override" + (p.OverrideKeys.Length == 1 ? "." : "s.");
         }
         void AddCurrent()
         {
