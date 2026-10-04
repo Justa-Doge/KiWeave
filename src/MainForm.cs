@@ -516,6 +516,8 @@ namespace FunctionRowRemapper
                     string migration = ConfigStore.MigrationPreview(d.FileName);
                     if (!migration.StartsWith("This configuration is already", StringComparison.Ordinal) && MessageBox.Show(this, migration + "\r\n\r\nContinue to preview the imported configuration?", "Migration preview", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                     Configuration imported = ConfigStore.Load(d.FileName);
+                    string importDiff = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = imported, Profiles = profiles, Preferences = preferences, StartWithWindows = Startup.Enabled }, saved, profiles, preferences, Startup.Enabled);
+                    if (MessageBox.Show(this, "Redacted comparison with the current saved setup:\r\n\r\n" + importDiff + "\r\n\r\nContinue to the full import review?", "Import comparison", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                     using (var review = new ImportReviewForm(imported, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Import cancelled. Your editor and active mappings are unchanged.", false); return; }
                     // Imported enabled state never changes the live toggle, and imports cannot add startup entries.
                     imported.Enabled = saved.Enabled; draft = imported; selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
@@ -540,6 +542,8 @@ namespace FunctionRowRemapper
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
                     ActionPack pack = ActionPackStore.Load(d.FileName);
+                    string packDiff = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = pack.Configuration, Profiles = pack.Profiles, Preferences = preferences, StartWithWindows = Startup.Enabled }, saved, profiles, preferences, Startup.Enabled);
+                    if (MessageBox.Show(this, "Redacted comparison with the current saved setup:\r\n\r\n" + packDiff + "\r\n\r\nContinue to the action-pack safety review?", "Action-pack comparison", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                     using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; }
                     bool importProfiles = false;
                     if (pack.Profiles != null && pack.Profiles.Profiles.Length > 0) {
