@@ -30,20 +30,21 @@ namespace FunctionRowRemapper
             if (String.IsNullOrEmpty(json) || Encoding.UTF8.GetByteCount(json) > MaxBytes) throw new ArgumentException("Action pack is too large.");
             JsonSyntax.Check(json);
             var root = new JavaScriptSerializer { MaxJsonLength = MaxBytes, RecursionLimit = 20 }.DeserializeObject(json) as Dictionary<string, object>;
-            if (root == null || root.Count != 8 || root["format"] as string != "kiweave-action-pack" || !(root["version"] is int) || (int)root["version"] != 1)
+            if (root == null || (root.Count != 8 && root.Count != 9) || root["format"] as string != "kiweave-action-pack" || !(root["version"] is int) || (int)root["version"] != 1)
                 throw new ArgumentException("Unsupported action-pack format.");
             string id = Text(root, "id"), name = Text(root, "name"), publisher = Text(root, "publisher"), description = Text(root, "description");
+            string packVersion = root.ContainsKey("packVersion") ? Text(root, "packVersion") : "1.0.0";
             string configuration = Text(root, "configuration"), profiles = Text(root, "profiles");
             if (id.Length < 3 || id.Length > 80 || !System.Text.RegularExpressions.Regex.IsMatch(id, "\\A[a-z0-9][a-z0-9.-]+\\z")) throw new ArgumentException("Action-pack id is invalid.");
             if (name.Length < 1 || name.Length > 80 || publisher.Length > 120 || description.Length > 1000) throw new ArgumentException("Action-pack metadata is invalid.");
-            var pack = new ActionPack { Id = id, Name = name, Publisher = publisher, Description = description, Configuration = ConfigStore.Parse(configuration), Profiles = ProfileStore.Parse(profiles) };
+            var pack = new ActionPack { Id = id, Name = name, Version = packVersion, Publisher = publisher, Description = description, Configuration = ConfigStore.Parse(configuration), Profiles = ProfileStore.Parse(profiles) };
             Validate(pack); return pack;
         }
         internal static string Serialize(ActionPack pack)
         {
             Validate(pack);
             var serializer = new JavaScriptSerializer { MaxJsonLength = MaxBytes };
-            string json = serializer.Serialize(new { format = "kiweave-action-pack", version = 1, id = pack.Id, name = pack.Name, publisher = pack.Publisher ?? "", description = pack.Description ?? "", configuration = ConfigStore.Serialize(pack.Configuration), profiles = ProfileStore.Serialize(pack.Profiles) });
+            string json = serializer.Serialize(new { format = "kiweave-action-pack", version = 1, id = pack.Id, packVersion = pack.Version, name = pack.Name, publisher = pack.Publisher ?? "", description = pack.Description ?? "", configuration = ConfigStore.Serialize(pack.Configuration), profiles = ProfileStore.Serialize(pack.Profiles) });
             if (Encoding.UTF8.GetByteCount(json) > MaxBytes) throw new ArgumentException("Action pack is too large.");
             return json;
         }
@@ -54,14 +55,22 @@ namespace FunctionRowRemapper
         internal static string Review(ActionPack pack)
         {
             Validate(pack);
-            return ActionPrivacy.Review(pack.Configuration, pack.Name) + "\r\nPACK ID: " + pack.Id + "\r\nPUBLISHER: " + pack.Publisher + "\r\nPROFILES: " + pack.Profiles.Profiles.Length;
+            return ActionPrivacy.Review(pack.Configuration, pack.Name) + "\r\nPACK ID: " + pack.Id + "\r\nPACK VERSION: " + pack.Version + "\r\nCOMPATIBILITY: " + Compatibility(pack) + "\r\nPUBLISHER: " + pack.Publisher + "\r\nPROFILES: " + pack.Profiles.Profiles.Length;
         }
         internal static void Validate(ActionPack pack)
         {
             if (pack == null) throw new ArgumentNullException("pack");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(pack.Version ?? "", "\\A[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?\\z")) throw new ArgumentException("Action-pack version must be semantic version text.");
+            if (Compatibility(pack).StartsWith("Incompatible", StringComparison.Ordinal)) throw new ArgumentException(Compatibility(pack));
             ConfigStore.Validate(pack.Configuration, false); ProfileStore.Validate(pack.Profiles, false);
             foreach (var item in ActionPrivacy.Mappings(pack.Configuration).SelectMany(x => ActionPrivacy.Effects(x.Value)))
                 if (item.Kind == ActionKind.Command || item.Kind == ActionKind.Python) throw new ArgumentException("Action packs cannot contain scripts or command actions.");
+        }
+        internal static string Compatibility(ActionPack pack)
+        {
+            int packMajor, currentMajor; string[] p = (pack == null ? "" : pack.Version ?? "").Split('.'); string[] c = UpdateChecker.CurrentVersion.Split('.');
+            if (p.Length < 1 || !Int32.TryParse(p[0], out packMajor) || c.Length < 1 || !Int32.TryParse(c[0], out currentMajor)) return "Unknown version";
+            return packMajor > currentMajor ? "Incompatible: requires a newer major KiWeave format." : "Compatible with this KiWeave major version.";
         }
         static string Text(Dictionary<string, object> root, string key)
         {
