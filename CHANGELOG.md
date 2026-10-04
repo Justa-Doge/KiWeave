@@ -71,4 +71,5 @@
 - 2026-10-03: Added selectable backup privacy review presets: Standard, Strict, and Metadata-only. Presets change only the pre-export review and never silently redact or alter the full backup. Build passed 116 checks.
 - 2026-10-03: Added a cycle-safe profile inheritance tree to the profile editor, showing each selected profile's chain back to Default or an invalid loop/missing profile. Build passed 117 checks.
 - 2026-10-03: Conflict Center now includes a visual layer map showing base F-keys, each layer's hold key, and duplicate hold-key warnings. Build passed 118 checks.
+- 2026-10-03: Added optional keyboard-layout IDs to profiles. Automatic profile switching now uses a matching local layout profile when no foreground-app rule matches; build passed 119 checks.
 - 2026-10-03: Audited the roadmap against current source and marked already-verified shipped items for profile snapshots, test previews, shortcut reference, reconnect controls, rollback, action-pack compatibility/merge, and first-party extensions/theme polish. No behavior change; the remaining open items are still tracked.

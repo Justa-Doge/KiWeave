@@ -32,6 +32,7 @@
     <Compile Include="src\ReleaseReadiness.cs" />
     <Compile Include="src\ReleaseReadinessForm.cs" />
     <Compile Include="src\GameMode.cs" />
+    <Compile Include="src\KeyboardLayoutProfiles.cs" />
     <Compile Include="src\BackupPrivacyForm.cs" />
     <Compile Include="src\AudioDrift.cs" />
     <Compile Include="src\StartupGuard.cs" />

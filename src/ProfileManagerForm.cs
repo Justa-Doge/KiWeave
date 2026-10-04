@@ -13,6 +13,7 @@ namespace FunctionRowRemapper
         readonly ListBox list = new DesignListBox();
         readonly TextBox name = new DesignTextBox(), applications = new DesignTextBox();
         readonly TextBox accent = new DesignTextBox(), icon = new DesignTextBox();
+        readonly TextBox layoutId = new DesignTextBox();
         readonly DesignComboBox inheritance = new DesignComboBox();
         readonly Label inheritanceTree = UiStyle.Text("", 9, false);
         readonly Label feedback = new Label();
@@ -37,6 +38,7 @@ namespace FunctionRowRemapper
             stack.Controls.Add(UiStyle.Field("Profile name", name));
             stack.Controls.Add(UiStyle.Field("Accent color (optional #RRGGBB)", accent));
             stack.Controls.Add(UiStyle.Field("Icon label (optional, up to 4 characters)", icon));
+            stack.Controls.Add(UiStyle.Field("Keyboard layout ID (optional)", layoutId));
             applications.Multiline = true; applications.Height = 92; applications.ScrollBars = ScrollBars.Vertical;
             stack.Controls.Add(UiStyle.Field("Automatic apps (one process name per line)", applications));
             stack.Controls.Add(UiStyle.Text("Examples: obs64.exe, Discord.exe, Spotify.exe. KiWeave switches only while its editor is closed and has no unsaved changes.", 8.5f, false));
@@ -62,7 +64,7 @@ namespace FunctionRowRemapper
             string selected = p == null || String.IsNullOrWhiteSpace(p.InheritFrom) ? "None (independent)" : p.InheritFrom;
             int index = inheritance.Items.Cast<object>().Select(x => x.ToString()).ToList().FindIndex(x => String.Equals(x, selected, StringComparison.OrdinalIgnoreCase));
             inheritance.SelectedIndex = Math.Max(0, index);
-            inheritanceTree.Text = p == null ? "" : "Inheritance: " + profiles.InheritanceTree(p.Name); feedback.Text = p == null ? "Choose a profile." : String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile." : "Inherits from " + p.InheritFrom + " with " + p.OverrideKeys.Length + " intentional override" + (p.OverrideKeys.Length == 1 ? "." : "s.");
+            layoutId.Text = p == null ? "" : KeyboardLayoutProfiles.ForProfile(p.Name); inheritanceTree.Text = p == null ? "" : "Inheritance: " + profiles.InheritanceTree(p.Name); feedback.Text = p == null ? "Choose a profile." : String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile." : "Inherits from " + p.InheritFrom + " with " + p.OverrideKeys.Length + " intentional override" + (p.OverrideKeys.Length == 1 ? "." : "s.");
         }
         void AddCurrent()
         {
@@ -92,7 +94,7 @@ namespace FunctionRowRemapper
             p.Name = name.Text.Trim(); p.Accent = accent.Text.Trim(); p.Icon = icon.Text.Trim(); p.Applications = applications.Lines.Select(ProfileStore.NormalizeProcess).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             string selectedBase = inheritance.SelectedItem == null ? "" : inheritance.SelectedItem.ToString(); p.InheritFrom = selectedBase == "None (independent)" ? "" : selectedBase;
             foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, oldName, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = p.Name;
-            try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(p, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
+            try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); KeyboardLayoutProfiles.Set(p.Name, layoutId.Text); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(p, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
             catch (Exception ex) {
                 foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, p.Name, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = oldName;
                 p.Name = oldName; p.Applications = oldApps; p.InheritFrom = oldBase; p.Accent = oldAccent; p.Icon = oldIcon; p.OverrideKeys = oldOverrides; p.Configuration = oldConfiguration; feedback.Text = ex.Message; return false;
