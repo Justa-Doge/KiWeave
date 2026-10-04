@@ -9,13 +9,14 @@ namespace FunctionRowRemapper
 {
     internal sealed class IntegrationHealthForm : Form
     {
-        readonly int monitors;
+        readonly DdcMonitor[] monitors;
         readonly ConfigurationHealthReport health;
         readonly TableLayoutPanel rows = new TableLayoutPanel();
 
-        internal IntegrationHealthForm(int detectedMonitors, ConfigurationHealthReport report)
+        internal IntegrationHealthForm(int detectedMonitors, ConfigurationHealthReport report) : this(Enumerable.Range(0, Math.Max(0, detectedMonitors)).Select(i => new DdcMonitor { Id = "preview-" + i, Name = "Preview monitor", Codes = new byte[0] }).ToArray(), report) { }
+        internal IntegrationHealthForm(DdcMonitor[] detectedMonitors, ConfigurationHealthReport report)
         {
-            monitors = detectedMonitors; health = report ?? ConfigurationHealthReport.Empty;
+            monitors = detectedMonitors ?? new DdcMonitor[0]; health = report ?? ConfigurationHealthReport.Empty;
             Text = "KiWeave integrations"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             ClientSize = new Size(700, 620); MinimumSize = new Size(620, 500); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; scroll.EnableKeyboardFocus(); Controls.Add(scroll);
@@ -33,7 +34,7 @@ namespace FunctionRowRemapper
         {
             rows.SuspendLayout(); rows.Controls.Clear(); rows.RowStyles.Clear(); rows.RowCount = 0;
             AddHeader("Integration", "Status", "What KiWeave checks");
-            Add("PowerToys", PowerToysStatus(), "Reads supported local Keyboard Manager shortcuts and compares them with the last local observation; it never edits PowerToys here."); Add("Discord", DiscordIntegration.Status, "Uses local IPC/RPC and only reconnects when network access and authorization allow it."); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running", "OBS actions require OBS to be installed and running when triggered."); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running", "Spotify mappings use Windows media keys and do not read account data."); Add("DDC/CI monitors", monitors == 0 ? "None detected" : monitors + " detected", "Monitor controls remain hardware-dependent and are probed read-only here."); Add("Audio devices", "Windows audio available to KiWeave", "Audio switching uses Windows device APIs; no audio is recorded."); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy", "Local validation only. No targets, commands, or URLs are executed by this scan.");
+            Add("PowerToys", PowerToysStatus(), "Reads supported local Keyboard Manager shortcuts and compares them with the last local observation; it never edits PowerToys here."); Add("Discord", DiscordIntegration.Status, "Uses local IPC/RPC and only reconnects when network access and authorization allow it."); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running", "OBS actions require OBS to be installed and running when triggered."); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running", "Spotify mappings use Windows media keys and do not read account data."); Add("DDC/CI monitors", monitors.Length == 0 ? "None detected" : monitors.Length + " detected · " + MonitorDrift.Observe(monitors), "Monitor capabilities are probed read-only and compared with the last local observation; KiWeave does not change hardware here."); Add("Audio devices", "Windows audio available to KiWeave", "Audio switching uses Windows device APIs; no audio is recorded."); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy", "Local validation only. No targets, commands, or URLs are executed by this scan.");
             rows.ResumeLayout(true);
         }
         void AddHeader(string name, string status, string explanation)
