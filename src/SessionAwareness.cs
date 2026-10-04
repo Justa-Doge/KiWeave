@@ -16,5 +16,6 @@ namespace FunctionRowRemapper
         }
         internal static string Describe(bool remote, bool vm) { if (remote && vm) return "Remote Desktop · virtual machine"; if (remote) return "Remote Desktop session"; if (vm) return "Virtual machine session"; return "Local Windows session"; }
         internal static string CurrentDescription() { return Describe(IsRemoteDesktop, IsVirtualMachine); }
+        internal static bool AllowsAutomaticAppProfile(bool remote, bool vm, bool hasLayoutMatch) { return (!remote && !vm) || hasLayoutMatch; }
     }
 }

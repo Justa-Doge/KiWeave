@@ -973,7 +973,8 @@ namespace FunctionRowRemapper
             if (isPreview || !preferences.AutomaticProfiles || pinnedProfile.Length > 0 || Visible || dirty || engine == null || profiles.Profiles.Length == 0) return;
             string process = Native.ForegroundProcessName();
             var match = profiles.ForApplication(process);
-            if (match == null) match = KeyboardLayoutProfiles.Match(profiles);
+            var layoutMatch = KeyboardLayoutProfiles.Match(profiles);
+            if (SessionAwareness.IsRemoteDesktop || SessionAwareness.IsVirtualMachine) match = layoutMatch; else if (match == null) match = layoutMatch;
             if (match != null) {
                 automaticProfileProcess = String.IsNullOrWhiteSpace(process) ? "" : process + ".exe";
                 if (!String.Equals(match.Name, currentProfile, StringComparison.OrdinalIgnoreCase) || !automaticProfileActive) ActivateProfile(match.Name, false, true);
