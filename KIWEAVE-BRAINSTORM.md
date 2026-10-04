@@ -487,23 +487,23 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 20. Release checksum and package-integrity verification.
 21. Stable, beta, and alpha update-channel preferences.
 22. Safe localization using text-only translation files.
-23. Accessibility and keyboard-only navigation pass.
-24. Live key tester improvements for suppression, translation, and layer state.
+23. Accessibility and keyboard-only navigation pass. (implemented locally)
+24. Live key tester improvements for suppression, translation, and layer state. (implemented locally)
 25. Conflict explanations with suggested fixes and affected integrations.
 26. Mapping, sequence, layer, condition, and profile duplication templates.
-27. Declarative local action-pack gallery with reviewed imports.
-28. Action-pack trust labels and optional signature verification.
+27. Declarative local action-pack gallery with reviewed imports. (implemented locally)
+28. Action-pack trust labels and optional signature verification. (trust labels implemented locally; signatures remain optional)
 29. Portable-mode improvements with explicit data-location controls.
-30. Windows notification preferences for updates, health, and safety warnings.
-31. Custom tray-menu profile switching.
+30. Windows notification preferences for updates, health, and safety warnings. (implemented locally)
+31. Custom tray-menu profile switching. (implemented locally)
 32. Local “why did this action run?” explanations without key-history logging.
-33. Dry-run mode for sequences and imported packs.
-34. Per-integration permission toggles beneath the master network policy.
+33. Dry-run mode for sequences and imported packs. (implemented locally)
+34. Per-integration permission toggles beneath the master network policy. (implemented locally)
 35. Backup privacy scan before export.
-36. One-click recovery after a failed startup.
-37. Admin-only Settings controls visible only in an elevated KiWeave session.
-38. Restricted elevated local-`.exe` launches, subject to a separate privacy and safety review.
-39. Read-only Windows admin-console shortcuts with explicit UAC prompts.
+36. One-click recovery after a failed startup. (implemented locally)
+37. Admin-only Settings controls visible only in an elevated KiWeave session. (implemented locally)
+38. Restricted elevated local-`.exe` launches, subject to a separate privacy and safety review. (implemented locally)
+39. Read-only Windows admin-console shortcuts with explicit UAC prompts. (implemented locally)
 40. A release-readiness checklist before the eventual 1.0.0 launch.
 
 ## Further roadmap backlog
@@ -523,7 +523,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 53. Modifier-layer conflict visualization. (implemented locally)
 54. Shortcut collision simulation.
 55. App-path migration assistant. (implemented locally)
-56. Offline documentation browser.
+56. Offline documentation browser. (implemented locally)
 57. Built-in keyboard shortcut reference. (implemented locally)
 58. Integration-specific reconnect controls. (implemented locally)
 59. Discord authorization-expiry warnings (implemented locally).
