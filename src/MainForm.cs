@@ -856,9 +856,10 @@ namespace FunctionRowRemapper
             if (dirty) { SetFeedback("Save or discard your edits before creating a full backup.", true); return; }
             if (MessageBox.Show(this, "A full backup contains your mappings, action targets, arguments, URLs, profiles, and preferences. Keep it private if any action contains personal or secret information.\n\nCreate the backup?", "Back up KiWeave", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
             try {
+                BackupPrivacyPreset privacyPreset; using (var preset = new BackupPrivacyForm()) if (preset.ShowDialog(this) != DialogResult.OK) return; else privacyPreset = preset.Preset;
                 using (var d = new SaveFileDialog { Filter = "KiWeave backup|*.keyweave", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".keyweave", DefaultExt = "keyweave", AddExtension = true })
                     if (d.ShowDialog(this) == DialogResult.OK) {
-                        string review = BackupPrivacy.Review(BackupBundle.Serialize(saved, profiles, preferences, Startup.Enabled));
+                        string review = BackupPrivacy.Review(BackupBundle.Serialize(saved, profiles, preferences, Startup.Enabled), privacyPreset);
                         if (MessageBox.Show(this, "Privacy review\r\n\r\n" + review + "\r\n\r\nCreate this private backup?", "Review backup privacy", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                         BackupBundle.Save(d.FileName, saved, profiles, preferences, Startup.Enabled); AuditTrail.Record("backup-export"); SetFeedback("Full backup created. PowerToys shortcuts were recorded as a read-only inventory.", false);
                     }

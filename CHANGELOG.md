@@ -68,3 +68,4 @@
 - 2026-10-03: Added temporary shortcut suspension by focused app. Settings stores up to 32 normalized process names locally; matching apps receive normal function/layer keys while KiWeave stays active. Build passed 113 checks.
 - 2026-10-03: Added a local Release readiness checklist in Settings covering configuration/profile validation, writable local storage, network posture, experimental-action controls, and Safe Mode availability. Build passed 114 checks.
 - 2026-10-03: Added anti-cheat-safe Game mode. When enabled, fullscreen foreground windows receive normal function/layer keys; KiWeave does not inject into games or install game components. Build passed 115 checks.
+- 2026-10-03: Added selectable backup privacy review presets: Standard, Strict, and Metadata-only. Presets change only the pre-export review and never silently redact or alter the full backup. Build passed 116 checks.

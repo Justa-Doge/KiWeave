@@ -514,7 +514,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 44. Temporary shortcut suspension by focused app. (implemented locally)
 45. Game mode with anti-cheat-safe restrictions. (implemented locally)
 46. Hardware keyboard detection and layout profiles.
-47. Import/export redaction presets.
+47. Import/export redaction presets. (implemented locally)
 48. Backup expiration reminders.
 49. Restore-point labels and private notes. (implemented locally)
 50. First-use action execution preview.
