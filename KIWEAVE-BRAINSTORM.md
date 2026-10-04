@@ -209,7 +209,7 @@ Packs should be reviewable before import, must never contain hidden executable c
 - Keep imported high-risk actions disabled until the user reviews and approves them.
 - Never treat a familiar-looking name or icon as proof that an action is safe.
 
-### 7. Private import review
+### 7. Private import review (selective staging implemented locally)
 
 - Preview every profile, layer, mapping, command, local path, URL, request body, and external integration before import.
 - Support selective import instead of requiring all-or-nothing replacement.

@@ -574,7 +574,7 @@ namespace FunctionRowRemapper
                     Configuration imported = ConfigStore.Load(d.FileName);
                     string importDiff = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = imported, Profiles = profiles, Preferences = preferences, StartWithWindows = Startup.Enabled }, saved, profiles, preferences, Startup.Enabled);
                     if (MessageBox.Show(this, "Redacted comparison with the current saved setup:\r\n\r\n" + importDiff + "\r\n\r\nContinue to the full import review?", "Import comparison", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
-                    using (var review = new ImportReviewForm(imported, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Import cancelled. Your editor and active mappings are unchanged.", false); return; }
+                    using (var review = new ImportReviewForm(imported, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Import cancelled. Your editor and active mappings are unchanged.", false); return; } else imported = review.SelectedConfiguration;
                     // Imported enabled state never changes the live toggle, and imports cannot add startup entries.
                     imported.Enabled = saved.Enabled; draft = imported; selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                     if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
@@ -601,7 +601,7 @@ namespace FunctionRowRemapper
                     if (MessageBox.Show(this, "Action-pack trust label: Unverified declarative pack\r\n\r\nPublisher identity is informational and is not proof that the pack is harmless. KiWeave will review the visible actions before staging them.\r\n\r\nContinue?", "Action-pack trust", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                     string packDiff = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = pack.Configuration, Profiles = pack.Profiles, Preferences = preferences, StartWithWindows = Startup.Enabled }, saved, profiles, preferences, Startup.Enabled);
                     if (MessageBox.Show(this, "Redacted comparison with the current saved setup:\r\n\r\n" + packDiff + "\r\n\r\nContinue to the action-pack safety review?", "Action-pack comparison", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
-                    using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; }
+                    using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; } else pack.Configuration = review.SelectedConfiguration;
                     bool importProfiles = false;
                     if (pack.Profiles != null && pack.Profiles.Profiles.Length > 0) {
                         string profileMessage = "This action pack contains " + pack.Profiles.Profiles.Length + " profile" + (pack.Profiles.Profiles.Length == 1 ? "" : "s") + ".\r\n\r\nYes = replace local profiles\r\nNo = merge them as new local profiles\r\nCancel = keep current profiles";
