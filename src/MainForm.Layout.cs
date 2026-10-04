@@ -356,6 +356,7 @@ namespace FunctionRowRemapper
             rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rows.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); rows.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             rows.Controls.Add(UiStyle.Text("Your function row", 9, true), 0, 0); PrepareList(list, "KEY"); rows.Controls.Add(list, 0, 1); left.Controls.Add(rows);
             list.SelectedIndexChanged += delegate { if (!loading && list.SelectedIndices.Count == 1) LoadEditor(list.SelectedIndices[0]); };
+            list.MouseMove += ExplainFunctionHover;
             var right = Card(); columns.Controls.Add(right, 1, 0); functionStack = EditorStack(right);
             editorTitle.AutoSize = true; editorTitle.Font = new Font("Segoe UI", 20, FontStyle.Bold); editorTitle.Margin = new Padding(0, 0, 0, 18); functionStack.Controls.Add(editorTitle);
             functionStack.Controls.Add(UiStyle.Text("Choose what happens when you press this key.", 9, false));
@@ -406,6 +407,7 @@ namespace FunctionRowRemapper
             removeCustomButton.MinimumSize = new Size(70, 42); removeCustomButton.Padding = new Padding(8, 8, 8, 8);
             rows.Controls.Add(commands, 0, 2); left.Controls.Add(rows);
             customList.SelectedIndexChanged += delegate { if (!loading && customList.SelectedIndices.Count == 1) LoadCustomEditor(customList.SelectedIndices[0]); };
+            customList.MouseMove += ExplainCustomHover;
             var right = Card(); columns.Controls.Add(right, 1, 0);
             customEditorHost.Dock = DockStyle.Fill; right.Controls.Add(customEditorHost); customEmpty.Dock = DockStyle.Fill; right.Controls.Add(customEmpty);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill }; customEditorHost.Controls.Add(scroll); customStack = UiStyle.Stack(); scroll.Controls.Add(customStack); scroll.SizeChanged += delegate { UiStyle.Wrap(customStack); };
@@ -437,6 +439,21 @@ namespace FunctionRowRemapper
             hotkeysTab.Primary = !powerToys; powerToysTab.Primary = powerToys;
             hotkeysTab.Invalidate(); powerToysTab.Invalidate();
             pageSubtitle.Text = powerToys ? "PowerToys shortcuts, right where your hotkeys live." : "Your favorite actions, one shortcut away.";
+        }
+        void ExplainFunctionHover(object sender, MouseEventArgs e)
+        {
+            ListViewItem item = list.GetItemAt(e.X, e.Y);
+            if (item == null || item.Index < 0 || item.Index >= 12) { tips.SetToolTip(list, ""); return; }
+            Mapping[] mappings = CurrentMappings();
+            string layer = selectedLayer < 0 ? "Base layer" : draft.Layers[selectedLayer].Name + " layer";
+            tips.SetToolTip(list, MainForm.ExplainShortcut("F" + (item.Index + 1), mappings[item.Index], layer));
+        }
+        void ExplainCustomHover(object sender, MouseEventArgs e)
+        {
+            ListViewItem item = customList.GetItemAt(e.X, e.Y);
+            if (item == null || item.Index < 0 || item.Index >= draft.CustomHotkeys.Length) { tips.SetToolTip(customList, ""); return; }
+            CustomHotkey hotkey = draft.CustomHotkeys[item.Index];
+            tips.SetToolTip(customList, MainForm.ExplainShortcut(hotkey.Shortcut, hotkey.Action, "Custom hotkey"));
         }
         void SetCustomEditorState(bool hasSelection)
         {

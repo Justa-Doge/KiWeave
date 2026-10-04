@@ -509,7 +509,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 ## Further roadmap backlog
 
 41. Per-profile backup snapshots.
-42. An “Explain this shortcut” hover panel.
+42. An “Explain this shortcut” hover panel (implemented locally).
 43. Conflict auto-resolution suggestions.
 44. Temporary shortcut suspension by focused app.
 45. Game mode with anti-cheat-safe restrictions.
