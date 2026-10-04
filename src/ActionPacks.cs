@@ -55,7 +55,7 @@ namespace FunctionRowRemapper
         internal static string Review(ActionPack pack)
         {
             Validate(pack);
-            return ActionPrivacy.Review(pack.Configuration, pack.Name) + "\r\nPACK ID: " + pack.Id + "\r\nPACK VERSION: " + pack.Version + "\r\nCOMPATIBILITY: " + Compatibility(pack) + "\r\nPUBLISHER: " + pack.Publisher + "\r\nPROFILES: " + pack.Profiles.Profiles.Length;
+            return ActionPrivacy.Review(pack.Configuration, pack.Name) + "\r\nPACK ID: " + pack.Id + "\r\nPACK VERSION: " + pack.Version + "\r\nCOMPATIBILITY: " + Compatibility(pack) + "\r\nTRUST: Unverified declarative pack\r\nPUBLISHER: " + pack.Publisher + " (informational; not a safety guarantee)\r\nPROFILES: " + pack.Profiles.Profiles.Length;
         }
         internal static void Validate(ActionPack pack)
         {

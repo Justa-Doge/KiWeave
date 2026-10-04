@@ -542,6 +542,7 @@ namespace FunctionRowRemapper
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
                     ActionPack pack = ActionPackStore.Load(d.FileName);
+                    if (MessageBox.Show(this, "Action-pack trust label: Unverified declarative pack\r\n\r\nPublisher identity is informational and is not proof that the pack is harmless. KiWeave will review the visible actions before staging them.\r\n\r\nContinue?", "Action-pack trust", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                     string packDiff = ConfigurationHistory.Compare(new KeyWeaveBackup { Configuration = pack.Configuration, Profiles = pack.Profiles, Preferences = preferences, StartWithWindows = Startup.Enabled }, saved, profiles, preferences, Startup.Enabled);
                     if (MessageBox.Show(this, "Redacted comparison with the current saved setup:\r\n\r\n" + packDiff + "\r\n\r\nContinue to the action-pack safety review?", "Action-pack comparison", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
                     using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; }
