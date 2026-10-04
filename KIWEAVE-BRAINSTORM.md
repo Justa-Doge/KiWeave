@@ -534,7 +534,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 64. Automatic rollback after failed configuration activation.
 65. User-selectable notification severity.
 66. Privacy-dashboard export history.
-67. Local audit trail with automatic redaction.
+67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch.
 69. Separate developer mode for test actions.
 70. Signed community action-pack repository.

@@ -545,7 +545,7 @@ namespace FunctionRowRemapper
                 catch (Exception ex) { dirty = true; SetFeedback("Mappings saved, but startup setting failed: " + ex.Message, true); return false; }
                 RecoveryStore.DeleteDraft();
                 try { RecoveryStore.SaveKnownGoodCurrent(); } catch (Exception ex) { AppLog.Record("KnownGoodRecovery", ex); }
-                SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
+                AuditTrail.Record("configuration-save"); SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
             } catch (Exception ex) {
                 if (persisted) try { PersistCurrent(previous); saved = previous.Copy(); draft = previous.Copy(); if (engine != null) { engine.Apply(previous); ApplyHotkeys(previous); } dirty = false; } catch (Exception rollback) { AppLog.Record("ConfigurationRollback", rollback); }
                 SetFeedback(persisted ? "Activation failed; KiWeave rolled back to the previous saved configuration. " + ex.Message : "Could not save: " + ex.Message, true); return false;
@@ -579,7 +579,7 @@ namespace FunctionRowRemapper
                     imported.Enabled = saved.Enabled; draft = imported; selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                     if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
                     MarkDirty();
-                    SetFeedback("Imported into the editor. Review all targets and commands, then Save to apply. Nothing has been run.", false); CheckMissingTargets();
+                    AuditTrail.Record("configuration-import-staged"); SetFeedback("Imported into the editor. Review all targets and commands, then Save to apply. Nothing has been run.", false); CheckMissingTargets();
                 } catch (Exception ex) { SetFeedback("Import rejected; current mappings are unchanged. " + ex.Message, true); }
             }
         }
@@ -613,7 +613,7 @@ namespace FunctionRowRemapper
                     }
                     pack.Configuration.Enabled = saved.Enabled; draft = pack.Configuration.Copy(); selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                     if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
-                    MarkDirty(); SetFeedback(importProfiles ? "Action pack mappings staged and reviewed profiles imported. Nothing was executed.": "Action pack staged for review. Nothing was executed or activated.", false); CheckMissingTargets();
+                    AuditTrail.Record("action-pack-import-staged"); MarkDirty(); SetFeedback(importProfiles ? "Action pack mappings staged and reviewed profiles imported. Nothing was executed.": "Action pack staged for review. Nothing was executed or activated.", false); CheckMissingTargets();
                 } catch (Exception ex) { SetFeedback("Action-pack import rejected; current mappings are unchanged. " + ex.Message, true); }
             }
         }
@@ -850,7 +850,7 @@ namespace FunctionRowRemapper
                     KeyWeaveBackup backup = BackupBundle.Load(d.FileName);
                     string message = BackupBundle.Describe(backup) + "\n\nThis replaces the Default mappings, profiles, tray preference, and startup preference. PowerToys is not changed. KiWeave will create a local rollback copy first.\n\nContinue?";
                     if (MessageBox.Show(this, message, "Restore KiWeave backup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                    CaptureHistory("backup restore"); string rollback = BackupBundle.Restore(backup); ApplyRestoredBackup(backup); SetFeedback("Backup restored. Rollback copy: " + rollback, false);
+                    CaptureHistory("backup restore"); string rollback = BackupBundle.Restore(backup); ApplyRestoredBackup(backup); AuditTrail.Record("backup-restore"); SetFeedback("Backup restored. Rollback copy: " + rollback, false);
                 } catch (Exception ex) { SetFeedback("Restore failed; the current setup was kept or rolled back. " + ex.Message, true); }
             }
         }
@@ -878,7 +878,7 @@ namespace FunctionRowRemapper
                 var entry = dialog.SelectedEntry;
                 string prompt = "Restore the selected local snapshot?\n\n" + entry + "\n\n" + ConfigurationHistory.Compare(entry.Backup, saved, profiles, preferences, Startup.Enabled) + "\n\nKiWeave will first preserve the current setup in history and create a rollback folder.";
                 if (MessageBox.Show(this, prompt, "Restore KiWeave history", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                try { CaptureHistory("history restore"); string rollback = BackupBundle.Restore(entry.Backup); ApplyRestoredBackup(entry.Backup); SetFeedback("History restored. Rollback copy: " + rollback, false); }
+                try { CaptureHistory("history restore"); string rollback = BackupBundle.Restore(entry.Backup); ApplyRestoredBackup(entry.Backup); AuditTrail.Record("history-restore"); SetFeedback("History restored. Rollback copy: " + rollback, false); }
                 catch (Exception ex) { SetFeedback("History restore failed; the current setup was kept or rolled back. " + ex.Message, true); }
             }
         }
@@ -938,7 +938,7 @@ namespace FunctionRowRemapper
                 if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                 if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
                 loading = true; enabled.Checked = saved.Enabled; loading = false; dirty = false; Text = "KiWeave"; UpdateStatus();
-                if (announce) SetFeedback("Using profile " + name + ".", false);
+                AuditTrail.Record("profile-activated"); if (announce) SetFeedback("Using profile " + name + ".", false);
                 return true;
             } catch (Exception ex) { if (announce) SetFeedback("Could not switch profile: " + ex.Message, true); return false; }
         }

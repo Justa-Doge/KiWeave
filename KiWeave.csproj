@@ -23,6 +23,7 @@
     <Compile Include="src\MonitorDrift.cs" />
     <Compile Include="src\AudioDrift.cs" />
     <Compile Include="src\StartupGuard.cs" />
+    <Compile Include="src\AuditTrail.cs" />
     <Compile Include="src\FirstPartyExtensions.cs" />
     <Compile Include="src\ActionPacks.cs" />
     <Compile Include="src\ProfileSchedules.cs" />
