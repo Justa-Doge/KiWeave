@@ -84,11 +84,11 @@ namespace FunctionRowRemapper
             ClientSize = new Size(900, 720); MinimumSize = new Size(700, 560); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; Controls.Add(scroll);
             var root = UiStyle.Stack(); scroll.Controls.Add(root);
-            var heading = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
-            heading.Controls.Add(UiStyle.Text("▣", 22, true)); heading.Controls.Add(UiStyle.Text("First-party extensions", 24, true)); root.Controls.Add(heading);
+            root.Controls.Add(UiStyle.Text("First-party extensions", 24, true));
             root.Controls.Add(UiStyle.Text("Optional KiWeave integrations live here instead of being mixed into the core shortcut editor. They are built and reviewed with KiWeave; this page never runs downloaded code.", 10, false));
             var searchRow = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 18, 0, 18) }; searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            search.Dock = DockStyle.Top; search.Margin = new Padding(0, 0, 10, 0); search.TextChanged += delegate { BuildRows(); }; new ToolTip().SetToolTip(search, "Search extensions"); searchRow.Controls.Add(search, 0, 0); searchRow.Controls.Add(UiStyle.Button("Clear", delegate { search.Clear(); }), 1, 0); root.Controls.Add(searchRow);
+            search.Dock = DockStyle.Top; search.Margin = Padding.Empty; search.TextChanged += delegate { BuildRows(); }; new ToolTip().SetToolTip(search, "Search extensions");
+            var searchField = UiStyle.Field("Search extensions", search); searchField.Margin = new Padding(0, 0, 10, 0); searchRow.Controls.Add(searchField, 0, 0); searchRow.Controls.Add(UiStyle.Button("Clear", delegate { search.Clear(); }), 1, 0); root.Controls.Add(searchRow);
             AddSection(root, "Installed extensions", installed);
             AddSection(root, "Featured first-party extensions", featured);
             var note = UiStyle.Text("Disabling an extension keeps existing mappings and notes intact. Those mappings simply fail safely until the extension is enabled again.", 9, false); note.Margin = new Padding(0, 14, 0, 10); root.Controls.Add(note);
@@ -107,7 +107,7 @@ namespace FunctionRowRemapper
             string query = (search.Text ?? "").Trim();
             foreach (var item in FirstPartyExtensionCatalog.Items) {
                 if (query.Length > 0 && (item.Name + " " + item.Description + " " + item.Maturity + " " + item.Permissions).IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                var card = new DesignCard { Width = 395, Height = 190, Margin = new Padding(0, 0, 14, 14), Padding = new Padding(14) };
+                var card = new DesignCard { Width = 395, Height = 178, Margin = new Padding(0, 0, 14, 14), Padding = new Padding(14) };
                 var stack = UiStyle.Stack(); stack.Dock = DockStyle.Fill; card.Controls.Add(stack);
                 var title = UiStyle.Text(item.Name, 13, true); title.Margin = new Padding(0, 0, 0, 4); stack.Controls.Add(title);
                 var description = UiStyle.Text(item.Description, 9, false); description.MaximumSize = new Size(360, 0); description.Margin = new Padding(0, 0, 0, 6); stack.Controls.Add(description);
@@ -137,7 +137,9 @@ namespace FunctionRowRemapper
             var state = UiStyle.Text(FirstPartyExtensionCatalog.IsEnabled(item.Id) ? "Enabled" : "Disabled", 10, true); state.ForeColor = FirstPartyExtensionCatalog.IsEnabled(item.Id) ? Color.FromArgb(127, 214, 169) : UiStyle.Muted; root.Controls.Add(state);
             Add(root, "Description", item.Description); Add(root, "Current status", FirstPartyExtensionCatalog.Status(item)); Add(root, "Version", "Built into KiWeave 1.0.0-beta.3"); Add(root, "Compatibility", "KiWeave 1.0.0 beta series and newer compatible releases"); Add(root, "Permissions", item.Permissions); Add(root, "Maturity", item.Maturity);
             root.Controls.Add(UiStyle.Text("No extension code is downloaded or executed from this view. Existing mappings remain local and are preserved if the extension is disabled.", 9, false));
-            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 18, 0, 0) }; buttons.Controls.Add(UiStyle.Button("Done", delegate { Close(); }, true)); root.Controls.Add(buttons);
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 18, 0, 0) };
+            if (item.Id == "discord") buttons.Controls.Add(UiStyle.Button("Reconnect", delegate { DiscordIntegration.Reconnect(); MessageBox.Show(this, DiscordIntegration.Status, "Discord", MessageBoxButtons.OK, MessageBoxIcon.Information); }));
+            buttons.Controls.Add(UiStyle.Button("Done", delegate { Close(); }, true)); root.Controls.Add(buttons);
         }
         static void Add(TableLayoutPanel root, string title, string value)
         {

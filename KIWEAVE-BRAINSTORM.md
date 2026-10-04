@@ -47,7 +47,7 @@ Requirements:
 - [x] Safe behavior when the layer key is released mid-action or after disabling.
 - [x] A visible layer selector in the function-key editor.
 - [x] Import/export support with backward-compatible config migration.
-- [ ] Active-layer indication and switching from the tray menu.
+- [x] Active-layer indication in the tray menu; layer switching remains hold-to-activate so the tray stays read-only and cannot steal a modifier key.
 - [ ] Cross-profile action conflict explanations beyond duplicate activation keys.
 
 ### 2. Live key tester (implemented locally)
@@ -129,6 +129,7 @@ Packs should be reviewable before import, must never contain hidden executable c
 
 ### Customization
 
+- Profile-local accent colors and short icon labels are now stored in profile format v3 with backward-compatible v1/v2 reads; personal images remain intentionally unsupported in exports/backups.
 - User-defined key labels.
 - Profile-specific themes.
 - Custom sidebar icons.
@@ -172,7 +173,7 @@ Packs should be reviewable before import, must never contain hidden executable c
 - Explain which rule currently wins and why.
 - Link each result directly to the relevant mapping editor.
 - Never resolve a conflict or rewrite another application's settings without explicit approval.
-- Current local implementation covers Windows-owned shortcuts, active PowerToys shortcuts, modifier-layer activation overlap, invalid/ambiguous profile rules, explicit winner explanations, and safe editor navigation without exposing action targets. Deeper cross-profile mapping comparisons remain future work.
+- Current local implementation covers Windows-owned shortcuts, active PowerToys shortcuts, modifier-layer activation overlap, invalid/ambiguous profile rules, explicit winner explanations, safe editor navigation without exposing action targets, and a target-redacted summary of divergent resolved mappings/custom-hotkey overlap when profiles claim the same application. Full per-rule cross-profile visualization remains future work.
 
 ### 3. Shortcut capture wizard (implemented locally)
 
@@ -234,7 +235,7 @@ Packs should be reviewable before import, must never contain hidden executable c
 - [x] No hooks, registered global hotkeys, automatic profiles, integrations, tray hiding, mapped actions, or network access.
 - [x] Readable configuration health, redacted diagnostics, Privacy Center, private backup export, full-backup restore, and undo-history restore.
 - [x] Rollback snapshots before replacement and a warned, deliberate restart into normal mode.
-- [ ] A future known-good recovery snapshot kept beside the existing Backups area.
+- [x] A known-good recovery snapshot kept beside the existing Backups area and available from Safe Mode.
 
 ### 10. Mapping search in the existing interface (implemented locally)
 
@@ -552,3 +553,5 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 83. First-party Extensions page: browse KiWeave-maintained integrations and declarative action packs from the official release source, showing version, permissions, supported KiWeave version, maturity, integrity state, and local-data impact before installation. No arbitrary extension code, silent downloads, or hidden network permissions.
 84. Modular first-party integrations: move Discord, Spotify, OBS, PowerToys, Stream Deck, MIDI, controller, and future app-specific support out of the default core experience and expose them through the first-party Extensions page. Existing mappings must migrate by stable integration IDs, disabled extensions must fail safely, and uninstalling an extension must preserve the user's mappings and notes.
 85. Extensions browsing polish: use an installed-versus-featured card layout, local search, details views, and clear permission/maturity labels. The browsing pattern is inspired by Windhawk's mod pages; KiWeave's extension model, safety rules, and attribution are its own.
+86. User theme and accent system: provide bounded live accent customization, readable preset palettes, optional Windows backdrop effects, and safe fallback behavior when a color or backdrop is unsupported.
+87. Integration recovery controls: expose per-extension health explanations and explicit reconnect controls without silently reauthorizing or changing permissions.

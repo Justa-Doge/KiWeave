@@ -13,9 +13,11 @@ namespace FunctionRowRemapper
         public string[] Applications = new string[0];
         public string InheritFrom = "";
         public string[] OverrideKeys = new string[0];
+        public string Accent = "";
+        public string Icon = "";
         public Configuration Configuration = new Configuration();
-        public KeyWeaveProfile Copy() { return new KeyWeaveProfile { Name = Name, Applications = Applications.ToArray(), InheritFrom = InheritFrom, OverrideKeys = OverrideKeys.ToArray(), Configuration = Configuration.Copy() }; }
-        public override string ToString() { return Name; }
+        public KeyWeaveProfile Copy() { return new KeyWeaveProfile { Name = Name, Applications = Applications.ToArray(), InheritFrom = InheritFrom, OverrideKeys = OverrideKeys.ToArray(), Accent = Accent, Icon = Icon, Configuration = Configuration.Copy() }; }
+        public override string ToString() { return (String.IsNullOrEmpty(Icon) ? "" : Icon + "  ") + Name; }
     }
 
     public sealed class ProfileCollection
@@ -65,6 +67,8 @@ namespace FunctionRowRemapper
             var applications = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var profile in collection.Profiles) {
                 if (profile == null || String.IsNullOrWhiteSpace(profile.Name) || profile.Name.Length > 40 || profile.Name.Any(Char.IsControl)) throw new ArgumentException("Profile names must be 1 to 40 characters.");
+                if (profile.Accent == null || profile.Accent.Length > 7 || profile.Accent.Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch(profile.Accent, "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException(profile.Name + " has an invalid accent color.");
+                if (profile.Icon == null || profile.Icon.Length > 4 || profile.Icon.Any(Char.IsControl)) throw new ArgumentException(profile.Name + " has an invalid icon label.");
                 if (!names.Add(profile.Name.Trim())) throw new ArgumentException("Profile names must be unique.");
                 if (profile.Applications == null || profile.Applications.Length > 24) throw new ArgumentException(profile.Name + " has too many automatic applications.");
                 var local = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -124,17 +128,18 @@ namespace FunctionRowRemapper
             if (json == null || Encoding.UTF8.GetByteCount(json) > MaxBytes) throw new ArgumentException("Profiles file is too large.");
             JsonSyntax.Check(json);
             var root = new JavaScriptSerializer { MaxJsonLength = MaxBytes, RecursionLimit = 20 }.DeserializeObject(json) as Dictionary<string, object>;
-            if (root == null || root.Count != 2 || !(root.ContainsKey("version")) || !(root["version"] is int) || ((int)root["version"] != 1 && (int)root["version"] != 2) || !root.ContainsKey("profiles")) throw new ArgumentException("Invalid profiles file.");
+            if (root == null || root.Count != 2 || !(root.ContainsKey("version")) || !(root["version"] is int) || ((int)root["version"] != 1 && (int)root["version"] != 2 && (int)root["version"] != 3) || !root.ContainsKey("profiles")) throw new ArgumentException("Invalid profiles file.");
             int version = (int)root["version"];
             var rawProfiles = root["profiles"] as object[]; if (rawProfiles == null) throw new ArgumentException("Profiles must be an array.");
             var result = new ProfileCollection { Profiles = rawProfiles.Select(item => {
                 var d = item as Dictionary<string, object>;
-                string[] fields = version == 1 ? new[] { "name", "applications", "configuration" } : new[] { "name", "applications", "inheritFrom", "overrideKeys", "configuration" };
+                string[] fields = version == 1 ? new[] { "name", "applications", "configuration" } : version == 2 ? new[] { "name", "applications", "inheritFrom", "overrideKeys", "configuration" } : new[] { "name", "applications", "inheritFrom", "overrideKeys", "accent", "icon", "configuration" };
                 if (d == null || d.Count != fields.Length || fields.Any(f => !d.ContainsKey(f)) || !(d["name"] is string) || !(d["configuration"] is string)) throw new ArgumentException("Invalid profile entry.");
                 var apps = d["applications"] as object[]; if (apps == null || apps.Any(a => !(a is string))) throw new ArgumentException("Profile applications must be text.");
                 var overrides = version == 1 ? new object[0] : d["overrideKeys"] as object[];
-                if (overrides == null || overrides.Any(x => !(x is string)) || (version == 2 && !(d["inheritFrom"] is string))) throw new ArgumentException("Invalid profile inheritance entry.");
-                return new KeyWeaveProfile { Name = (string)d["name"], Applications = apps.Cast<string>().ToArray(), InheritFrom = version == 1 ? "" : (string)d["inheritFrom"], OverrideKeys = overrides.Cast<string>().ToArray(), Configuration = ConfigStore.Parse((string)d["configuration"]) };
+                if (overrides == null || overrides.Any(x => !(x is string)) || (version >= 2 && !(d["inheritFrom"] is string))) throw new ArgumentException("Invalid profile inheritance entry.");
+                string accent = version >= 3 && d["accent"] is string ? (string)d["accent"] : ""; string icon = version >= 3 && d["icon"] is string ? (string)d["icon"] : "";
+                return new KeyWeaveProfile { Name = (string)d["name"], Applications = apps.Cast<string>().ToArray(), InheritFrom = version == 1 ? "" : (string)d["inheritFrom"], OverrideKeys = overrides.Cast<string>().ToArray(), Accent = accent, Icon = icon, Configuration = ConfigStore.Parse((string)d["configuration"]) };
             }).ToArray() };
             Validate(result, false); return result;
         }
@@ -142,7 +147,7 @@ namespace FunctionRowRemapper
         {
             Validate(collection, false);
             var s = new JavaScriptSerializer { MaxJsonLength = MaxBytes };
-            var payload = new { version = 2, profiles = collection.Profiles.Select(p => new { name = p.Name.Trim(), applications = p.Applications.Select(NormalizeProcess).ToArray(), inheritFrom = p.InheritFrom.Trim(), overrideKeys = p.OverrideKeys, configuration = ConfigStore.Serialize(p.Configuration) }).ToArray() };
+            var payload = new { version = 3, profiles = collection.Profiles.Select(p => new { name = p.Name.Trim(), applications = p.Applications.Select(NormalizeProcess).ToArray(), inheritFrom = p.InheritFrom.Trim(), overrideKeys = p.OverrideKeys, accent = p.Accent ?? "", icon = p.Icon ?? "", configuration = ConfigStore.Serialize(p.Configuration) }).ToArray() };
             string json = s.Serialize(payload); if (Encoding.UTF8.GetByteCount(json) > MaxBytes) throw new ArgumentException("Profiles exceed the 1 MB limit."); return json;
         }
         public static void Save(string path, ProfileCollection collection)

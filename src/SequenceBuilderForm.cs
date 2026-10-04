@@ -138,7 +138,9 @@ namespace FunctionRowRemapper
         {
             Text = mapping == null ? "Edit pause" : "Edit action"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             Icon = Program.AppIcon();
-            ClientSize = new Size(540, 560); MinimumSize = new Size(500, 500); AutoScroll = true; StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false; Design.DarkTitlebar(this);
+            bool launchEditor = mapping != null && ((mapping.Kind >= ActionKind.Application && mapping.Kind <= ActionKind.Command) || mapping.Kind == ActionKind.Python);
+            int editorHeight = mapping == null ? 300 : launchEditor ? 480 : 380;
+            ClientSize = new Size(540, editorHeight); MinimumSize = new Size(500, Math.Min(editorHeight, 440)); AutoScroll = true; StartPosition = FormStartPosition.CenterParent; BackColor = UiStyle.Canvas; ShowInTaskbar = false; Design.DarkTitlebar(this);
             var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root);
             root.Controls.Add(UiStyle.Text(Text, 20, true));
             var target = new DesignTextBox { Text = mapping == null ? "" : mapping.Target };
@@ -147,7 +149,7 @@ namespace FunctionRowRemapper
             var delay = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, DecimalPlaces = 3, Value = Math.Max(0.001M, milliseconds / 1000M) };
             if (mapping == null) root.Controls.Add(UiStyle.Field("Seconds", delay));
             else {
-                bool launch = (mapping.Kind >= ActionKind.Application && mapping.Kind <= ActionKind.Command) || mapping.Kind == ActionKind.Python;
+                bool launch = launchEditor;
                 if (mapping.Kind != ActionKind.LockThenSleep) root.Controls.Add(UiStyle.Field(launch ? "File path" : "Key or shortcut", target));
                 if (launch) {
                     var browse = UiStyle.Button("Browse...", delegate { using (var d = new OpenFileDialog { Filter = mapping.Kind == ActionKind.Python ? "Python scripts|*.py" : "All files|*.*", DereferenceLinks = false }) if (d.ShowDialog(this) == DialogResult.OK) target.Text = d.FileName; });

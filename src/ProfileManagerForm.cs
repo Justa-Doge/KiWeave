@@ -11,6 +11,7 @@ namespace FunctionRowRemapper
         readonly Configuration current, defaultConfiguration;
         readonly ListBox list = new DesignListBox();
         readonly TextBox name = new DesignTextBox(), applications = new DesignTextBox();
+        readonly TextBox accent = new DesignTextBox(), icon = new DesignTextBox();
         readonly DesignComboBox inheritance = new DesignComboBox();
         readonly Label feedback = new Label();
         public KeyWeaveProfile SelectedProfile { get; private set; }
@@ -20,7 +21,7 @@ namespace FunctionRowRemapper
         {
             profiles = source.Copy(); current = currentConfiguration.Copy(); defaultConfiguration = defaultProfile.Copy();
             Text = "KiWeave profiles"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink; Design.DarkTitlebar(this);
-            StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(820, 630); MinimumSize = new Size(760, 610);
+            StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(820, 630); MinimumSize = new Size(820, 610);
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22), ColumnCount = 2, RowCount = 1 };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60)); Controls.Add(root);
             var left = new DesignCard { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 14, 0) }; root.Controls.Add(left, 0, 0);
@@ -32,6 +33,8 @@ namespace FunctionRowRemapper
             var right = new DesignCard { Dock = DockStyle.Fill }; root.Controls.Add(right, 1, 0); var stack = UiStyle.Stack(); right.Controls.Add(stack);
             stack.Controls.Add(UiStyle.Text("Profiles", 20, true)); stack.Controls.Add(UiStyle.Text("Switch layouts manually or assign apps for automatic switching.", 9, false));
             stack.Controls.Add(UiStyle.Field("Profile name", name));
+            stack.Controls.Add(UiStyle.Field("Accent color (optional #RRGGBB)", accent));
+            stack.Controls.Add(UiStyle.Field("Icon label (optional, up to 4 characters)", icon));
             applications.Multiline = true; applications.Height = 92; applications.ScrollBars = ScrollBars.Vertical;
             stack.Controls.Add(UiStyle.Field("Automatic apps (one process name per line)", applications));
             stack.Controls.Add(UiStyle.Text("Examples: obs64.exe, Discord.exe, Spotify.exe. KiWeave switches only while its editor is closed and has no unsaved changes.", 8.5f, false));
@@ -51,7 +54,7 @@ namespace FunctionRowRemapper
         }
         void LoadSelected()
         {
-            var p = list.SelectedItem as KeyWeaveProfile; name.Text = p == null ? "" : p.Name; applications.Text = p == null ? "" : String.Join(Environment.NewLine, p.Applications);
+            var p = list.SelectedItem as KeyWeaveProfile; name.Text = p == null ? "" : p.Name; accent.Text = p == null ? "" : p.Accent; icon.Text = p == null ? "" : p.Icon; applications.Text = p == null ? "" : String.Join(Environment.NewLine, p.Applications);
             inheritance.Items.Clear(); inheritance.Items.Add("None (independent)"); inheritance.Items.Add("Default");
             foreach (var candidate in profiles.Profiles.Where(x => p == null || !ReferenceEquals(x, p))) inheritance.Items.Add(candidate.Name);
             string selected = p == null || String.IsNullOrWhiteSpace(p.InheritFrom) ? "None (independent)" : p.InheritFrom;
@@ -76,16 +79,16 @@ namespace FunctionRowRemapper
         bool SaveDetails()
         {
             var p = list.SelectedItem as KeyWeaveProfile; if (p == null) { feedback.Text = "Choose a profile first."; return false; }
-            string oldName = p.Name; string[] oldApps = p.Applications; string oldBase = p.InheritFrom; string[] oldOverrides = p.OverrideKeys.ToArray(); Configuration oldConfiguration = p.Configuration.Copy();
+            string oldName = p.Name; string[] oldApps = p.Applications; string oldBase = p.InheritFrom; string oldAccent = p.Accent; string oldIcon = p.Icon; string[] oldOverrides = p.OverrideKeys.ToArray(); Configuration oldConfiguration = p.Configuration.Copy();
             Configuration effective;
             try { effective = profiles.Resolve(p.Name, defaultConfiguration); } catch (Exception ex) { feedback.Text = ex.Message; return false; }
-            p.Name = name.Text.Trim(); p.Applications = applications.Lines.Select(ProfileStore.NormalizeProcess).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            p.Name = name.Text.Trim(); p.Accent = accent.Text.Trim(); p.Icon = icon.Text.Trim(); p.Applications = applications.Lines.Select(ProfileStore.NormalizeProcess).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             string selectedBase = inheritance.SelectedItem == null ? "" : inheritance.SelectedItem.ToString(); p.InheritFrom = selectedBase == "None (independent)" ? "" : selectedBase;
             foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, oldName, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = p.Name;
             try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
             catch (Exception ex) {
                 foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, p.Name, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = oldName;
-                p.Name = oldName; p.Applications = oldApps; p.InheritFrom = oldBase; p.OverrideKeys = oldOverrides; p.Configuration = oldConfiguration; feedback.Text = ex.Message; return false;
+                p.Name = oldName; p.Applications = oldApps; p.InheritFrom = oldBase; p.Accent = oldAccent; p.Icon = oldIcon; p.OverrideKeys = oldOverrides; p.Configuration = oldConfiguration; feedback.Text = ex.Message; return false;
             }
         }
         void UseSelected()

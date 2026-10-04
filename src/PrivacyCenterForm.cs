@@ -46,7 +46,7 @@ namespace FunctionRowRemapper
             health = healthReport ?? ConfigurationHealthReport.Empty;
             Text = "KiWeave privacy center"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             ClientSize = new Size(880, 650); MinimumSize = new Size(760, 570); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
-            var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; Controls.Add(scroll);
+            var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; scroll.EnableKeyboardFocus(); Controls.Add(scroll);
             var root = UiStyle.Stack(); scroll.Controls.Add(root);
             root.Controls.Add(UiStyle.Text("Privacy center", 24, true));
             var intro = UiStyle.Text("KiWeave has no account, analytics, advertising ID, cloud sync, typing history, or automatic uploads. Core remapping works offline.", 10, false); intro.Margin = new Padding(0, 0, 0, 20); root.Controls.Add(intro);
@@ -84,6 +84,7 @@ namespace FunctionRowRemapper
             close.Controls.Add(UiStyle.Button("Done", delegate { Close(); }, true)); root.Controls.Add(close);
             scroll.SizeChanged += delegate { UiStyle.Wrap(root); };
             SizeChanged += delegate { if (IsHandleCreated) try { BeginInvoke((Action)delegate { scroll.AutoScrollPosition = Point.Empty; }); } catch { } };
+            Shown += delegate { try { BeginInvoke((Action)delegate { ActiveControl = scroll; scroll.Focus(); scroll.AutoScrollPosition = Point.Empty; }); } catch { } };
         }
 
         static DesignCard Card(string title, string status, Color statusColor, string body)
@@ -104,4 +105,5 @@ namespace FunctionRowRemapper
             catch (Exception ex) { MessageBox.Show(this, "The folder could not be opened: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
     }
+
 }

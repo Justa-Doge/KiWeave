@@ -35,7 +35,10 @@ namespace FunctionRowRemapper
             var appOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var profile in profiles.Profiles) foreach (string app in profile.Applications ?? new string[0]) {
                 string normalized = ProfileStore.NormalizeProcess(app), owner;
-                if (appOwners.TryGetValue(normalized, out owner)) issues.Add(new ConflictIssue { Severity = ConflictSeverity.Critical, Area = ConflictArea.Profiles, ProfileName = profile.Name, Title = normalized + " activates more than one profile", Detail = owner + " and " + profile.Name + " both claim the same foreground application.", Winner = owner + " wins because it appears first in the saved profile order." });
+                if (appOwners.TryGetValue(normalized, out owner)) {
+                    string differences = ProfileDifference(owner, profile.Name, defaultConfiguration, profiles);
+                    issues.Add(new ConflictIssue { Severity = ConflictSeverity.Critical, Area = ConflictArea.Profiles, ProfileName = profile.Name, Title = normalized + " activates more than one profile", Detail = owner + " and " + profile.Name + " both claim the same foreground application." + differences, Winner = owner + " wins because it appears first in the saved profile order." });
+                }
                 else appOwners[normalized] = profile.Name;
             }
             try { ProfileStore.Validate(profiles, false); }
@@ -62,6 +65,22 @@ namespace FunctionRowRemapper
                 }
             }
             return issues.OrderBy(x => x.Severity).ThenBy(x => x.ProfileName).ThenBy(x => x.Title).ToList();
+        }
+        static string ProfileDifference(string first, string second, Configuration defaults, ProfileCollection profiles)
+        {
+            try {
+                Configuration a = profiles.Resolve(first, defaults), b = profiles.Resolve(second, defaults);
+                var changed = new List<string>();
+                for (int i = 0; i < 12 && changed.Count < 3; i++) if (a.Mappings[i].Summary != b.Mappings[i].Summary) changed.Add("F" + (i + 1));
+                var hotkeysA = new HashSet<string>((a.CustomHotkeys ?? new CustomHotkey[0]).Select(x => HotkeyChord.Normalize(x.Shortcut)), StringComparer.OrdinalIgnoreCase);
+                var hotkeysB = new HashSet<string>((b.CustomHotkeys ?? new CustomHotkey[0]).Select(x => HotkeyChord.Normalize(x.Shortcut)), StringComparer.OrdinalIgnoreCase);
+                int overlap = hotkeysA.Count(hotkeysB.Contains);
+                if (changed.Count == 0 && overlap == 0) return " Their resolved mappings are currently identical, so the overlap is purely an activation-order conflict.";
+                string detail = " Their resolved configurations differ";
+                if (changed.Count > 0) detail += " on " + String.Join(", ", changed.ToArray()) + (changed.Count == 3 ? " or more" : "");
+                if (overlap > 0) detail += (changed.Count > 0 ? "; " : " on top of that, ") + overlap + " custom hotkey" + (overlap == 1 ? " also overlaps" : "s also overlap");
+                return detail + ".";
+            } catch { return " KiWeave could not compare their resolved mappings safely."; }
         }
     }
 

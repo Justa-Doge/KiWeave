@@ -18,7 +18,7 @@ namespace FunctionRowRemapper
             var credit = UiStyle.Text("Created by Justa-Doge\n\nFunction keys, custom hotkeys, profiles, and Windows integrations woven into one place.", 10, false); credit.MaximumSize = new Size(500, 0); credit.Margin = new Padding(0, 18, 0, 20); stack.Controls.Add(credit);
             stack.Controls.Add(UiStyle.Text("Apache License 2.0\nKiWeave © 2026 Justa-Doge", 9, true));
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0, 22, 0, 0), WrapContents = true };
-            buttons.Controls.Add(UiStyle.Button("GitHub", delegate { Open("https://github.com/Justa-Doge/KeyWeave"); }, true));
+            buttons.Controls.Add(UiStyle.Button("GitHub", delegate { Open("https://github.com/Justa-Doge/KiWeave"); }, true));
             buttons.Controls.Add(UiStyle.Button("View license", delegate { Open(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LICENSE")); }));
             buttons.Controls.Add(UiStyle.Button("Close", delegate { Close(); })); stack.Controls.Add(buttons);
         }

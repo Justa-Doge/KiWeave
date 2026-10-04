@@ -9,7 +9,11 @@ namespace FunctionRowRemapper
     internal static class UiPreview
     {
         static T Field<T>(object o, string name) { return (T)o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(o); }
-        static object Call(object o, string name, params object[] args) { return o.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(o, args); }
+        static object Call(object o, string name, params object[] args)
+        {
+            var method = o.GetType().GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).Single(x => x.Name == name && x.GetParameters().Length == args.Length);
+            return method.Invoke(o, args);
+        }
         static void CheckDropdownLayout(Control control)
         {
             foreach (Control child in control.Controls) {
@@ -57,6 +61,11 @@ namespace FunctionRowRemapper
                 f.Scale(new SizeF(1.5f, 1.5f)); Capture(f, "scaled-layout");
                 Call(f, "Save");
             }
+            using (var f = new MainForm(false, true)) { Prepare(f); UiStyle.ApplyAccent("#A457D2"); Call(f, "RefreshVisualTheme"); Capture(f, "accent-live"); f.Close(); }
+            UiStyle.ApplyTheme("KiWeave Dark");
+            using (var f = new FirstPartyExtensionsForm(null)) { Prepare(f); Capture(f, "extensions"); f.Size = f.MinimumSize; Capture(f, "extensions-minimum"); f.Close(); }
+            using (var f = new IntegrationHealthForm(1, ConfigurationHealthReport.Empty)) { Prepare(f); Capture(f, "integration-health"); f.Size = f.MinimumSize; Capture(f, "integration-health-minimum"); f.Close(); }
+            using (var f = new ProfileSchedulesForm(new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Gaming" } } })) { Prepare(f); Capture(f, "profile-schedules"); f.Size = f.MinimumSize; Capture(f, "profile-schedules-minimum"); f.Close(); }
             using (var f = new LayerManagerForm(new[] { new ModifierLayer { Name = "Media layer", ActivationKey = "CapsLock" } })) { Prepare(f); Capture(f, "layers"); f.Size = f.MinimumSize; Capture(f, "layers-minimum"); f.Close(); }
             var profileDefault = new Configuration(); profileDefault.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };
             var inheritedProfile = new KeyWeaveProfile { Name = "Gaming", Applications = new[] { "game.exe" }, InheritFrom = "Default", OverrideKeys = new[] { "F2" }, Configuration = profileDefault.Copy() };

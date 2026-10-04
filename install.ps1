@@ -18,14 +18,28 @@ $installedExe = Join-Path $installDir 'KiWeave.exe'
 $installedUninstaller = Join-Path $installDir 'UninstallKiWeave.exe'
 $legacyInstallDir = Join-Path $env:LOCALAPPDATA 'Programs\FunctionRowRemapper'
 $legacyInstalledExe = Join-Path $legacyInstallDir 'FunctionRowRemapper.exe'
+function Invoke-KiWeaveChecker([string]$argument) {
+    $stdout = [IO.Path]::GetTempFileName()
+    $stderr = [IO.Path]::GetTempFileName()
+    try {
+        $process = Start-Process -FilePath $SourceExe -ArgumentList $argument -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        [PSCustomObject]@{
+            ExitCode = $process.ExitCode
+            Output = if (Test-Path -LiteralPath $stdout) { Get-Content -Raw -LiteralPath $stdout } else { '' }
+            Error = if (Test-Path -LiteralPath $stderr) { Get-Content -Raw -LiteralPath $stderr } else { '' }
+        }
+    } finally {
+        Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+    }
+}
 $running = @(@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue) + @(Get-Process -Name FunctionRowRemapper -ErrorAction SilentlyContinue))
 if ($running.Count -gt 0) {
     $localCheckerMarker = Join-Path $sourceDir 'KiWeave.LocalOnly'
     if (-not (Test-Path -LiteralPath $localCheckerMarker -PathType Leaf)) { throw 'KiWeave is running. Exit the visible app or tray copy before installing a public build.' }
-    $stateOutput = @(& $SourceExe --inspect-state 2>&1); $stateCode = $LASTEXITCODE
-    if ($stateCode -ne 0) { throw ('KiWeave is running but is not safe to close automatically. ' + ($stateOutput -join ' ')) }
-    & $SourceExe --exit-for-update 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'KiWeave did not close cleanly for the update.' }
+    $state = Invoke-KiWeaveChecker '--inspect-state'
+    if ($state.ExitCode -ne 0) { $stateText = [string]$state.Output; $stateError = [string]$state.Error; throw ('KiWeave is running but is not safe to close automatically. ' + $stateText + ' ' + $stateError) }
+    $close = Invoke-KiWeaveChecker '--exit-for-update'
+    if ($close.ExitCode -ne 0) { $closeText = [string]$close.Output; $closeError = [string]$close.Error; throw ('KiWeave did not close cleanly for the update. ' + $closeText + ' ' + $closeError) }
     Start-Sleep -Milliseconds 250
     if (@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue).Count -gt 0) { throw 'KiWeave is still running after the clean-close request.' }
 }

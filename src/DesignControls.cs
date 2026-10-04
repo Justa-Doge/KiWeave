@@ -58,7 +58,27 @@ namespace FunctionRowRemapper
             g.DrawString("F", font, Brushes.White, x, y);
         }
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-        internal static void DarkTitlebar(Form form) { form.HandleCreated += delegate { try { int on = 1; DwmSetWindowAttribute(form.Handle, 20, ref on, 4); } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { } }; }
+        internal static void DarkTitlebar(Form form)
+        {
+            Action apply = delegate {
+                if (!form.IsHandleCreated) return;
+                try {
+                    // Windows 10/11 use attribute 20 on current builds and 19 on
+                    // older DWM revisions. Applying both keeps every KiWeave dialog
+                    // out of the light caption fallback.
+                    int on = 1; DwmSetWindowAttribute(form.Handle, 20, ref on, 4); DwmSetWindowAttribute(form.Handle, 19, ref on, 4);
+                    int caption = ColorTranslator.ToWin32(UiStyle.Canvas), text = ColorTranslator.ToWin32(UiStyle.Ink);
+                    DwmSetWindowAttribute(form.Handle, 35, ref caption, 4); DwmSetWindowAttribute(form.Handle, 36, ref text, 4);
+                } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
+            };
+            form.HandleCreated += delegate { apply(); };
+            form.Shown += delegate { apply(); };
+            if (form.IsHandleCreated) apply();
+        }
+        internal static void GlassBackdrop(Form form, bool enabled)
+        {
+            form.HandleCreated += delegate { try { int value = enabled ? 2 : 0; DwmSetWindowAttribute(form.Handle, 38, ref value, 4); } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { } };
+        }
         internal static ContextMenuStrip DarkMenu(Font font)
         {
             var menu = new ContextMenuStrip {
@@ -105,8 +125,20 @@ namespace FunctionRowRemapper
     // Keep native sizing/accessibility but use a consistent content origin for painting.
     internal sealed class DesignLabel : Label
     {
+        internal DesignLabel()
+        {
+            // Labels are child windows inside auto-scrolling cards. Explicitly
+            // repaint their background before drawing text so a rapid scroll cannot
+            // expose the previous card contents or leave a blank text band behind.
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+        }
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Design.Background(Parent));
+        }
         protected override void OnPaint(PaintEventArgs e)
         {
+            OnPaintBackground(e);
             var area = ClientRectangle;
             area.X += Padding.Left; area.Y += Padding.Top;
             area.Width -= Padding.Horizontal; area.Height -= Padding.Vertical;
@@ -117,7 +149,7 @@ namespace FunctionRowRemapper
     }
     internal class DesignButton : Button
     {
-        internal bool Primary, Sidebar, Active;
+        internal bool Primary, Sidebar, Active, Danger;
         internal string Glyph;
         bool hover, pressed;
         internal DesignButton()
@@ -135,11 +167,12 @@ namespace FunctionRowRemapper
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.Clear(Design.Background(Parent));
-            Color fill = Sidebar ? (Active ? UiStyle.Soft : hover ? Color.FromArgb(44, 45, 65) : UiStyle.Sidebar) : Primary ? (hover ? Color.FromArgb(125, 94, 213) : UiStyle.AccentFill) : hover ? UiStyle.Soft : UiStyle.Input;
+            Color dangerFill = hover ? Color.FromArgb(91, 40, 49) : Color.FromArgb(55, 34, 42);
+            Color fill = Sidebar ? (Active ? UiStyle.Soft : hover ? Color.FromArgb(44, 45, 65) : UiStyle.Sidebar) : Danger ? dangerFill : Primary ? (hover ? Color.FromArgb(125, 94, 213) : UiStyle.AccentFill) : hover ? UiStyle.Soft : UiStyle.Input;
             if (pressed) fill = Sidebar ? Color.FromArgb(78, 65, 123) : UiStyle.Soft;
-            Color ink = !Enabled ? UiStyle.Muted : Sidebar ? (Active ? Color.White : Color.FromArgb(190, 190, 209)) : Primary && !pressed ? Color.White : UiStyle.Ink;
+            Color ink = !Enabled ? UiStyle.Muted : Sidebar ? (Active ? Color.White : Color.FromArgb(190, 190, 209)) : Danger ? Color.FromArgb(255, 184, 193) : Primary && !pressed ? Color.White : UiStyle.Ink;
             var r = new Rectangle(1, 1, Width - 3, Height - 3);
-            Design.Box(e.Graphics, r, fill, Sidebar ? fill : Primary ? UiStyle.AccentFill : UiStyle.Border, 10);
+            Design.Box(e.Graphics, r, fill, Sidebar ? fill : Danger ? Color.FromArgb(126, 58, 70) : Primary ? UiStyle.AccentFill : UiStyle.Border, 10);
             if (Glyph != null) Design.Glyph(e.Graphics, Glyph, new Rectangle(12, 0, 28, Height), ink);
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(Glyph == null ? 8 : 43, 0, Width - (Glyph == null ? 16 : 47), Height), ink,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | (Sidebar ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter));
@@ -148,7 +181,15 @@ namespace FunctionRowRemapper
     }
     internal sealed class DesignCard : Panel
     {
-        internal DesignCard() { DoubleBuffered = true; BackColor = UiStyle.Surface; Padding = new Padding(22); }
+        internal DesignCard()
+        {
+            // Cards are children of the auto-scrolling surface. A second buffer
+            // here can preserve the pre-scroll child composition and then blit
+            // it back over freshly moved labels during rapid wheel input.
+            DoubleBuffered = false;
+            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint, true);
+            BackColor = UiStyle.Surface; Padding = new Padding(22);
+        }
         protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(Design.Background(Parent)); }
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -197,6 +238,30 @@ namespace FunctionRowRemapper
             if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, new Rectangle(e.Bounds.X + 12, e.Bounds.Y, e.Bounds.Width - 24, e.Bounds.Height), selected ? UiStyle.Blue : UiStyle.Ink, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
     }
+    internal sealed class DesignCheckBox : CheckBox
+    {
+        internal DesignCheckBox()
+        {
+            AutoSize = true; Cursor = Cursors.Hand;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+        protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Design.Background(Parent));
+            var box = new Rectangle(1, Math.Max(1, (Height - 18) / 2), 18, 18);
+            Design.Box(e.Graphics, box, Checked ? UiStyle.AccentFill : UiStyle.Input, Checked ? UiStyle.AccentFill : UiStyle.Border, 5);
+            if (Checked) using (var pen = new Pen(Color.White, 2f)) {
+                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round;
+                e.Graphics.DrawLines(pen, new[] { new Point(5, box.Y + 9), new Point(9, box.Y + 13), new Point(16, box.Y + 5) });
+            }
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(28, 0, Math.Max(1, Width - 28), Height), Enabled ? UiStyle.Ink : UiStyle.Muted,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, new Rectangle(26, 1, Math.Max(1, Width - 27), Math.Max(1, Height - 2)));
+        }
+    }
 
     // Native text/list controls keep their accessibility and keyboard behavior,
     // while opting into the same dark scrollbar theme as the rest of KiWeave.
@@ -206,7 +271,26 @@ namespace FunctionRowRemapper
     }
     internal sealed class DesignListBox : ListBox
     {
+        internal DesignListBox()
+        {
+            DrawMode = DrawMode.OwnerDrawFixed; ItemHeight = 30; BorderStyle = BorderStyle.None;
+            BackColor = UiStyle.Surface; ForeColor = UiStyle.Ink; IntegralHeight = false;
+        }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Design.DarkNative(this); }
+        protected override void OnDrawItem(DrawItemEventArgs e)
+        {
+            if (e.Index >= 0) {
+                bool selected = (e.State & DrawItemState.Selected) != 0;
+                using (var brush = new SolidBrush(selected ? UiStyle.Soft : BackColor)) e.Graphics.FillRectangle(brush, e.Bounds);
+                TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font,
+                    new Rectangle(e.Bounds.X + 10, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 20), e.Bounds.Height),
+                    selected ? UiStyle.Blue : ForeColor, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                if ((e.State & DrawItemState.Focus) != 0) ControlPaint.DrawFocusRectangle(e.Graphics, e.Bounds, selected ? UiStyle.Blue : ForeColor, selected ? UiStyle.Soft : BackColor);
+            }
+            // Forms with richer list rows can subscribe to DrawItem and paint over
+            // this consistent fallback (for example, the sequence step cards).
+            base.OnDrawItem(e);
+        }
     }
     internal sealed class InputFrame : Panel
     {
@@ -240,12 +324,36 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
         static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
         const int GwlStyle = -16, WsHscroll = 0x00100000, WsVscroll = 0x00200000;
+        bool hidePending;
 
         internal DesignScrollPanel()
         {
             AutoScroll = true;
             BackColor = UiStyle.Surface;
-            SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+            // WinForms' buffered Panel scrolling can copy a stale back buffer while
+            // child windows are moving. Rapid wheel input then leaves duplicated
+            // headings, clipped buttons, and blank bands until another repaint.
+            // Let the native scroll operation move the children and repaint the
+            // complete visible tree after every position change instead.
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            SetStyle(ControlStyles.ResizeRedraw, true);
+        }
+
+        protected override void OnScroll(ScrollEventArgs se)
+        {
+            base.OnScroll(se);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            // OnScroll is normally raised first, but repaint here as well for wheel
+            // messages that land at a boundary or are coalesced by Windows.
+        }
+
+        internal void EnableKeyboardFocus()
+        {
+            SetStyle(ControlStyles.Selectable, true); TabStop = true;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -258,16 +366,24 @@ namespace FunctionRowRemapper
         protected override void OnLayout(LayoutEventArgs e)
         {
             base.OnLayout(e);
-            HideScrollBars();
+            // AutoScroll can recreate its native bars after the handle-created pass.
+            // Defer a lightweight hide until this layout settles. Avoid mutating the
+            // window style here because that caused stale resize artifacts.
+            QueueScrollbarHide();
+        }
+
+        void QueueScrollbarHide()
+        {
+            if (!IsHandleCreated || hidePending || IsDisposed) return;
+            hidePending = true;
+            try { BeginInvoke((MethodInvoker)delegate { hidePending = false; HideScrollBars(); }); }
+            catch (InvalidOperationException) { hidePending = false; }
         }
 
         void HideScrollBars()
         {
             if (IsHandleCreated) try {
                 ShowScrollBar(Handle, 3, false);
-                long style = GetWindowLongPtr64(Handle, GwlStyle).ToInt64();
-                style &= ~(WsHscroll | WsVscroll);
-                SetWindowLongPtr64(Handle, GwlStyle, new IntPtr(style));
             } catch { }
         }
 

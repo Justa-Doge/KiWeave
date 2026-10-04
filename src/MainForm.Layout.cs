@@ -7,10 +7,31 @@ namespace FunctionRowRemapper
 {
     internal static class UiStyle
     {
-        internal static readonly Color Canvas = Color.FromArgb(23, 24, 32), Ink = Color.FromArgb(237, 235, 245),
+        internal static Color Canvas = Color.FromArgb(23, 24, 32), Ink = Color.FromArgb(237, 235, 245),
             Muted = Color.FromArgb(165, 161, 181), Blue = Color.FromArgb(187, 164, 255), AccentFill = Color.FromArgb(112, 82, 202),
             Border = Color.FromArgb(56, 56, 74), Soft = Color.FromArgb(52, 43, 77), Sidebar = Color.FromArgb(16, 17, 25),
             Surface = Color.FromArgb(31, 32, 44), Input = Color.FromArgb(39, 40, 54);
+        internal static string ThemeName = "KiWeave Dark";
+        internal static void ApplyTheme(string name)
+        {
+            ThemeName = String.IsNullOrWhiteSpace(name) ? "KiWeave Dark" : name;
+            if (ThemeName == "Midnight Blue") { Canvas = Color.FromArgb(14, 20, 32); Ink = Color.FromArgb(235, 242, 255); Muted = Color.FromArgb(157, 174, 204); Blue = Color.FromArgb(143, 197, 255); AccentFill = Color.FromArgb(46, 111, 190); Border = Color.FromArgb(45, 62, 87); Soft = Color.FromArgb(33, 54, 87); Sidebar = Color.FromArgb(9, 14, 24); Surface = Color.FromArgb(22, 31, 47); Input = Color.FromArgb(28, 40, 61); }
+            else if (ThemeName == "Plum") { Canvas = Color.FromArgb(29, 21, 34); Ink = Color.FromArgb(248, 237, 250); Muted = Color.FromArgb(190, 163, 194); Blue = Color.FromArgb(241, 171, 255); AccentFill = Color.FromArgb(153, 67, 170); Border = Color.FromArgb(76, 48, 83); Soft = Color.FromArgb(76, 40, 88); Sidebar = Color.FromArgb(20, 13, 25); Surface = Color.FromArgb(40, 27, 46); Input = Color.FromArgb(52, 34, 59); }
+            else if (ThemeName == "Glass") { Canvas = Color.FromArgb(27, 30, 40); Ink = Color.FromArgb(242, 245, 252); Muted = Color.FromArgb(183, 190, 207); Blue = Color.FromArgb(170, 218, 255); AccentFill = Color.FromArgb(64, 133, 184); Border = Color.FromArgb(74, 91, 112); Soft = Color.FromArgb(49, 75, 101); Sidebar = Color.FromArgb(17, 22, 31); Surface = Color.FromArgb(38, 46, 59); Input = Color.FromArgb(48, 58, 73); }
+            else { ThemeName = "KiWeave Dark"; Canvas = Color.FromArgb(23, 24, 32); Ink = Color.FromArgb(237, 235, 245); Muted = Color.FromArgb(165, 161, 181); Blue = Color.FromArgb(187, 164, 255); AccentFill = Color.FromArgb(112, 82, 202); Border = Color.FromArgb(56, 56, 74); Soft = Color.FromArgb(52, 43, 77); Sidebar = Color.FromArgb(16, 17, 25); Surface = Color.FromArgb(31, 32, 44); Input = Color.FromArgb(39, 40, 54); }
+        }
+        internal static string SafeAccent(string value)
+        {
+            if (String.IsNullOrEmpty(value) || !System.Text.RegularExpressions.Regex.IsMatch(value, "\\A#[0-9a-fA-F]{6}\\z")) return "";
+            Color color = ColorTranslator.FromHtml(value); int brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000;
+            if (brightness < 55 || brightness > 220) return "";
+            return "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
+        }
+        internal static void ApplyAccent(string value)
+        {
+            string safe = SafeAccent(value); if (safe.Length == 0) return;
+            Color color = ColorTranslator.FromHtml(safe); AccentFill = color; Blue = ControlPaint.Light(color, .35f); Soft = ControlPaint.Dark(color, .55f); Border = ControlPaint.Dark(color, .35f);
+        }
         internal static Label Text(string text, float size, bool bold)
         {
             return new DesignLabel { Text = text, AutoSize = true, Dock = DockStyle.Top, BackColor = Color.Transparent,
@@ -83,7 +104,7 @@ namespace FunctionRowRemapper
             BackColor = UiStyle.Canvas;
             Design.DarkTitlebar(this);
             var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = Padding.Empty };
-            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 206)); shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(shell);
+            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 232)); shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(shell);
             var sidebar = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Sidebar, Margin = Padding.Empty, Padding = new Padding(20, 28, 20, 22) }; shell.Controls.Add(sidebar, 0, 0);
             var sideTop = UiStyle.Stack(); sidebar.Controls.Add(sideTop);
             var logo = new Panel { Height = 60, Dock = DockStyle.Top, Margin = new Padding(0, 0, 0, 14) };
@@ -115,7 +136,11 @@ namespace FunctionRowRemapper
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); shell.Controls.Add(root, 1, 0);
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = Padding.Empty };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 215));
-            var headings = UiStyle.Stack(); headings.Controls.Add(pageTitle); headings.Controls.Add(pageSubtitle); header.Controls.Add(headings, 0, 0);
+            var headings = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty, BackColor = Color.Transparent };
+            headings.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); headings.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            pageTitle.AutoSize = false; pageTitle.Dock = DockStyle.Fill; pageTitle.Margin = Padding.Empty;
+            pageSubtitle.AutoSize = false; pageSubtitle.Dock = DockStyle.Fill; pageSubtitle.Margin = Padding.Empty;
+            headings.Controls.Add(pageTitle, 0, 0); headings.Controls.Add(pageSubtitle, 0, 1); header.Controls.Add(headings, 0, 0);
             var active = UiStyle.Stack(); active.Padding = new Padding(0, 4, 0, 0);
             enabled.Text = "Shortcuts enabled"; enabled.AutoSize = false; enabled.Size = new Size(206, 36); enabled.CheckedChanged += ToggleEnabled;
             profileBadge.AutoSize = false; profileBadge.Size = new Size(206, 34); profileBadge.MinimumSize = new Size(206, 34); profileBadge.Padding = new Padding(10, 4, 10, 4); profileBadge.Margin = new Padding(0, 2, 0, 0);
@@ -170,6 +195,9 @@ namespace FunctionRowRemapper
             var left = UiStyle.Stack(); generalScroll.Controls.Add(left);
             left.Controls.Add(UiStyle.Text("General", 15, true));
             var intro = UiStyle.Text("Background behavior saves as soon as you change it.", 9, false); intro.Margin = new Padding(0, 0, 0, 22); left.Controls.Add(intro);
+            themeChoice.Items.Clear(); themeChoice.Items.AddRange(new object[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass" }); themeChoice.SelectedItem = preferences.Theme; themeChoice.SelectedIndexChanged += ThemeChanged; UiStyle.Combo(themeChoice);
+            left.Controls.Add(UiStyle.Field("Theme", themeChoice));
+            var accent = UiStyle.Button("Choose accent color", ChooseAccentColor); accent.Margin = new Padding(0, 0, 0, 14); left.Controls.Add(accent);
             AddSetting(left, startup, "Start with Windows", "Launch KiWeave quietly when you sign in.", ToggleStartup);
             AddSetting(left, useTray, "Keep running in tray", "Closing the window keeps your shortcuts active.", ToggleTray);
             AddSetting(left, automaticProfiles, "Switch profiles automatically", "Use app matches from Profiles while KiWeave is in the background.", ToggleBackgroundPreference);
@@ -181,26 +209,34 @@ namespace FunctionRowRemapper
             var right = UiStyle.Stack(); toolsScroll.Controls.Add(right);
             right.Controls.Add(UiStyle.Text("Tools and data", 15, true));
             var toolsHelp = UiStyle.Text("Back up your setup, troubleshoot problems, or revisit the basics.", 9, false); toolsHelp.Margin = new Padding(0, 0, 0, 18); right.Controls.Add(toolsHelp);
+            AddSettingsSection(right, "Profiles and updates");
             var primary = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             primary.Controls.Add(UiStyle.Button("Check for updates", delegate { CheckForUpdatesNow(); }, true));
-            primary.Controls.Add(UiStyle.Button("Manage profiles", delegate { OpenProfiles(); })); right.Controls.Add(primary);
+            primary.Controls.Add(UiStyle.Button("Manage profiles", delegate { OpenProfiles(); }));
+            primary.Controls.Add(UiStyle.Button("Profile schedules", delegate { using (var dialog = new ProfileSchedulesForm(profiles)) dialog.ShowDialog(this); })); right.Controls.Add(primary);
+            AddSettingsSection(right, "Backup and recovery");
             var backup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             backup.Controls.Add(UiStyle.Button("Back up everything", ExportBackup)); backup.Controls.Add(UiStyle.Button("Restore backup", ImportBackup)); right.Controls.Add(backup);
+            AddSettingsSection(right, "Inspect and troubleshoot");
             var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             help.Controls.Add(UiStyle.Button("Welcome guide", delegate { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); }));
-            help.Controls.Add(UiStyle.Button("Privacy center", delegate { OpenPrivacyCenter(); }, true));
-            help.Controls.Add(UiStyle.Button("Find mappings", delegate { OpenMappingSearch(); }, true));
+            help.Controls.Add(UiStyle.Button("Privacy center", delegate { OpenPrivacyCenter(); }));
+            help.Controls.Add(UiStyle.Button("Find mappings", delegate { OpenMappingSearch(); }));
             help.Controls.Add(UiStyle.Button("Live key tester", delegate { OpenLiveKeyTester(); }));
             help.Controls.Add(UiStyle.Button("Conflict center", delegate { OpenConflictCenter(); }));
             help.Controls.Add(UiStyle.Button("Undo and history", delegate { OpenHistory(); }));
             help.Controls.Add(UiStyle.Button("Diagnostics", delegate { OpenDiagnostics(); })); right.Controls.Add(help);
+            AddSettingsSection(right, "Folders and connections");
             var folders = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             folders.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenDataFolder(); }));
-            folders.Controls.Add(UiStyle.Button("Open log folder", delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } })); right.Controls.Add(folders);
-            right.Controls.Add(UiStyle.Button("Discord connection", delegate { using (var dialog = new DiscordConnectionForm(this)) dialog.ShowDialog(this); }));
-            right.Controls.Add(UiStyle.Button("About KiWeave", delegate { using (var about = new AboutForm()) about.ShowDialog(this); }));
-
-            readOnlyButton = UiStyle.Button("Lock editing", delegate { ToggleReadOnlyMode(); }); right.Controls.Add(readOnlyButton);
+            folders.Controls.Add(UiStyle.Button("Open log folder", delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } }));
+            folders.Controls.Add(UiStyle.Button("Discord connection", delegate { using (var dialog = new DiscordConnectionForm(this)) dialog.ShowDialog(this); }));
+            folders.Controls.Add(UiStyle.Button("About KiWeave", delegate { using (var about = new AboutForm()) about.ShowDialog(this); })); right.Controls.Add(folders);
+            AddSettingsSection(right, "App controls");
+            var appControls = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 12, 0, 12) };
+            readOnlyButton = UiStyle.Button("Lock editing", delegate { ToggleReadOnlyMode(); }); appControls.Controls.Add(readOnlyButton);
+            appControls.Controls.Add(UiStyle.Button("Restart KiWeave", delegate { RestartApp(); }));
+            var exit = UiStyle.Button("Exit KiWeave", delegate { ExitApp(); }); ((DesignButton)exit).Danger = true; appControls.Controls.Add(exit); right.Controls.Add(appControls);
 
             if (Program.IsElevated()) {
                 var admin = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 16, 0, 0), Padding = new Padding(18) };
@@ -218,6 +254,11 @@ namespace FunctionRowRemapper
             }
         }
 
+        void AddSettingsSection(TableLayoutPanel stack, string text)
+        {
+            var label = UiStyle.Text(text.ToUpperInvariant(), 8, true); label.ForeColor = UiStyle.Blue; label.Margin = new Padding(0, 8, 0, 8); stack.Controls.Add(label);
+        }
+
         void OpenAdministratorTool(string name)
         {
             try { SystemActions.ExecuteAdministratorTool(name); }
@@ -228,7 +269,7 @@ namespace FunctionRowRemapper
         {
             var row = UiStyle.Stack(); row.Margin = new Padding(0, 0, 0, 12);
             box.Text = title; box.AutoSize = true; box.ForeColor = UiStyle.Ink; box.Font = new Font("Segoe UI", 10, FontStyle.Bold); box.Margin = new Padding(0, 0, 0, 5); box.CheckedChanged += changed; row.Controls.Add(box);
-            var help = UiStyle.Text(description, 9, false); help.Margin = new Padding(24, 0, 0, 0); row.Controls.Add(help); stack.Controls.Add(row);
+            var help = UiStyle.Text(description, 9, false); help.Margin = new Padding(28, 0, 0, 0); row.Controls.Add(help); stack.Controls.Add(row);
         }
         TableLayoutPanel PageColumns(Control page)
         {

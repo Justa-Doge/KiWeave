@@ -164,6 +164,10 @@ namespace FunctionRowRemapper
         {
             lock (Gate) { if (reconnectTimer != null) { reconnectTimer.Dispose(); reconnectTimer = null; } if (client != null) client.Dispose(); client = null; accessToken = ""; }
         }
+        internal static void Reconnect()
+        {
+            lock (Gate) { Disconnect(); if (NetworkPolicy.Enabled) StartReconnectMonitorLocked(); }
+        }
 
         internal static void ForgetAuthorization()
         {
@@ -260,7 +264,7 @@ namespace FunctionRowRemapper
     {
         readonly Label status = new Label(); readonly Button connect; readonly Button forget;
         internal DiscordConnectionForm(IWin32Window owner) {
-            Text = "KiWeave - Discord connection"; Icon = Program.AppIcon(); StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(560, 250); MinimumSize = new Size(560, 250); BackColor = Color.FromArgb(24, 24, 32); ForeColor = UiStyle.Ink;
+            Text = "KiWeave - Discord connection"; Icon = Program.AppIcon(); StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(560, 250); MinimumSize = new Size(560, 250); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             var root = UiStyle.Stack(); root.Padding = new Padding(24); Controls.Add(root); root.Controls.Add(UiStyle.Text("Discord connection", 18, true)); root.Controls.Add(UiStyle.Text("Authorizes once, then reuses an encrypted refresh token for this Windows account. Access tokens stay in memory.", 9, false));
             status.Text = DiscordIntegration.Status; status.AutoSize = true; status.ForeColor = UiStyle.Muted; status.Margin = new Padding(0, 18, 0, 18); root.Controls.Add(status);
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };

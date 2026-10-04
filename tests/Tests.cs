@@ -398,7 +398,7 @@ namespace FunctionRowRemapper
                 Assert(work.OverrideKeys.SequenceEqual(new[] { "F2" }) && child.OverrideKeys.SequenceEqual(new[] { "F3" }), "intentional overrides");
                 defaults.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeDown" };
                 var resolved = collection.Resolve("Editing", defaults); Assert(resolved.Mappings[0].Target == "VolumeDown" && resolved.Mappings[1].Target == "VolumeMute" && resolved.Mappings[2].Target == "MediaPlayPause", "inheritance resolution");
-                string json = ProfileStore.Serialize(collection); var loaded = ProfileStore.Parse(json); Assert(json.Contains("\"version\":2") && loaded.Resolve("Editing", defaults).Mappings[0].Target == "VolumeDown", "inheritance round trip");
+                string json = ProfileStore.Serialize(collection); var loaded = ProfileStore.Parse(json); Assert(json.Contains("\"version\":3") && loaded.Resolve("Editing", defaults).Mappings[0].Target == "VolumeDown", "inheritance round trip");
                 loaded.Find("Work").InheritFrom = "Editing"; Reject(() => ProfileStore.Validate(loaded, false));
             });
             Test("Conflict center explains Windows, PowerToys, layer and profile winners", delegate {

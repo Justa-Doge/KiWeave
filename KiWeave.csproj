@@ -20,6 +20,7 @@
     <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" />
     <Compile Include="src\PowerToysIntegration.cs" /><Compile Include="src\PowerToysPanel.cs" />
     <Compile Include="src\FirstPartyExtensions.cs" />
+    <Compile Include="src\ProfileSchedules.cs" />
     <Compile Include="src\Profiles.cs" /><Compile Include="src\ProfileManagerForm.cs" /><Compile Include="src\DiagnosticsForm.cs" />
     <Compile Include="src\ProfileStatusForm.cs" />
     <Compile Include="src\ConditionalActions.cs" /><Compile Include="src\ConditionalActionForm.cs" />

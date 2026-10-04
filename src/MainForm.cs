@@ -62,7 +62,8 @@ namespace FunctionRowRemapper
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;
-        readonly CheckBox enabled = new DesignToggle(), startup = new CheckBox(), useTray = new CheckBox(), checkUpdates = new CheckBox(), automaticProfiles = new CheckBox(), networkAccess = new CheckBox();
+        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox();
+        readonly ComboBox themeChoice = new DesignComboBox();
         Button hideToTray;
         readonly ToolTip tips = new ToolTip();
         UserPreferences preferences;
@@ -75,7 +76,9 @@ namespace FunctionRowRemapper
         readonly ToolStripMenuItem trayProfiles = new ToolStripMenuItem("Profiles");
         readonly ToolStripMenuItem trayWhyProfile = new ToolStripMenuItem("Why this profile?");
         readonly ToolStripMenuItem trayPinProfile = new ToolStripMenuItem("Pin current profile");
+        readonly ToolStripMenuItem trayLayer = new ToolStripMenuItem("Layer: Base");
         readonly System.Windows.Forms.Timer statusTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        readonly System.Windows.Forms.Timer scheduleTimer = new System.Windows.Forms.Timer { Interval = 30000 };
         readonly System.Windows.Forms.Timer draftTimer = new System.Windows.Forms.Timer { Interval = 750 };
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = UpdateChecker.CheckIntervalMilliseconds };
         readonly bool startInTray;
@@ -102,12 +105,15 @@ namespace FunctionRowRemapper
             isPreview = preview;
             customDispatcher = new ActionDispatcher(new WindowsActionSink(RequestProfileActivation));
             showWelcome = !preview && !File.Exists(ConfigStore.DefaultPath) && !File.Exists(UserPreferences.DefaultPath) && !File.Exists(FirstRun.SeenPath);
-            Text = "KiWeave"; Font = new Font("Segoe UI", 10F); ForeColor = ink; BackColor = Color.FromArgb(245, 247, 251);
-            AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(1200, 820); MinimumSize = new Size(1080, 740); StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
+            Text = "KiWeave"; Font = new Font("Segoe UI", 10F); ForeColor = ink; BackColor = UiStyle.Canvas;
+            AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(1200, 900); MinimumSize = new Size(1200, 900); MaximumSize = new Size(1200, 900); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false; StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
             Icon = Program.AppIcon();
             saved = new Configuration();
             try { preferences = UserPreferences.Load(UserPreferences.DefaultPath); }
             catch (Exception ex) { preferences = new UserPreferences { UseTray = false }; initialError = "Tray preference could not be loaded; the window will stay accessible. " + ex.Message; }
+            UiStyle.ApplyTheme(preferences.Theme);
+            UiStyle.ApplyAccent(preferences.CustomAccent);
+            Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
             DiscordIntegration.Start(NetworkPolicy.Enabled);
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
@@ -115,7 +121,9 @@ namespace FunctionRowRemapper
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
             catch (Exception ex) { initialError = "Profiles could not be loaded; the original file is untouched. " + ex.Message; }
             draft = saved.Copy();
-            BuildUi(); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(0);
+            BuildUi();
+            Shown += delegate { SelectPage(0); PerformLayout(); Invalidate(true); };
+            RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(0);
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             if (preview) {
                 loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = Startup.Enabled;
@@ -138,6 +146,7 @@ namespace FunctionRowRemapper
             loading = false;
             SetupTray(); UpdateStatus();
             statusTimer.Tick += delegate { CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
+            scheduleTimer.Tick += delegate { CheckScheduledProfile(); }; scheduleTimer.Start();
             draftTimer.Tick += delegate { draftTimer.Stop(); SaveRecoveryDraft(); };
             updateTimer.Tick += delegate { RunAutomaticUpdateCheck(); };
             UpdateAutomaticCheckTimer();
@@ -153,11 +162,17 @@ namespace FunctionRowRemapper
             FormClosing += OnClosing;
         }
         void Ui(Action a) { if (!IsDisposed && IsHandleCreated) try { BeginInvoke(a); } catch (InvalidOperationException) { } }
+        void CheckScheduledProfile()
+        {
+            if (isPreview || !preferences.AutomaticProfiles || pinnedProfile.Length > 0 || Visible || dirty || engine == null) return;
+            string scheduled = ProfileScheduleStore.ActiveProfile(DateTime.Now);
+            if (scheduled.Length > 0 && !String.Equals(scheduled, currentProfile, StringComparison.OrdinalIgnoreCase)) ActivateProfile(scheduled, false, true);
+        }
         Label LabelText(string text, float size, Color color) { return new Label { Text = text, AutoSize = true, Font = new Font("Segoe UI", size), ForeColor = color, Margin = new Padding(0, 0, 0, 6) }; }
         Button ButtonText(string text, EventHandler click)
         {
-            var b = new Button { Text = text, AutoSize = true, MinimumSize = new Size(90, 35), FlatStyle = FlatStyle.Flat, BackColor = Color.White, Margin = new Padding(0, 0, 8, 0), Padding = new Padding(7, 2, 7, 2) };
-            b.FlatAppearance.BorderColor = Color.FromArgb(207, 216, 231); b.Click += click; return b;
+            var b = new Button { Text = text, AutoSize = true, MinimumSize = new Size(90, 35), FlatStyle = FlatStyle.Flat, BackColor = UiStyle.Input, ForeColor = UiStyle.Ink, Margin = new Padding(0, 0, 8, 0), Padding = new Padding(7, 2, 7, 2) };
+            b.FlatAppearance.BorderColor = UiStyle.Border; b.Click += click; return b;
         }
         static int FunctionGroup(ActionKind kind) { if (kind == ActionKind.PassThrough) return 0; if (kind == ActionKind.Unbound) return 1; if (kind == ActionKind.SendKey || kind == ActionKind.SendShortcut) return 2; if (kind == ActionKind.Media) return 3; if (kind == ActionKind.Monitor) return 5; if (kind == ActionKind.LockThenSleep || kind == ActionKind.SystemAction || kind == ActionKind.Conditional) return 6; return 4; }
         static int CustomGroup(ActionKind kind) { if (kind == ActionKind.SendKey || kind == ActionKind.SendShortcut) return 0; if (kind == ActionKind.Media) return 1; if (kind == ActionKind.LockThenSleep || kind == ActionKind.Sequence || kind == ActionKind.SystemAction || kind == ActionKind.Conditional) return 3; return 2; }
@@ -596,6 +611,7 @@ namespace FunctionRowRemapper
             trayToggle.Click += delegate { enabled.Checked = !enabled.Checked; }; menu.Items.Add(trayToggle);
             trayWhyProfile.Click += delegate { OpenProfileStatus(); }; menu.Items.Add(trayWhyProfile);
             trayPinProfile.Click += delegate { ToggleProfilePin(); }; menu.Items.Add(trayPinProfile);
+            trayLayer.Enabled = false; menu.Items.Add(trayLayer);
             menu.Items.Add(trayProfiles); menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Exit", null, delegate { ExitApp(); });
             tray.Icon = Program.TrayIcon(); tray.Text = "KiWeave"; tray.ContextMenuStrip = menu; tray.Visible = preferences.UseTray; tray.DoubleClick += delegate { ShowSettings(); };
             hideToTray.Enabled = preferences.UseTray; RefreshTrayProfiles();
@@ -614,7 +630,7 @@ namespace FunctionRowRemapper
         }
         UserPreferences NewPreferencesFromUi()
         {
-            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked };
+            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent };
         }
         void ToggleBackgroundPreference(object sender, EventArgs e)
         {
@@ -671,6 +687,12 @@ namespace FunctionRowRemapper
             } catch (Exception ex) { SetFeedback("Could not open the data folder: " + ex.Message, true); }
         }
         void ExitApp() { exitRequested = true; Close(); }
+        void RestartApp()
+        {
+            if (dirty && !Save()) return;
+            try { exitRequested = true; Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = true }); Close(); }
+            catch (Exception ex) { SetFeedback("KiWeave could not restart: " + ex.Message, true); exitRequested = false; }
+        }
         internal void RequestShow() { Ui(ShowSettings); }
         internal void RequestAutomationCommand(string command)
         {
@@ -692,6 +714,7 @@ namespace FunctionRowRemapper
             trayWhyProfile.Text = "Active: " + currentProfile + " · Why?";
             trayPinProfile.Text = pinnedProfile.Length > 0 ? "Resume automatic switching" : "Pin current profile for this session";
             trayPinProfile.Checked = pinnedProfile.Length > 0;
+            trayLayer.Text = "Layer: " + (engine == null ? "Base" : engine.ActiveLayerName);
             RefreshTrayProfileChecks();
         }
         void ExportBackup(object sender, EventArgs e)
@@ -730,7 +753,7 @@ namespace FunctionRowRemapper
         }
         void ApplyRestoredBackup(KeyWeaveBackup backup)
         {
-            saved = backup.Configuration.Copy(); draft = saved.Copy(); profiles = backup.Profiles.Copy(); preferences = new UserPreferences { UseTray = backup.Preferences.UseTray, CheckUpdates = backup.Preferences.CheckUpdates, AutomaticProfiles = backup.Preferences.AutomaticProfiles, NetworkAccess = backup.Preferences.NetworkAccess }; NetworkPolicy.Enabled = preferences.NetworkAccess; currentProfile = "Default"; automaticProfileActive = false; pinnedProfile = ""; automaticProfileProcess = ""; profileReason = "Restored backup selected the Default profile."; selectedLayer = -1; customSelected = -1;
+            saved = backup.Configuration.Copy(); draft = saved.Copy(); profiles = backup.Profiles.Copy(); preferences = new UserPreferences { UseTray = backup.Preferences.UseTray, CheckUpdates = backup.Preferences.CheckUpdates, AutomaticProfiles = backup.Preferences.AutomaticProfiles, NetworkAccess = backup.Preferences.NetworkAccess, Theme = backup.Preferences.Theme, CustomAccent = backup.Preferences.CustomAccent }; UiStyle.ApplyTheme(preferences.Theme); UiStyle.ApplyAccent(preferences.CustomAccent); NetworkPolicy.Enabled = preferences.NetworkAccess; currentProfile = "Default"; automaticProfileActive = false; pinnedProfile = ""; automaticProfileProcess = ""; profileReason = "Restored backup selected the Default profile."; selectedLayer = -1; customSelected = -1;
             if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = backup.StartWithWindows; loading = false;
@@ -950,6 +973,34 @@ namespace FunctionRowRemapper
             if (readOnlyButton != null) readOnlyButton.Text = readOnlyMode ? "Unlock editing" : "Lock editing";
             SetFeedback(readOnlyMode ? "Read-only mode is active. Mappings continue running; editing is locked." : "Editing unlocked.", false);
         }
+        void ThemeChanged(object sender, EventArgs e)
+        {
+            if (loading || themeChoice.SelectedItem == null) return;
+            preferences.Theme = themeChoice.SelectedItem.ToString();
+            try { UserPreferences.Save(UserPreferences.DefaultPath, preferences); SetFeedback("Theme saved. Restart KiWeave to apply it to every window.", false); }
+            catch (Exception ex) { SetFeedback("Theme could not be saved: " + ex.Message, true); }
+        }
+        void ChooseAccentColor(object sender, EventArgs e)
+        {
+            using (var dialog = new ColorDialog { FullOpen = true, Color = UiStyle.AccentFill }) if (dialog.ShowDialog(this) == DialogResult.OK) {
+                string value = "#" + dialog.Color.R.ToString("X2") + dialog.Color.G.ToString("X2") + dialog.Color.B.ToString("X2");
+                string safe = UiStyle.SafeAccent(value); if (safe.Length == 0) { MessageBox.Show(this, "Choose a medium-brightness color so text and buttons remain readable.", "Accent color", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                preferences.CustomAccent = safe; UiStyle.ApplyAccent(safe); RefreshVisualTheme();
+                try { UserPreferences.Save(UserPreferences.DefaultPath, preferences); SetFeedback("Accent color updated.", false); } catch (Exception ex) { SetFeedback("Accent color could not be saved: " + ex.Message, true); }
+            }
+        }
+        void RefreshVisualTheme()
+        {
+            RefreshVisualTheme(this); Invalidate(true);
+        }
+        void RefreshVisualTheme(Control control)
+        {
+            // Accent changes are consumed by owner-drawn controls at paint time.
+            // Do not flatten existing background and text roles here: doing so turns
+            // sidebar panels into canvas panels and muted copy into bright headings.
+            control.Invalidate();
+            foreach (Control child in control.Controls) RefreshVisualTheme(child);
+        }
         string BuildSafeDiagnostics()
         {
             int powerToys = 0; try { powerToys = PowerToysIntegration.Load().Count; } catch { }
@@ -982,8 +1033,8 @@ namespace FunctionRowRemapper
                 if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) { e.Cancel = true; exitRequested = false; return; }
                 if (r == DialogResult.No) RecoveryStore.DeleteDraft();
             }
-            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
+            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); scheduleTimer.Stop(); tray.Visible = false; tray.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); scheduleTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
     }
 }

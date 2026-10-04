@@ -18,26 +18,40 @@ namespace FunctionRowRemapper
             monitors = detectedMonitors; health = report ?? ConfigurationHealthReport.Empty;
             Text = "KiWeave integrations"; Icon = Program.AppIcon(); Font = new Font("Segoe UI", 10); BackColor = UiStyle.Canvas; ForeColor = UiStyle.Ink;
             ClientSize = new Size(700, 620); MinimumSize = new Size(620, 500); StartPosition = FormStartPosition.CenterParent; Design.DarkTitlebar(this);
-            var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; Controls.Add(scroll);
+            var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; scroll.EnableKeyboardFocus(); Controls.Add(scroll);
             var root = UiStyle.Stack(); scroll.Controls.Add(root);
             root.Controls.Add(UiStyle.Text("Integrations", 24, true));
             root.Controls.Add(UiStyle.Text("Read-only availability checks. KiWeave does not install, launch, authorize, or modify anything from this page.", 10, false));
-            rows.Dock = DockStyle.Top; rows.AutoSize = true; rows.ColumnCount = 2; rows.Margin = new Padding(0, 20, 0, 16); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32)); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 68)); root.Controls.Add(rows);
+            rows.Dock = DockStyle.Top; rows.AutoSize = true; rows.ColumnCount = 3; rows.Margin = new Padding(0, 20, 0, 16);
+            rows.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135)); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 185)); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); root.Controls.Add(rows);
             RefreshRows();
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 8, 0, 0) };
             buttons.Controls.Add(UiStyle.Button("Refresh", delegate { RefreshRows(); }, true)); buttons.Controls.Add(UiStyle.Button("Done", delegate { Close(); })); root.Controls.Add(buttons);
+            Shown += delegate { try { BeginInvoke((Action)delegate { ActiveControl = scroll; scroll.Focus(); scroll.AutoScrollPosition = Point.Empty; }); } catch { } };
         }
         void RefreshRows()
         {
-            rows.SuspendLayout(); rows.Controls.Clear();
-            Add("PowerToys", PowerToysStatus()); Add("Discord", DiscordIntegration.Status); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running"); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running"); Add("DDC/CI monitors", monitors == 0 ? "None detected" : monitors + " detected"); Add("Audio devices", "Windows audio available to KiWeave"); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy");
+            rows.SuspendLayout(); rows.Controls.Clear(); rows.RowStyles.Clear(); rows.RowCount = 0;
+            AddHeader("Integration", "Status", "What KiWeave checks");
+            Add("PowerToys", PowerToysStatus(), "Reads supported local Keyboard Manager shortcuts; it never edits PowerToys here."); Add("Discord", DiscordIntegration.Status, "Uses local IPC/RPC and only reconnects when network access and authorization allow it."); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running", "OBS actions require OBS to be installed and running when triggered."); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running", "Spotify mappings use Windows media keys and do not read account data."); Add("DDC/CI monitors", monitors == 0 ? "None detected" : monitors + " detected", "Monitor controls remain hardware-dependent and are probed read-only here."); Add("Audio devices", "Windows audio available to KiWeave", "Audio switching uses Windows device APIs; no audio is recorded."); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy", "Local validation only. No targets, commands, or URLs are executed by this scan.");
             rows.ResumeLayout(true);
         }
-        void Add(string name, string value)
+        void AddHeader(string name, string status, string explanation)
         {
-            var label = UiStyle.Text(name, 10, true); label.Margin = new Padding(0, 6, 12, 6);
-            var status = UiStyle.Text(value ?? "Unavailable", 10, false); status.Margin = new Padding(0, 6, 0, 6); status.ForeColor = value == "Healthy" || value == "Connected" || value == "Authorized; waiting for Discord" ? Color.FromArgb(127, 214, 169) : UiStyle.Ink;
-            rows.Controls.Add(label); rows.Controls.Add(status);
+            int row = rows.RowCount++; rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var first = UiStyle.Text(name.ToUpperInvariant(), 8, true); first.ForeColor = UiStyle.Blue;
+            var second = UiStyle.Text(status.ToUpperInvariant(), 8, true); second.ForeColor = UiStyle.Blue;
+            var third = UiStyle.Text(explanation.ToUpperInvariant(), 8, true); third.ForeColor = UiStyle.Blue;
+            first.Margin = second.Margin = third.Margin = new Padding(0, 0, 12, 10);
+            rows.Controls.Add(first, 0, row); rows.Controls.Add(second, 1, row); rows.Controls.Add(third, 2, row);
+        }
+        void Add(string name, string value, string explanation)
+        {
+            int row = rows.RowCount++; rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var label = UiStyle.Text(name, 10, true); label.Margin = new Padding(0, 8, 12, 10); label.MaximumSize = new Size(125, 0);
+            var status = UiStyle.Text(value ?? "Unavailable", 9.5f, false); status.Margin = new Padding(0, 8, 12, 10); status.MaximumSize = new Size(173, 0); status.ForeColor = value == "Healthy" || value == "Connected" || value == "Authorized; waiting for Discord" ? Color.FromArgb(127, 214, 169) : UiStyle.Ink;
+            var detail = UiStyle.Text(explanation, 8.5f, false); detail.Margin = new Padding(0, 8, 0, 10); detail.MaximumSize = new Size(300, 0);
+            rows.Controls.Add(label, 0, row); rows.Controls.Add(status, 1, row); rows.Controls.Add(detail, 2, row);
         }
         static string PowerToysStatus()
         {
