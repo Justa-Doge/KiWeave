@@ -541,7 +541,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 71. Action-pack version compatibility checks.
 72. Profile import merge mode.
 73. Profile conflict-resolution wizard.
-74. Keyboard-layout change detection.
+74. Keyboard-layout change detection. (implemented locally)
 75. Per-Windows-user profiles.
 76. Multi-monitor-specific mappings.
 77. Remote-desktop-aware profiles.
