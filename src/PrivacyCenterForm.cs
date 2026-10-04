@@ -25,12 +25,24 @@ namespace FunctionRowRemapper
             long backups = FolderBytes(Path.Combine(DataFolder, "Backups"));
             long history = FolderBytes(ConfigurationHistory.DefaultFolder);
             long powerToys = FolderBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave", "PowerToysBackups"));
+            string reminder = BackupReminder();
             return "Active configuration and preferences: " + Size(active) + "\r\n" +
                 "KiWeave backups: " + Size(backups) + "\r\n" +
                 "Undo history: " + Size(history) + "\r\n" +
                 "PowerToys safety backups: " + Size(powerToys) + "\r\n" +
                 "Private-safe logs: " + Size(AppLog.TotalBytes()) + "\r\n" +
+                reminder + "\r\n" +
                 "Cache: none";
+        }
+        static string BackupReminder()
+        {
+            try {
+                string folder = Path.Combine(DataFolder, "Backups");
+                var files = Directory.Exists(folder) ? Directory.GetFiles(folder, "*.keyweave", SearchOption.AllDirectories).Select(x => new FileInfo(x)).OrderBy(x => x.LastWriteTimeUtc).ToArray() : new FileInfo[0];
+                if (files.Length == 0) return "Backup age: none yet";
+                TimeSpan age = DateTime.UtcNow - files[0].LastWriteTimeUtc.ToUniversalTime();
+                return age.TotalDays >= 30 ? "Backup age: oldest rollback is " + (int)age.TotalDays + " days old; review or remove stale rollback folders" : "Backup age: oldest rollback is " + (int)Math.Max(0, age.TotalDays) + " days old";
+            } catch { return "Backup age: unavailable"; }
         }
     }
 
