@@ -418,6 +418,7 @@ namespace FunctionRowRemapper
                 Assert(issues.Any(x => x.Title.Contains("owned by Windows") && x.Winner.Contains("Windows")), "Windows ownership");
                 Assert(issues.Any(x => x.Title.Contains("PowerToys") && x.Winner.Contains("registered first")), "PowerToys ownership");
                 Assert(issues.Any(x => x.Title.Contains("layer key") && x.Winner.Contains("layer rule wins")), "layer ownership");
+                Assert(CollisionSimulator.Simulate("Ctrl+Alt+K", defaults, profiles, pt).Contains("PowerToys"), "collision simulation");
                 Assert(issues.Any(x => x.Title.Contains("more than one profile") && x.Winner.Contains("First wins")), "profile ownership");
                 Assert(!report.Contains("secret.cmd") && !report.Contains(@"C:\private"), "private target leaked");
             });

@@ -84,6 +84,20 @@ namespace FunctionRowRemapper
         }
     }
 
+    internal static class CollisionSimulator
+    {
+        internal static string Simulate(string shortcut, Configuration defaults, ProfileCollection profiles, IEnumerable<PowerToysShortcut> powerToys)
+        {
+            string chord = HotkeyChord.Normalize(shortcut); var hits = new List<string>();
+            if (new[] { "Win+L", "Win+U", "Win+G", "Win+R", "Win+X", "Win+D", "Win+E", "Win+I", "Win+V", "Alt+Tab", "Alt+Esc", "Ctrl+Shift+Esc" }.Contains(chord, StringComparer.OrdinalIgnoreCase)) hits.Add("Windows normally owns this shortcut.");
+            foreach (var pt in powerToys ?? new PowerToysShortcut[0]) try { if (String.Equals(HotkeyChord.Normalize(pt.Chord), chord, StringComparison.OrdinalIgnoreCase)) hits.Add("PowerToys: " + pt.Module + " · " + pt.Action); } catch { }
+            var scopes = new List<KeyValuePair<string, Configuration>> { new KeyValuePair<string, Configuration>("Default", defaults) };
+            foreach (var p in profiles.Profiles) try { scopes.Add(new KeyValuePair<string, Configuration>(p.Name, profiles.Resolve(p.Name, defaults))); } catch { }
+            foreach (var scope in scopes) foreach (var hotkey in scope.Value.CustomHotkeys ?? new CustomHotkey[0]) try { if (String.Equals(HotkeyChord.Normalize(hotkey.Shortcut), chord, StringComparison.OrdinalIgnoreCase)) hits.Add(scope.Key + " profile already assigns this shortcut."); } catch { }
+            return hits.Count == 0 ? chord + " has no known collision in the current KiWeave, Windows, or PowerToys snapshot." : chord + " collision simulation:\r\n• " + String.Join("\r\n• ", hits.Distinct().ToArray());
+        }
+    }
+
     internal sealed class ConflictCenterForm : Form
     {
         readonly Configuration defaultConfiguration;
@@ -103,6 +117,7 @@ namespace FunctionRowRemapper
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), RowCount = 3 };
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Controls.Add(root);
             var header = UiStyle.Stack(); header.Controls.Add(UiStyle.Text("Conflict center", 22, true)); header.Controls.Add(UiStyle.Text("Find overlapping shortcuts and rules without changing anything automatically.", 9, false));
+            var simulator = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 8, 0, 0) }; var proposed = new DesignTextBox { Width = 180, Text = "Ctrl+Shift+P" }; simulator.Controls.Add(proposed); simulator.Controls.Add(UiStyle.Button("Simulate collision", delegate { try { IEnumerable<PowerToysShortcut> pts = suppliedPowerToys ?? PowerToysIntegration.Load(); MessageBox.Show(this, CollisionSimulator.Simulate(proposed.Text, defaultConfiguration, profiles, pts), "Collision simulation", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch (Exception ex) { MessageBox.Show(this, "Enter a valid modifier shortcut. " + ex.Message, "Collision simulation", MessageBoxButtons.OK, MessageBoxIcon.Information); } })); header.Controls.Add(simulator);
             summary.AutoSize = true; summary.ForeColor = UiStyle.Muted; summary.Margin = new Padding(0, 8, 0, 0); header.Controls.Add(summary); root.Controls.Add(header, 0, 0);
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0, 18, 0, 12) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57)); root.Controls.Add(body, 0, 1);
