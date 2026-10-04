@@ -10,7 +10,7 @@ namespace FunctionRowRemapper
 {
     internal sealed class ConfigurationHistoryEntry
     {
-        internal string Path, Reason;
+        internal string Path, Reason, Note;
         internal DateTime CreatedUtc;
         internal long Bytes;
         internal KeyWeaveBackup Backup;
@@ -41,7 +41,7 @@ namespace FunctionRowRemapper
         {
             var entries = new List<ConfigurationHistoryEntry>(); if (!Directory.Exists(folder)) return entries;
             foreach (string path in Directory.GetFiles(folder, "*.keyweave", SearchOption.TopDirectoryOnly)) try {
-                var backup = BackupBundle.Load(path); entries.Add(new ConfigurationHistoryEntry { Path = path, Backup = backup, CreatedUtc = backup.CreatedUtc, Bytes = new FileInfo(path).Length, Reason = ReasonFromFile(path) });
+                var backup = BackupBundle.Load(path); entries.Add(new ConfigurationHistoryEntry { Path = path, Backup = backup, CreatedUtc = backup.CreatedUtc, Bytes = new FileInfo(path).Length, Reason = ReasonFromFile(path), Note = LoadNote(path) });
             } catch { }
             return entries.OrderByDescending(x => x.CreatedUtc).ToList();
         }
@@ -80,6 +80,9 @@ namespace FunctionRowRemapper
             string[] parts = Path.GetFileNameWithoutExtension(path).Split(new[] { "--" }, StringSplitOptions.None); string slug = parts.Length >= 2 ? parts[1] : "change";
             return String.Join(" ", slug.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries).Select(x => Char.ToUpperInvariant(x[0]) + x.Substring(1)));
         }
+        internal static string NotePath(string path) { return path + ".note"; }
+        internal static string LoadNote(string path) { try { return File.Exists(NotePath(path)) ? File.ReadAllText(NotePath(path), Encoding.UTF8) : ""; } catch { return ""; } }
+        internal static void SaveNote(string path, string note) { if (String.IsNullOrWhiteSpace(note)) { try { if (File.Exists(NotePath(path))) File.Delete(NotePath(path)); } catch { } return; } if (note.Length > 500) throw new ArgumentException("Private notes are limited to 500 characters."); File.WriteAllText(NotePath(path), note.Trim(), Encoding.UTF8); }
         static void Trim(string folder, int limit)
         {
             foreach (string path in Directory.GetFiles(folder, "*.keyweave").OrderByDescending(Path.GetFileName).Skip(limit)) try { File.Delete(path); } catch { }
@@ -88,7 +91,7 @@ namespace FunctionRowRemapper
 
     internal sealed class ConfigurationHistoryForm : Form
     {
-        readonly ListBox list = new DesignListBox(); readonly Label title = new DesignLabel(), meta = new DesignLabel(), comparison = new DesignLabel(); readonly Button restore;
+        readonly ListBox list = new DesignListBox(); readonly Label title = new DesignLabel(), meta = new DesignLabel(), comparison = new DesignLabel(); readonly TextBox note = new DesignTextBox(); readonly Button restore, saveNote;
         readonly Configuration current; readonly ProfileCollection profiles; readonly UserPreferences preferences; readonly bool startup;
         internal ConfigurationHistoryEntry SelectedEntry { get { return list.SelectedItem as ConfigurationHistoryEntry; } }
         internal ConfigurationHistoryForm(Configuration configuration, ProfileCollection profileCollection, UserPreferences userPreferences, bool startWithWindows) : this(configuration, profileCollection, userPreferences, startWithWindows, null) { }
@@ -106,17 +109,21 @@ namespace FunctionRowRemapper
             title.AutoSize = true; title.Font = new Font("Segoe UI", 15, FontStyle.Bold); title.ForeColor = UiStyle.Ink; title.Margin = new Padding(0, 0, 0, 4); stack.Controls.Add(title);
             meta.AutoSize = true; meta.Font = new Font("Segoe UI", 10, FontStyle.Bold); meta.ForeColor = UiStyle.Ink; meta.Margin = new Padding(0, 0, 0, 16); stack.Controls.Add(meta);
             comparison.AutoSize = true; comparison.MaximumSize = new Size(430, 0); comparison.ForeColor = UiStyle.Muted; stack.Controls.Add(comparison);
+            note.Multiline = true; note.Height = 64; note.ScrollBars = ScrollBars.Vertical; note.Enabled = false; stack.Controls.Add(UiStyle.Field("Private note (stays beside this snapshot)", note));
             var privacy = UiStyle.Text("History stays on this computer and can contain private mappings, targets, URLs, and profile data. Restoring never happens automatically.", 9, false); privacy.Margin = new Padding(0, 20, 0, 0); stack.Controls.Add(privacy);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 0) }; buttons.Controls.Add(UiStyle.Button("Close", delegate { Close(); }));
-            restore = UiStyle.Button("Restore selected", delegate { if (SelectedEntry != null) { DialogResult = DialogResult.OK; Close(); } }, true); buttons.Controls.Add(restore); buttons.Controls.Add(UiStyle.Button("Open history folder", delegate { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + ConfigurationHistory.DefaultFolder + "\"") { UseShellExecute = true }); })); root.Controls.Add(buttons, 0, 2);
+            restore = UiStyle.Button("Restore selected", delegate { if (SelectedEntry != null) { DialogResult = DialogResult.OK; Close(); } }, true); buttons.Controls.Add(restore); saveNote = UiStyle.Button("Save note", delegate { SaveSelectedNote(); }); saveNote.Enabled = false; buttons.Controls.Add(saveNote); buttons.Controls.Add(UiStyle.Button("Open history folder", delegate { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + ConfigurationHistory.DefaultFolder + "\"") { UseShellExecute = true }); })); root.Controls.Add(buttons, 0, 2);
             foreach (var entry in suppliedEntries ?? ConfigurationHistory.List(ConfigurationHistory.DefaultFolder)) list.Items.Add(entry); if (list.Items.Count > 0) list.SelectedIndex = 0; else { title.Text = "No history yet"; meta.Text = ""; comparison.Text = "KiWeave creates a snapshot before the next successful mapping save, profile edit, or restore."; restore.Enabled = false; }
         }
         void ShowSelected()
         {
-            var entry = SelectedEntry; restore.Enabled = entry != null; if (entry == null) return;
+            var entry = SelectedEntry; restore.Enabled = entry != null; saveNote.Enabled = note.Enabled = entry != null; if (entry == null) return;
             title.Text = entry.Reason; meta.Text = entry.CreatedUtc.ToLocalTime().ToString("f") + "  •  " + Math.Max(1, entry.Bytes / 1024) + " KB";
             comparison.Text = ConfigurationHistory.Compare(entry.Backup, current, profiles, preferences, startup);
+            note.Text = entry.Note ?? "";
         }
+        void SaveSelectedNote() { var entry = SelectedEntry; if (entry == null) return; try { ConfigurationHistory.SaveNote(entry.Path, note.Text); entry.Note = ConfigurationHistory.LoadNote(entry.Path); SetFeedback("Private history note saved.", false); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "History note", MessageBoxButtons.OK, MessageBoxIcon.Warning); } }
+        void SetFeedback(string text, bool error) { Text = "KiWeave history · " + text; }
         void DrawEntry(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0) return; var entry = (ConfigurationHistoryEntry)list.Items[e.Index]; bool selected = (e.State & DrawItemState.Selected) != 0;

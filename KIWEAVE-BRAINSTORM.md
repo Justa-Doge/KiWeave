@@ -516,7 +516,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 46. Hardware keyboard detection and layout profiles.
 47. Import/export redaction presets.
 48. Backup expiration reminders.
-49. Restore-point labels and private notes.
+49. Restore-point labels and private notes. (implemented locally)
 50. First-use action execution preview.
 51. Test-without-saving editor mode.
 52. A visual profile-inheritance tree.
