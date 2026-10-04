@@ -68,6 +68,12 @@ namespace FunctionRowRemapper
             foreach (var issue in issues) issue.Suggestion = SuggestionFor(issue);
             return issues.OrderBy(x => x.Severity).ThenBy(x => x.ProfileName).ThenBy(x => x.Title).ToList();
         }
+        internal static string LayerVisualization(Configuration configuration)
+        {
+            if (configuration == null) return "No layer map."; var parts = new List<string> { "Base: F1–F12" }; var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in configuration.Layers ?? new ModifierLayer[0]) { string key = layer.ActivationKey ?? "?"; parts.Add(layer.Name + " [hold " + LayerKeys.Label(key) + "]: F1–F12"); if (!used.Add(key)) parts.Add("⚠ duplicate hold key " + LayerKeys.Label(key)); }
+            return String.Join("\r\n", parts.ToArray());
+        }
         static string SuggestionFor(ConflictIssue issue)
         {
             if (issue == null) return "Review the affected rule before changing anything.";
@@ -115,7 +121,7 @@ namespace FunctionRowRemapper
         readonly ProfileCollection profiles;
         readonly IEnumerable<PowerToysShortcut> suppliedPowerToys;
         readonly ListBox list = new DesignListBox();
-        readonly Label summary = new DesignLabel(), title = new DesignLabel(), detail = new DesignLabel(), winner = new DesignLabel(), suggestion = new DesignLabel();
+        readonly Label summary = new DesignLabel(), layerMap = new DesignLabel(), title = new DesignLabel(), detail = new DesignLabel(), winner = new DesignLabel(), suggestion = new DesignLabel();
         readonly Button open;
         public ConflictIssue SelectedIssue { get { return list.SelectedItem as ConflictIssue; } }
 
@@ -129,7 +135,7 @@ namespace FunctionRowRemapper
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Controls.Add(root);
             var header = UiStyle.Stack(); header.Controls.Add(UiStyle.Text("Conflict center", 22, true)); header.Controls.Add(UiStyle.Text("Find overlapping shortcuts and rules without changing anything automatically.", 9, false));
             var simulator = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 8, 0, 0) }; var proposed = new DesignTextBox { Width = 180, Text = "Ctrl+Shift+P" }; simulator.Controls.Add(proposed); simulator.Controls.Add(UiStyle.Button("Simulate collision", delegate { try { IEnumerable<PowerToysShortcut> pts = suppliedPowerToys ?? PowerToysIntegration.Load(); MessageBox.Show(this, CollisionSimulator.Simulate(proposed.Text, defaultConfiguration, profiles, pts), "Collision simulation", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch (Exception ex) { MessageBox.Show(this, "Enter a valid modifier shortcut. " + ex.Message, "Collision simulation", MessageBoxButtons.OK, MessageBoxIcon.Information); } })); header.Controls.Add(simulator);
-            summary.AutoSize = true; summary.ForeColor = UiStyle.Muted; summary.Margin = new Padding(0, 8, 0, 0); header.Controls.Add(summary); root.Controls.Add(header, 0, 0);
+            summary.AutoSize = true; summary.ForeColor = UiStyle.Muted; summary.Margin = new Padding(0, 8, 0, 0); header.Controls.Add(summary); layerMap.AutoSize = true; layerMap.MaximumSize = new Size(850, 0); layerMap.ForeColor = UiStyle.Blue; layerMap.Margin = new Padding(0, 8, 0, 0); header.Controls.Add(layerMap); root.Controls.Add(header, 0, 0);
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0, 18, 0, 12) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57)); root.Controls.Add(body, 0, 1);
             var left = new DesignCard { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 14, 0) }; body.Controls.Add(left, 0, 0);
@@ -148,6 +154,7 @@ namespace FunctionRowRemapper
             var issues = suppliedPowerToys == null ? ConflictScanner.Scan(defaultConfiguration, profiles) : ConflictScanner.Scan(defaultConfiguration, profiles, suppliedPowerToys); list.Items.Clear(); list.Items.AddRange(issues.Cast<object>().ToArray());
             int critical = issues.Count(x => x.Severity == ConflictSeverity.Critical), warnings = issues.Count(x => x.Severity == ConflictSeverity.Warning);
             summary.Text = issues.Count == 0 ? "All clear. No known conflicts were found." : issues.Count + " finding" + (issues.Count == 1 ? "" : "s") + "  •  " + critical + " critical  •  " + warnings + " warning" + (warnings == 1 ? "" : "s");
+            layerMap.Text = "Layer map\r\n" + ConflictScanner.LayerVisualization(defaultConfiguration);
             if (list.Items.Count > 0) list.SelectedIndex = 0; else { title.Text = "No known conflicts"; detail.Text = "KiWeave did not find duplicate application rules, layer-key collisions, Windows-owned shortcuts, or active PowerToys overlaps."; winner.Text = "Nothing needs attention."; suggestion.Text = ""; open.Enabled = false; }
         }
         void ShowSelected() { var issue = SelectedIssue; open.Enabled = issue != null; if (issue == null) return; title.Text = issue.Title; detail.Text = issue.Detail; winner.Text = issue.Winner; suggestion.Text = issue.Suggestion; }

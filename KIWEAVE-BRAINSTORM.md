@@ -520,7 +520,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 50. First-use action execution preview. (implemented locally)
 51. Test-without-saving editor mode. (implemented locally)
 52. A visual profile-inheritance tree. (implemented locally)
-53. Modifier-layer conflict visualization.
+53. Modifier-layer conflict visualization. (implemented locally)
 54. Shortcut collision simulation.
 55. App-path migration assistant. (implemented locally)
 56. Offline documentation browser.
