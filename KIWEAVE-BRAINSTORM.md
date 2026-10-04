@@ -530,7 +530,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 60. PowerToys configuration drift detection (implemented locally).
 61. Monitor capability-change alerts (implemented locally).
 62. Audio-device availability alerts (implemented locally).
-63. Safe startup after repeated crashes.
+63. Safe startup after repeated crashes (implemented locally).
 64. Automatic rollback after failed configuration activation.
 65. User-selectable notification severity.
 66. Privacy-dashboard export history.

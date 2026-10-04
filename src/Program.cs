@@ -62,7 +62,9 @@ namespace FunctionRowRemapper
                 }
                 Design.EnableDarkAppMode(); Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+                bool cleanExit = false;
                 try {
+                    if (!safeMode && StartupGuard.RecordStart() && MessageBox.Show("KiWeave did not close cleanly twice in a row. Open Safe Mode to review recovery tools before loading keyboard hooks?", "KiWeave recovery", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes) safeMode = true;
                     if (safeMode) using (var form = new SafeModeForm()) { Application.Run(form); restartNormally = form.RestartNormallyRequested; }
                     else using (var wake = new EventWaitHandle(false, EventResetMode.AutoReset, wakeName))
                         using (var form = new MainForm(Array.IndexOf(args, "--tray") >= 0)) {
@@ -70,8 +72,10 @@ namespace FunctionRowRemapper
                             var listener = ThreadPool.RegisterWaitForSingleObject(wake, delegate(object state, bool timeout) { string command = AppStorage.TakeControlCommand(); if (String.IsNullOrEmpty(command)) form.RequestShow(); else form.RequestAutomationCommand(command); }, null, Timeout.Infinite, false);
                             try { Application.Run(form); } finally { listener.Unregister(null); }
                         }
+                    cleanExit = true;
                 }
                 catch (Exception ex) { AppLog.Record("Fatal application error", ex); MessageBox.Show(safeMode ? "KiWeave Safe Mode must close. No hooks or hotkeys were loaded.\n\n" + ex.Message : "KiWeave must close. Its hook will be released.\n\n" + ex.Message, safeMode ? "KiWeave Safe Mode" : "KiWeave", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                finally { if (cleanExit) StartupGuard.MarkClean(); }
             }
             if (restartNormally) try { Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--normal-mode") { UseShellExecute = true }); } catch (Exception ex) { MessageBox.Show("KiWeave could not restart normally.\n\n" + ex.Message, "KiWeave Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
