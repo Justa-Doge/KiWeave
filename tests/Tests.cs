@@ -668,6 +668,17 @@ namespace FunctionRowRemapper
             Test("Localization uses a safe text-only fallback", delegate {
                 string old = Localization.Current; try { Localization.Save("Español"); Assert(Localization.Translate("Save") == "Guardar" && Localization.Translate("Unknown label") == "Unknown label", "translation fallback"); } finally { Localization.Save(old); }
             });
+            Test("Localization applies recursively without rewriting unknown text", delegate {
+                string old = Localization.Current; try {
+                    Localization.Save("Español");
+                    using (var form = new Form()) using (var panel = new Panel()) {
+                        var button = new Button { Text = "Save" }; var unknown = new Label { Text = "Private dynamic value" };
+                        var combo = new ComboBox(); combo.Items.Add("Cancel"); combo.Items.Add("Private option"); panel.Controls.Add(button); panel.Controls.Add(unknown); panel.Controls.Add(combo); form.Controls.Add(panel);
+                        Localization.Apply(form);
+                        Assert(button.Text == "Guardar" && unknown.Text == "Private dynamic value" && Convert.ToString(combo.Items[0]) == "Cancelar" && Convert.ToString(combo.Items[1]) == "Private option", "recursive translation");
+                    }
+                } finally { Localization.Save(old); }
+            });
             Test("Encrypted backups round-trip without plaintext on disk", delegate {
                 string path = Path.Combine(scratch, "encrypted.keyweave.enc"); var c = new Configuration(); var p = new ProfileCollection(); var pref = new UserPreferences(); BackupBundle.SaveEncrypted(path, c, p, pref, false); string raw = Encoding.UTF8.GetString(File.ReadAllBytes(path)); Assert(!raw.Contains("KeyWeave Backup"), "encrypted plaintext boundary"); var loaded = BackupBundle.LoadEncrypted(path); Assert(loaded.Configuration.Mappings.Length == 12, "encrypted round trip");
             });

@@ -60,6 +60,9 @@ namespace FunctionRowRemapper
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
         internal static void DarkTitlebar(Form form)
         {
+            // Apply the selected text-only language after each dialog has built
+            // its controls, while leaving unknown/dynamic text untouched.
+            Localization.Apply(form);
             Action apply = delegate {
                 if (!form.IsHandleCreated) return;
                 try {
@@ -72,7 +75,7 @@ namespace FunctionRowRemapper
                 } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
             };
             form.HandleCreated += delegate { apply(); };
-            form.Shown += delegate { apply(); };
+            form.Shown += delegate { Localization.Apply(form); apply(); };
             if (form.IsHandleCreated) apply();
         }
         internal static void GlassBackdrop(Form form, bool enabled)
