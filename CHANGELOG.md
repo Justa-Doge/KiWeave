@@ -60,3 +60,4 @@
 - 2026-10-03: Import review now supports selective staging of individual non-default base-key, modifier-layer, and custom-hotkey actions. Unchecked actions become pass-through or are omitted before the reviewed import reaches the editor; build passed 107 checks.
 - 2026-10-03: Privacy Center now reports bounded redacted activity history, records configuration/action-pack/backup exports, and offers a confirmation-gated clear action. Build passed 107 checks.
 - 2026-10-03: Action-pack profile imports now use a per-profile conflict wizard with replace, import-as-new, or skip choices, followed by strict inheritance and duplicate-app validation. Build passed 107 checks.
+- 2026-10-03: Added a safe script workspace entry in Settings. Supported script files open in VS Code when available or the default editor as fallback; KiWeave never executes them from this flow. Build passed 108 checks.
