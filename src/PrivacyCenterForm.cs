@@ -71,7 +71,9 @@ namespace FunctionRowRemapper
             storage.Text = PrivacyData.Summary(); storage.Margin = new Padding(0, 6, 0, 16); dataStack.Controls.Add(storage);
             var dataButtons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
             dataButtons.Controls.Add(UiStyle.Button("Open data folder", delegate { OpenFolder(PrivacyData.DataFolder); }));
-            dataButtons.Controls.Add(UiStyle.Button("Clear local logs", delegate { ClearLogs(); })); dataStack.Controls.Add(dataButtons); root.Controls.Add(data);
+            dataButtons.Controls.Add(UiStyle.Button("Clear local logs", delegate { ClearLogs(); }));
+            dataButtons.Controls.Add(UiStyle.Button("Clear undo history", delegate { ClearHistory(); }));
+            dataButtons.Controls.Add(UiStyle.Button("Clear recovery draft", delegate { ClearDraft(); })); dataStack.Controls.Add(dataButtons); root.Controls.Add(data);
 
             var diagnostic = new DesignCard { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 0, 0, 16), Padding = new Padding(22) };
             var diagnosticStack = UiStyle.Stack(); diagnostic.Controls.Add(diagnosticStack); diagnosticStack.Controls.Add(UiStyle.Text("Safe diagnostics", 15, true));
@@ -103,6 +105,18 @@ namespace FunctionRowRemapper
         {
             try { Directory.CreateDirectory(folder); Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true }); }
             catch (Exception ex) { MessageBox.Show(this, "The folder could not be opened: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+        void ClearHistory()
+        {
+            if (MessageBox.Show(this, "Delete KiWeave's local undo/history snapshots? Active mappings, profiles, backups, and preferences will not be changed.", "Clear undo history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            try { if (Directory.Exists(ConfigurationHistory.DefaultFolder)) foreach (string file in Directory.GetFiles(ConfigurationHistory.DefaultFolder, "*.keyweave")) File.Delete(file); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "Undo history was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+            catch (Exception ex) { MessageBox.Show(this, "Undo history could not be cleared: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+        void ClearDraft()
+        {
+            if (MessageBox.Show(this, "Delete the crash-recovery draft? This does not change saved mappings or profiles.", "Clear recovery draft", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            try { RecoveryStore.DeleteDraft(); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "The recovery draft was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+            catch (Exception ex) { MessageBox.Show(this, "The recovery draft could not be cleared: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
     }
 
