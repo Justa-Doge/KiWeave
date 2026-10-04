@@ -382,7 +382,7 @@ Privacy is a core product boundary, not a cosmetic settings section.
 - Keep notes local, exclude them from logs and safe diagnostics, and clearly include them only in private/full exports and backups.
 - Never interpret notes as commands, templates, variables, or executable content.
 
-### 26. Duplicate and template actions
+### 26. Duplicate and template actions (custom-hotkey slice implemented locally)
 
 - Allow deliberate duplication of mappings, sequences, layers, conditions, and profiles from their existing menus.
 - Give every copy a new identity and a clear **Copy** name until the user renames it.

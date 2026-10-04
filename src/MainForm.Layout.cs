@@ -404,6 +404,7 @@ namespace FunctionRowRemapper
             rows.Controls.Add(UiStyle.Text("Saved hotkeys", 9, true), 0, 0); PrepareList(customList, "HOTKEY"); rows.Controls.Add(customList, 0, 1);
             var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 12, 0, 0), WrapContents = false };
             commands.Controls.Add(UiStyle.Button("Add hotkey", delegate { AddCustomHotkey(); }));
+            commands.Controls.Add(UiStyle.Button("Duplicate", delegate { DuplicateCustomHotkey(); }));
             removeCustomButton = UiStyle.Button("Remove", delegate { RemoveCustomHotkey(); }); commands.Controls.Add(removeCustomButton);
             removeCustomButton.MinimumSize = new Size(70, 42); removeCustomButton.Padding = new Padding(8, 8, 8, 8);
             rows.Controls.Add(commands, 0, 2); left.Controls.Add(rows);

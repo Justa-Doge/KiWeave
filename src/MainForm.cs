@@ -262,6 +262,13 @@ namespace FunctionRowRemapper
             var all = draft.CustomHotkeys.Concat(new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "" } } }).ToArray();
             draft.CustomHotkeys = all; customSelected = all.Length - 1; PopulateCustomList(); LoadCustomEditor(customSelected); MarkDirty();
         }
+        void DuplicateCustomHotkey()
+        {
+            if (customSelected < 0 || customSelected >= draft.CustomHotkeys.Length) return;
+            var copy = draft.CustomHotkeys[customSelected].Copy(); copy.Shortcut = "Ctrl+Alt+K";
+            draft.CustomHotkeys = draft.CustomHotkeys.Concat(new[] { copy }).ToArray(); customSelected = draft.CustomHotkeys.Length - 1;
+            PopulateCustomList(); LoadCustomEditor(customSelected); MarkDirty(); SetFeedback("Duplicated the action as a template. Choose a new shortcut before saving.", false);
+        }
         void RemoveCustomHotkey()
         {
             if (customSelected < 0 || customSelected >= draft.CustomHotkeys.Length) return;
