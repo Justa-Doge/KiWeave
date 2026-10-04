@@ -19,6 +19,7 @@
     <Compile Include="src\AssemblyInfo.cs" />
     <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" /><Compile Include="src\NotificationPreferences.cs" />
     <Compile Include="src\PowerToysIntegration.cs" /><Compile Include="src\PowerToysPanel.cs" />
+    <Compile Include="src\PowerToysDrift.cs" />
     <Compile Include="src\FirstPartyExtensions.cs" />
     <Compile Include="src\ActionPacks.cs" />
     <Compile Include="src\ProfileSchedules.cs" />

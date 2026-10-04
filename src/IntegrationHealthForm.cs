@@ -21,7 +21,7 @@ namespace FunctionRowRemapper
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(28) }; scroll.EnableKeyboardFocus(); Controls.Add(scroll);
             var root = UiStyle.Stack(); scroll.Controls.Add(root);
             root.Controls.Add(UiStyle.Text("Integrations", 24, true));
-            root.Controls.Add(UiStyle.Text("Read-only availability checks. KiWeave does not install, launch, authorize, or modify anything from this page.", 10, false));
+            root.Controls.Add(UiStyle.Text("Read-only availability checks. KiWeave does not install, launch, authorize, or modify integrations from this page; it only records a local observation for drift warnings.", 10, false));
             rows.Dock = DockStyle.Top; rows.AutoSize = true; rows.ColumnCount = 3; rows.Margin = new Padding(0, 20, 0, 16);
             rows.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135)); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 185)); rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); root.Controls.Add(rows);
             RefreshRows();
@@ -33,7 +33,7 @@ namespace FunctionRowRemapper
         {
             rows.SuspendLayout(); rows.Controls.Clear(); rows.RowStyles.Clear(); rows.RowCount = 0;
             AddHeader("Integration", "Status", "What KiWeave checks");
-            Add("PowerToys", PowerToysStatus(), "Reads supported local Keyboard Manager shortcuts; it never edits PowerToys here."); Add("Discord", DiscordIntegration.Status, "Uses local IPC/RPC and only reconnects when network access and authorization allow it."); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running", "OBS actions require OBS to be installed and running when triggered."); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running", "Spotify mappings use Windows media keys and do not read account data."); Add("DDC/CI monitors", monitors == 0 ? "None detected" : monitors + " detected", "Monitor controls remain hardware-dependent and are probed read-only here."); Add("Audio devices", "Windows audio available to KiWeave", "Audio switching uses Windows device APIs; no audio is recorded."); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy", "Local validation only. No targets, commands, or URLs are executed by this scan.");
+            Add("PowerToys", PowerToysStatus(), "Reads supported local Keyboard Manager shortcuts and compares them with the last local observation; it never edits PowerToys here."); Add("Discord", DiscordIntegration.Status, "Uses local IPC/RPC and only reconnects when network access and authorization allow it."); Add("OBS Studio", ProcessExists("obs64") || ProcessExists("obs32") ? "Running" : "Not running", "OBS actions require OBS to be installed and running when triggered."); Add("Spotify", ProcessExists("Spotify") ? "Running" : "Not running", "Spotify mappings use Windows media keys and do not read account data."); Add("DDC/CI monitors", monitors == 0 ? "None detected" : monitors + " detected", "Monitor controls remain hardware-dependent and are probed read-only here."); Add("Audio devices", "Windows audio available to KiWeave", "Audio switching uses Windows device APIs; no audio is recorded."); Add("Configuration", health.HasWarnings ? health.Findings.Length + " issue(s) found" : "Healthy", "Local validation only. No targets, commands, or URLs are executed by this scan.");
             rows.ResumeLayout(true);
         }
         void AddHeader(string name, string status, string explanation)
@@ -55,7 +55,7 @@ namespace FunctionRowRemapper
         }
         static string PowerToysStatus()
         {
-            try { int count = PowerToysIntegration.Load().Count; return count == 0 ? "Not detected or no shortcuts" : count + " shortcuts detected"; } catch { return "Unavailable"; }
+            try { var shortcuts = PowerToysIntegration.Load(); string drift = PowerToysDrift.Observe(shortcuts); return (shortcuts.Count == 0 ? "Not detected or no shortcuts" : shortcuts.Count + " shortcuts detected") + " · " + drift; } catch { return "Unavailable"; }
         }
         static bool ProcessExists(string name) { try { return Process.GetProcessesByName(name).Length > 0; } catch { return false; } }
     }
