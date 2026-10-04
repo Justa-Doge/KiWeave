@@ -233,7 +233,7 @@ namespace FunctionRowRemapper
                 bool ignore = k.ExtraInfo == Native.Tag || (injected && (!testInjected || k.ExtraInfo != Native.TestTag));
                 bool down = msg == 0x100 || msg == 0x104;
 
-                if (!ignore && ShortcutSuspension.IsSuspended()) return Native.CallNextHookEx(hook, code, wParam, lParam);
+                if (!ignore && (ShortcutSuspension.IsSuspended() || (GameMode.Enabled && GameMode.IsFullscreenForeground()))) return Native.CallNextHookEx(hook, code, wParam, lParam);
 
                 Configuration snapshot = Volatile.Read(ref config);
                 KeyDecision d = machine.Process((int)k.Vk, down, ignore, snapshot);

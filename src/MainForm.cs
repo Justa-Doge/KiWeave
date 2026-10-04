@@ -65,7 +65,7 @@ namespace FunctionRowRemapper
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;
-        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
+        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), gameMode = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly NumericUpDown historyRetention = new DesignNumericUpDown { Minimum = 5, Maximum = 100, Increment = 5, Value = 20 };
@@ -152,7 +152,7 @@ namespace FunctionRowRemapper
             checkUpdates.Checked = preferences.CheckUpdates;
             automaticProfiles.Checked = preferences.AutomaticProfiles;
             networkAccess.Checked = preferences.NetworkAccess;
-            experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode;
+            experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode; gameMode.Checked = GameMode.Enabled;
             checkUpdates.Enabled = preferences.NetworkAccess;
             try { startup.Checked = Startup.Enabled; } catch (Exception ex) { initialError = "Cannot read startup setting: " + ex.Message; }
             loading = false;
@@ -774,6 +774,10 @@ namespace FunctionRowRemapper
             if (loading || isPreview) return;
             try { featureFlags.ExperimentalEnabled = experimentalFeatures.Checked; featureFlags.DeveloperMode = developerMode.Checked; featureFlags.Save(); SetFeedback("Feature safety settings saved.", false); }
             catch (Exception ex) { loading = true; experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode; loading = false; SetFeedback("Feature safety settings could not be saved: " + ex.Message, true); }
+        }
+        void ToggleGameMode(object sender, EventArgs e)
+        {
+            if (loading || isPreview) return; try { GameMode.Set(gameMode.Checked); SetFeedback(gameMode.Checked ? "Game mode enabled. Fullscreen foreground windows receive normal keys." : "Game mode disabled.", false); } catch (Exception ex) { loading = true; gameMode.Checked = GameMode.Enabled; loading = false; SetFeedback("Game mode could not be saved: " + ex.Message, true); }
         }
         void ToggleNotificationPreference(object sender, EventArgs e)
         {
