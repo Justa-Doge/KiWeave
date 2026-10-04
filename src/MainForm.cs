@@ -171,6 +171,10 @@ namespace FunctionRowRemapper
                 else CheckMissingTargets();
                 if (startInTray && preferences.UseTray && initialError == null) Hide();
                 if (showWelcome) try { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); FirstRun.MarkSeen(); } catch (Exception ex) { SetFeedback("Welcome setup could not be saved: " + ex.Message, true); }
+                try {
+                    DateTime lastNotice; var reminder = BackupReminder.Inspect(Path.Combine(AppStorage.DataFolder, "Backups"), DateTime.UtcNow, BackupReminder.TryReadLastNotified(out lastNotice) ? (DateTime?)lastNotice : null);
+                    if (reminder.ShouldNotify && notificationPreferences.Safety && notificationPreferences.AllowsWarning) { SetFeedback(reminder.Message, true); if (preferences.UseTray) tray.ShowBalloonTip(5000, "Backup reminder", reminder.Message, ToolTipIcon.Info); BackupReminder.MarkNotified(DateTime.UtcNow); }
+                } catch { }
                 if (preferences.NetworkAccess && preferences.CheckUpdates) UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) updateNotice = new UpdateNotification(tag); }));
             };
             FormClosing += OnClosing;

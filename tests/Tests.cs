@@ -631,6 +631,11 @@ namespace FunctionRowRemapper
             Test("Portable data mode has an explicit marker and separate root", delegate {
                 Assert(AppStorage.PortableMarkerPath.EndsWith("portable.mode") && !String.Equals(AppStorage.PortableRoot, AppStorage.DefaultDataFolder, StringComparison.OrdinalIgnoreCase), "portable paths");
             });
+            Test("Backup reminders are bounded and repeat no more than weekly", delegate {
+                string folder = Path.Combine(scratch, "backup-reminder"); Directory.CreateDirectory(folder); string file = Path.Combine(folder, "old.keyweave"); File.WriteAllText(file, "x"); File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddDays(-31));
+                var first = BackupReminder.Inspect(folder, DateTime.UtcNow, null); var recent = BackupReminder.Inspect(folder, DateTime.UtcNow, DateTime.UtcNow.AddDays(-2));
+                Assert(first.ShouldNotify && first.OldestAgeDays >= 30 && !recent.ShouldNotify && recent.Message.Contains("days old"), "backup reminder cadence");
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }
