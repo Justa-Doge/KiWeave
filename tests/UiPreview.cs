@@ -24,6 +24,19 @@ namespace FunctionRowRemapper
         }
         static void Prepare(Form form) { form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-22000, -22000); form.Show(); Application.DoEvents(); }
         static void Capture(Form form, string name) { form.PerformLayout(); Application.DoEvents(); CheckDropdownLayout(form); using (var b = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(b, new Rectangle(Point.Empty, form.Size)); b.Save(Path.Combine("bin-designed-ui", name + ".png")); } }
+        static DesignScrollPanel FindScroll(Control root)
+        {
+            var panel = root as DesignScrollPanel;
+            if (panel != null) return panel;
+            foreach (Control child in root.Controls) { var found = FindScroll(child); if (found != null) return found; }
+            return null;
+        }
+        static void CaptureBottom(Form form, string name)
+        {
+            var scroll = FindScroll(form);
+            if (scroll != null) { scroll.ScrollToBottom(); Application.DoEvents(); }
+            Capture(form, name);
+        }
         [STAThread] static int Main(string[] args)
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
@@ -63,15 +76,15 @@ namespace FunctionRowRemapper
             }
             using (var f = new MainForm(false, true)) { Prepare(f); UiStyle.ApplyAccent("#A457D2"); Call(f, "RefreshVisualTheme"); Capture(f, "accent-live"); f.Close(); }
             UiStyle.ApplyTheme("KiWeave Dark");
-            using (var f = new FirstPartyExtensionsForm(null)) { Prepare(f); Capture(f, "extensions"); f.Size = f.MinimumSize; Capture(f, "extensions-minimum"); f.Close(); }
-            using (var f = new IntegrationHealthForm(1, ConfigurationHealthReport.Empty)) { Prepare(f); Capture(f, "integration-health"); f.Size = f.MinimumSize; Capture(f, "integration-health-minimum"); f.Close(); }
+            using (var f = new FirstPartyExtensionsForm(null)) { Prepare(f); Capture(f, "extensions"); f.Size = f.MinimumSize; Capture(f, "extensions-minimum"); CaptureBottom(f, "extensions-minimum-scrolled"); f.Close(); }
+            using (var f = new IntegrationHealthForm(1, ConfigurationHealthReport.Empty)) { Prepare(f); Capture(f, "integration-health"); f.Size = f.MinimumSize; Capture(f, "integration-health-minimum"); CaptureBottom(f, "integration-health-scrolled"); f.Close(); }
             using (var f = new ProfileSchedulesForm(new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Gaming" } } })) { Prepare(f); Capture(f, "profile-schedules"); f.Size = f.MinimumSize; Capture(f, "profile-schedules-minimum"); f.Close(); }
             using (var f = new LayerManagerForm(new[] { new ModifierLayer { Name = "Media layer", ActivationKey = "CapsLock" } })) { Prepare(f); Capture(f, "layers"); f.Size = f.MinimumSize; Capture(f, "layers-minimum"); f.Close(); }
             var profileDefault = new Configuration(); profileDefault.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };
             var inheritedProfile = new KeyWeaveProfile { Name = "Gaming", Applications = new[] { "game.exe" }, InheritFrom = "Default", OverrideKeys = new[] { "F2" }, Configuration = profileDefault.Copy() };
             inheritedProfile.Configuration.Mappings[1] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" };
             using (var f = new ProfileManagerForm(new ProfileCollection { Profiles = new[] { inheritedProfile } }, inheritedProfile.Configuration, profileDefault)) { Prepare(f); Capture(f, "profiles-inheritance"); f.Size = f.MinimumSize; Capture(f, "profiles-inheritance-minimum"); f.Close(); }
-            using (var f = new PrivacyCenterForm(false, "KiWeave diagnostics\r\nVersion: 1.0.0-beta.3\r\nMaster network access: blocked\r\n")) { Prepare(f); Capture(f, "privacy-center"); f.Size = f.MinimumSize; Capture(f, "privacy-center-minimum"); f.Close(); }
+            using (var f = new PrivacyCenterForm(false, "KiWeave diagnostics\r\nVersion: 1.0.0-beta.3\r\nMaster network access: blocked\r\n")) { Prepare(f); Capture(f, "privacy-center"); f.Size = f.MinimumSize; Capture(f, "privacy-center-minimum"); CaptureBottom(f, "privacy-center-minimum-scrolled"); f.Close(); }
             using (var f = new LiveKeyTesterForm(null, () => "Default", true)) { Prepare(f); Capture(f, "live-key-tester"); f.Size = f.MinimumSize; Capture(f, "live-key-tester-minimum"); f.Close(); }
             var conflictConfig = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Win+L", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" } }, new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" } } } };
             var conflictPowerToys = new[] { new PowerToysShortcut { Module = "ColorPicker", Action = "Activation", Chord = "Ctrl+Alt+K", ModuleEnabled = true } };
@@ -82,7 +95,7 @@ namespace FunctionRowRemapper
             var historyEntry = new ConfigurationHistoryEntry { Path = "preview.keyweave", Reason = "Mapping save", CreatedUtc = historyBackup.CreatedUtc, Bytes = 4096, Backup = historyBackup };
             using (var f = new ConfigurationHistoryForm(new Configuration(), new ProfileCollection(), new UserPreferences(), false, new[] { historyEntry })) { Prepare(f); Capture(f, "history"); f.Size = f.MinimumSize; Capture(f, "history-minimum"); f.Close(); }
             var imported = new Configuration { CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+W", Action = new Mapping { Kind = ActionKind.HttpRequest, Target = "https://example.invalid/hook", Arguments = "{\"ok\":true}" } } } }; imported.Mappings[0] = new Mapping { Kind = ActionKind.Command, Target = @"C:\Tools\sample.cmd", Arguments = "--preview" };
-            using (var f = new ImportReviewForm(imported, "example-import.json")) { Prepare(f); Capture(f, "import-review"); f.Size = f.MinimumSize; Capture(f, "import-review-minimum"); f.Close(); }
+            using (var f = new ImportReviewForm(imported, "example-import.json")) { Prepare(f); Capture(f, "import-review"); f.Size = f.MinimumSize; Capture(f, "import-review-minimum"); CaptureBottom(f, "import-review-scrolled"); f.Close(); }
             using (var f = new SequenceBuilderForm(new[] {
                 new SequenceStep { Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Win+E" } },
                 new SequenceStep { WaitMilliseconds = 1000 },
@@ -93,7 +106,7 @@ namespace FunctionRowRemapper
             }
             var conditionPreview = new ConditionalRule { Condition = ConditionKind.ForegroundApplication, Application = "Discord.exe", WhenMatched = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }, Otherwise = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+M" } };
             using (var f = new ConditionalActionForm(new Mapping { Kind = ActionKind.Conditional, Target = ConditionalCodec.Serialize(conditionPreview) })) { Prepare(f); Capture(f, "conditional"); f.Size = f.MinimumSize; Capture(f, "conditional-minimum"); f.Close(); }
-            using (var f = new SafeModeForm()) { Prepare(f); Capture(f, "safe-mode"); f.Size = f.MinimumSize; Capture(f, "safe-mode-minimum"); var safeScroll = Field<DesignScrollPanel>(f, "scroll"); safeScroll.AutoScrollPosition = new Point(0, safeScroll.VerticalScroll.Maximum); Application.DoEvents(); Capture(f, "safe-mode-minimum-scrolled"); f.Close(); }
+            using (var f = new SafeModeForm()) { Prepare(f); Capture(f, "safe-mode"); f.Size = f.MinimumSize; Capture(f, "safe-mode-minimum"); CaptureBottom(f, "safe-mode-minimum-scrolled"); f.Close(); }
             var searchConfig = new Configuration(); searchConfig.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeMute" }; searchConfig.CustomHotkeys = new[] { new CustomHotkey { Shortcut = "Ctrl+Alt+K", Action = new Mapping { Kind = ActionKind.SendShortcut, Target = "Ctrl+Shift+S" } } };
             using (var f = new MappingSearchForm(searchConfig, new ProfileCollection())) { Prepare(f); Capture(f, "mapping-search"); f.Size = f.MinimumSize; Capture(f, "mapping-search-minimum"); f.Close(); }
             var recoveryPreview = new KeyWeaveBackup { Configuration = searchConfig, Profiles = new ProfileCollection(), Preferences = new UserPreferences(), StartWithWindows = false, CreatedUtc = DateTime.UtcNow.AddMinutes(-3) };

@@ -326,78 +326,125 @@ namespace FunctionRowRemapper
 
     internal sealed class DesignScrollPanel : Panel
     {
-        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-        static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
-        [DllImport("user32.dll")]
-        static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
-        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
-        static extern IntPtr GetWindowLongPtr64(IntPtr hwnd, int index);
-        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
-        static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
-        const int GwlStyle = -16, WsHscroll = 0x00100000, WsVscroll = 0x00200000;
-        bool hidePending;
+        Control content;
+        int offset;
+        bool layingOut;
+
+        internal int ScrollOffset { get { return offset; } }
 
         internal DesignScrollPanel()
         {
-            AutoScroll = true;
+            AutoScroll = false;
             BackColor = UiStyle.Surface;
-            // WinForms' buffered Panel scrolling can copy a stale back buffer while
-            // child windows are moving. Rapid wheel input then leaves duplicated
-            // headings, clipped buttons, and blank bands until another repaint.
-            // Let the native scroll operation move the children and repaint the
-            // complete visible tree after every position change instead.
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
-            SetStyle(ControlStyles.ResizeRedraw, true);
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.ResizeRedraw, true);
+            ControlAdded += delegate(object sender, ControlEventArgs e) { AttachWheel(e.Control); LayoutContent(); };
+            ControlRemoved += delegate { LayoutContent(); };
         }
 
-        protected override void OnScroll(ScrollEventArgs se)
+        protected override void OnControlAdded(ControlEventArgs e)
         {
-            base.OnScroll(se);
+            base.OnControlAdded(e);
+            if (content == null) content = e.Control;
+            AttachWheel(e.Control);
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            if (layingOut) return;
+            LayoutContent();
+        }
+
+        void LayoutContent()
+        {
+            if (layingOut) return;
+            layingOut = true;
+            try
+            {
+                if (content == null || content.IsDisposed) return;
+                content.Dock = DockStyle.None;
+                int width = Math.Max(1, ClientSize.Width - Padding.Horizontal);
+                int height = Math.Max(ClientSize.Height, content.GetPreferredSize(new Size(width, 0)).Height);
+                int max = Math.Max(0, height + Padding.Vertical - ClientSize.Height);
+                offset = Math.Max(0, Math.Min(offset, max));
+                content.SetBounds(Padding.Left, Padding.Top - offset, width, height);
+            }
+            finally { layingOut = false; }
+        }
+
+        void AttachWheel(Control control)
+        {
+            if (control == null) return;
+            control.MouseWheel -= ChildMouseWheel;
+            control.MouseWheel += ChildMouseWheel;
+            foreach (Control child in control.Controls) AttachWheel(child);
+            control.ControlAdded -= ChildControlAdded;
+            control.ControlAdded += ChildControlAdded;
+        }
+
+        void ChildControlAdded(object sender, ControlEventArgs e)
+        {
+            AttachWheel(e.Control);
+            LayoutContent();
+        }
+
+        void ChildMouseWheel(object sender, MouseEventArgs e)
+        {
+            ScrollBy(-(e.Delta / 3));
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e);
-            // OnScroll is normally raised first, but repaint here as well for wheel
-            // messages that land at a boundary or are coalesced by Windows.
+            ScrollBy(-(e.Delta / 3));
+        }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            Keys key = keyData & Keys.KeyCode;
+            return key == Keys.PageUp || key == Keys.PageDown || key == Keys.Home || key == Keys.End || base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.PageUp) ScrollBy(-ClientSize.Height);
+            else if (e.KeyCode == Keys.PageDown) ScrollBy(ClientSize.Height);
+            else if (e.KeyCode == Keys.Home) SetScrollOffset(0);
+            else if (e.KeyCode == Keys.End) ScrollToBottom();
+        }
+
+        internal void ScrollBy(int amount)
+        {
+            if (content == null) return;
+            int max = Math.Max(0, content.Height + Padding.Vertical - ClientSize.Height);
+            SetScrollOffset(offset + amount, max);
+        }
+
+        internal void ScrollToBottom()
+        {
+            if (content == null) return;
+            SetScrollOffset(Int32.MaxValue);
+        }
+
+        internal void SetScrollOffset(int value)
+        {
+            SetScrollOffset(value, Math.Max(0, (content == null ? 0 : content.Height) + Padding.Vertical - ClientSize.Height));
+        }
+
+        void SetScrollOffset(int value, int max)
+        {
+            int next = Math.Max(0, Math.Min(value, max));
+            if (next == offset && content != null) return;
+            offset = next;
+            LayoutContent();
+            Invalidate(true);
         }
 
         internal void EnableKeyboardFocus()
         {
             SetStyle(ControlStyles.Selectable, true); TabStop = true;
         }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
-            try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
-            HideScrollBars();
-        }
-
-        protected override void OnLayout(LayoutEventArgs e)
-        {
-            base.OnLayout(e);
-            // AutoScroll can recreate its native bars after the handle-created pass.
-            // Defer a lightweight hide until this layout settles. Avoid mutating the
-            // window style here because that caused stale resize artifacts.
-            QueueScrollbarHide();
-        }
-
-        void QueueScrollbarHide()
-        {
-            if (!IsHandleCreated || hidePending || IsDisposed) return;
-            hidePending = true;
-            try { BeginInvoke((MethodInvoker)delegate { hidePending = false; HideScrollBars(); }); }
-            catch (InvalidOperationException) { hidePending = false; }
-        }
-
-        void HideScrollBars()
-        {
-            if (IsHandleCreated) try {
-                ShowScrollBar(Handle, 3, false);
-            } catch { }
-        }
-
     }
 
     internal sealed class DesignNumericUpDown : NumericUpDown
