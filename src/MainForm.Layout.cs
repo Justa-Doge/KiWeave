@@ -380,6 +380,7 @@ namespace FunctionRowRemapper
             workBrowse.Click += delegate { using (var d = new FolderBrowserDialog()) if (d.ShowDialog(this) == DialogResult.OK) working.Text = d.SelectedPath; };
             functionWorkField = UiStyle.Field("Working folder (optional)", PathRow(working, workBrowse)); functionStack.Controls.Add(functionWorkField);
             hint.AutoSize = true; hint.Font = new Font("Segoe UI", 9); hint.Dock = DockStyle.Top; hint.ForeColor = muted; hint.Margin = new Padding(0, 20, 0, 0); functionStack.Controls.Add(hint);
+            functionNote.TextChanged += SaveFunctionNote; functionStack.Controls.Add(UiStyle.Field("Private note (never exported)", functionNote));
             target.TextChanged += delegate { Edited(); }; arguments.TextChanged += delegate { Edited(); }; working.TextChanged += delegate { Edited(); }; media.SelectedIndexChanged += delegate { Edited(); };
         }
         void BuildCustomPage(Control page)
@@ -430,6 +431,7 @@ namespace FunctionRowRemapper
             customStack.Controls.Add(customArgsField); customStack.Controls.Add(customWorkField);
             sequenceField = UiStyle.Field("Sequence", sequenceSummary); customStack.Controls.Add(sequenceField);
             customHelp.Margin = new Padding(0, 12, 0, 0); customStack.Controls.Add(customHelp);
+            customNote.TextChanged += SaveCustomNote; customStack.Controls.Add(UiStyle.Field("Private note (never exported)", customNote));
             customShortcut.TextChanged += delegate { CustomEdited(); }; customTarget.TextChanged += delegate { CustomEdited(); }; customArguments.TextChanged += delegate { CustomEdited(); }; customWorking.TextChanged += delegate { CustomEdited(); }; customMedia.SelectedIndexChanged += delegate { CustomEdited(); };
             SelectCustomSection(false);
         }

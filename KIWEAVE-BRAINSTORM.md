@@ -375,7 +375,7 @@ Privacy is a core product boundary, not a cosmetic settings section.
 - Do not claim the checker code is literally unremovable. Malware capable of rewriting the executable could patch an internal check; authenticity must ultimately be anchored in Windows signature validation and a private signing key the attacker does not possess.
 - Provide a separate small verification or repair entry point so the main executable is not the only component deciding whether it has been modified.
 
-### 25. Private mapping notes
+### 25. Private mapping notes (implemented locally)
 
 - Add an optional Notes item in the extra mapping/profile menu.
 - Allow notes on mappings, sequences, layers, conditions, and profiles to explain purpose, expected application state, or setup requirements.

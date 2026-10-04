@@ -59,6 +59,9 @@ namespace FunctionRowRemapper
         bool scanning;
         readonly TextBox target = new DesignTextBox(), arguments = new DesignTextBox(), working = new DesignTextBox();
         readonly TextBox customShortcut = new DesignTextBox(), customTarget = new DesignTextBox(), customArguments = new DesignTextBox(), customWorking = new DesignTextBox();
+        readonly TextBox functionNote = new DesignTextBox { Multiline = true, Height = 62, ScrollBars = ScrollBars.Vertical };
+        readonly TextBox customNote = new DesignTextBox { Multiline = true, Height = 62, ScrollBars = ScrollBars.Vertical };
+        Dictionary<string, string> mappingNotes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;
@@ -124,6 +127,8 @@ namespace FunctionRowRemapper
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
             catch (Exception ex) { initialError = "Profiles could not be loaded; the original file is untouched. " + ex.Message; }
+            try { mappingNotes = MappingNoteStore.Load(); }
+            catch (Exception ex) { mappingNotes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); initialError = "Private mapping notes could not be loaded; the notes file is untouched. " + ex.Message; }
             draft = saved.Copy();
             BuildUi();
             Shown += delegate { SelectPage(0); PerformLayout(); Invalidate(true); };
@@ -268,7 +273,7 @@ namespace FunctionRowRemapper
             foreach (ListViewItem item in customList.Items) item.Selected = item.Index == index;
             SetCustomEditorState(true); customTitle.Text = String.IsNullOrWhiteSpace(h.Shortcut) ? "New shortcut" : h.Shortcut;
             sequenceSteps.Clear(); if (h.Action.Kind == ActionKind.Sequence) try { sequenceSteps.AddRange(SequenceCodec.Parse(h.Action.Target)); } catch { }
-            customShortcut.Text = h.Shortcut; customKind.SelectedIndex = (int)h.Action.Kind; customTarget.Text = h.Action.Target; customArguments.Text = h.Action.Arguments; customWorking.Text = h.Action.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), h.Action.Target); customSimpleKind.SelectedIndex = GroupFor(h.Action, true); PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, h.Action); ConfigureCustomFields(false); loading = false;
+            customShortcut.Text = h.Shortcut; customKind.SelectedIndex = (int)h.Action.Kind; customTarget.Text = h.Action.Target; customArguments.Text = h.Action.Arguments; customWorking.Text = h.Action.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), h.Action.Target); customSimpleKind.SelectedIndex = GroupFor(h.Action, true); PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, h.Action); ConfigureCustomFields(false); customNote.Text = NoteForCustom(index); loading = false;
         }
         void ConfigureCustomFields(bool reset)
         {
@@ -376,7 +381,30 @@ namespace FunctionRowRemapper
             foreach (ListViewItem item in list.Items) item.Selected = item.Index == index;
             target.Text = m.Target; arguments.Text = m.Arguments; working.Text = m.WorkingDirectory; media.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), m.Target); simpleKind.SelectedIndex = GroupFor(m, false); PopulateChoices(specificKind, simpleKind.SelectedIndex, false, m);
             LoadMonitorChoices(m.MonitorId, m.MonitorControl); monitorStep.Value = Math.Max(1, Math.Min(20, m.MonitorStep));
-            ConfigureFields(false); loading = false;
+            ConfigureFields(false); functionNote.Text = NoteForFunction(index); loading = false;
+        }
+        string NoteForFunction(int index)
+        {
+            string layer = selectedLayer < 0 ? "Base" : draft.Layers[selectedLayer].Name; string value;
+            return mappingNotes.TryGetValue(MappingNoteStore.FunctionKey(currentProfile, layer, index), out value) ? value : "";
+        }
+        string NoteForCustom(int index)
+        {
+            string value; return mappingNotes.TryGetValue(MappingNoteStore.CustomKey(currentProfile, index), out value) ? value : "";
+        }
+        void SaveFunctionNote(object sender, EventArgs e)
+        {
+            if (loading) return; string layer = selectedLayer < 0 ? "Base" : draft.Layers[selectedLayer].Name;
+            SaveNote(MappingNoteStore.FunctionKey(currentProfile, layer, selected), functionNote.Text);
+        }
+        void SaveCustomNote(object sender, EventArgs e)
+        {
+            if (loading || customSelected < 0) return; SaveNote(MappingNoteStore.CustomKey(currentProfile, customSelected), customNote.Text);
+        }
+        void SaveNote(string key, string value)
+        {
+            try { MappingNoteStore.Set(mappingNotes, key, value); MappingNoteStore.Save(MappingNoteStore.Path, mappingNotes); }
+            catch (Exception ex) { SetFeedback("Private note was not saved: " + ex.Message, true); }
         }
         void ConfigureFields(bool reset)
         {
