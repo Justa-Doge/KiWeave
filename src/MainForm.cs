@@ -514,6 +514,28 @@ namespace FunctionRowRemapper
                 } catch (Exception ex) { SetFeedback("Import rejected; current mappings are unchanged. " + ex.Message, true); }
             }
         }
+        void ExportActionPack(object sender, EventArgs e)
+        {
+            try {
+                ConfigStore.Validate(draft, false);
+                var pack = new ActionPack { Id = "local.kiweave-pack", Name = "KiWeave local action pack", Publisher = "Local user", Description = "Exported from this KiWeave setup.", Configuration = draft.Copy(), Profiles = new ProfileCollection() };
+                using (var d = new SaveFileDialog { Filter = "KiWeave action pack|*.kiweavepack", FileName = "kiweave-action-pack.kiweavepack", DefaultExt = "kiweavepack", AddExtension = true })
+                    if (d.ShowDialog(this) == DialogResult.OK) { ActionPackStore.Save(d.FileName, pack); SetFeedback("Exported a declarative action pack. It contains no scripts or command actions.", false); }
+            } catch (Exception ex) { SetFeedback("Action-pack export failed: " + ex.Message, true); }
+        }
+        void ImportActionPack(object sender, EventArgs e)
+        {
+            using (var d = new OpenFileDialog { Filter = "KiWeave action packs|*.kiweavepack|All files|*.*", CheckFileExists = true }) {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                try {
+                    ActionPack pack = ActionPackStore.Load(d.FileName);
+                    using (var review = new ImportReviewForm(pack.Configuration, d.FileName)) if (review.ShowDialog(this) != DialogResult.OK || !review.Approved) { SetFeedback("Action-pack import cancelled. Active mappings are unchanged.", false); return; }
+                    pack.Configuration.Enabled = saved.Enabled; draft = pack.Configuration.Copy(); selectedLayer = -1; customSelected = -1; RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
+                    if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
+                    MarkDirty(); SetFeedback("Action pack staged for review. Nothing was executed or activated.", false); CheckMissingTargets();
+                } catch (Exception ex) { SetFeedback("Action-pack import rejected; current mappings are unchanged. " + ex.Message, true); }
+            }
+        }
         void CheckMissingTargets()
         {
             for (int i = 0; i < 12; i++) try { ConfigStore.Validate(draft.Mappings[i], true); } catch (Exception ex) { SetFeedback("Check F" + (i + 1) + ": " + ex.Message, true); return; }

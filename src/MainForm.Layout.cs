@@ -158,6 +158,7 @@ namespace FunctionRowRemapper
             menu.Items.Add("Profiles...", null, delegate { OpenProfiles(); }); menu.Items.Add("Diagnostics...", null, delegate { OpenDiagnostics(); }); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Back up everything...", null, ExportBackup); menu.Items.Add("Restore backup...", null, ImportBackup); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Import configuration...", null, Import); menu.Items.Add("Export configuration...", null, Export);
+            menu.Items.Add("Import action pack...", null, ImportActionPack); menu.Items.Add("Export action pack...", null, ExportActionPack);
             menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Reset function keys", null, delegate { Bulk(false); });
             menu.Items.Add("Disable all function keys", null, delegate { Bulk(true); }); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("About KiWeave...", null, delegate { using (var about = new AboutForm()) about.ShowDialog(this); });
