@@ -157,7 +157,9 @@ namespace FunctionRowRemapper
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; BackColor = Color.Transparent; Cursor = Cursors.Hand;
             AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; MinimumSize = new Size(88, 42); Padding = new Padding(14, 8, 14, 8); Margin = new Padding(0, 0, 8, 0);
+            AccessibleRole = AccessibleRole.PushButton;
         }
+        protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); if (!String.IsNullOrWhiteSpace(Text)) AccessibleName = Text; }
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hover = pressed = false; Invalidate(); base.OnMouseLeave(e); }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
