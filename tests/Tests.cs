@@ -688,6 +688,7 @@ namespace FunctionRowRemapper
                 string description = GameInputSupport.Describe(); Assert(!String.IsNullOrWhiteSpace(description) && (description.Contains("available") || description.Contains("unavailable")), "game input capability description");
                 ushort buttons; Assert(!GameInputSupport.TryReadButtons(-1, out buttons), "invalid game input index");
             });
+            Test("Virtual gamepad output requires explicit opt-in", delegate { VirtualGamepadBackend backend; string error; Assert(!VirtualGamepadBackend.TryCreate(false, out backend, out error) && backend == null && error.Contains("explicit opt-in"), "virtual output gate"); Assert(VirtualGamepadBackend.Describe().Contains("disabled by default"), "virtual output default"); });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }
