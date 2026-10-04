@@ -336,8 +336,10 @@ namespace FunctionRowRemapper
         {
             AutoScroll = false;
             BackColor = UiStyle.Surface;
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.ResizeRedraw, true);
+            // This container moves a real child tree rather than painting a flat
+            // bitmap. Buffered parent repaints can preserve stale bands between
+            // child-window moves, so let Windows repaint the full exposed region.
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
             ControlAdded += delegate(object sender, ControlEventArgs e) { AttachWheel(e.Control); LayoutContent(); };
             ControlRemoved += delegate { LayoutContent(); };
         }
@@ -439,6 +441,8 @@ namespace FunctionRowRemapper
             offset = next;
             LayoutContent();
             Invalidate(true);
+            if (content != null) { content.Invalidate(true); content.Update(); }
+            Update();
         }
 
         internal void EnableKeyboardFocus()
