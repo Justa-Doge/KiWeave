@@ -387,6 +387,7 @@ namespace FunctionRowRemapper
                 var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
                 string legacy = serializer.Serialize(new { version = 1, profiles = new[] { new { name = "Legacy", applications = new[] { "old.exe" }, configuration = ConfigStore.Serialize(new Configuration()) } } });
                 var migrated = ProfileStore.Parse(legacy); Assert(migrated.Find("Legacy") != null && migrated.Find("Legacy").InheritFrom == "" && migrated.Find("Legacy").OverrideKeys.Length == 0, "version 1 migration");
+                var merged = ProfileCollection.Merge(collection, new ProfileCollection { Profiles = new[] { new KeyWeaveProfile { Name = "Streaming", Configuration = new Configuration() } } }); Assert(merged.Profiles.Length == 2 && merged.Find("Streaming (2)") != null, "profile merge rename");
             });
             Test("Profile inheritance resolves overrides and rejects loops", delegate {
                 var defaults = new Configuration { Enabled = true }; defaults.Mappings[0] = new Mapping { Kind = ActionKind.Media, Target = "VolumeUp" };

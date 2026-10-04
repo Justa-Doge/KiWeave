@@ -24,6 +24,16 @@ namespace FunctionRowRemapper
     {
         public KeyWeaveProfile[] Profiles = new KeyWeaveProfile[0];
         public ProfileCollection Copy() { return new ProfileCollection { Profiles = Profiles.Select(p => p.Copy()).ToArray() }; }
+        public static ProfileCollection Merge(ProfileCollection current, ProfileCollection imported)
+        {
+            var result = (current ?? new ProfileCollection()).Copy();
+            foreach (var incoming in (imported ?? new ProfileCollection()).Profiles) {
+                var copy = incoming.Copy(); string baseName = copy.Name; int suffix = 2;
+                while (result.Find(copy.Name) != null) { string tail = " (" + suffix++ + ")"; copy.Name = (baseName.Length + tail.Length > 40 ? baseName.Substring(0, 40 - tail.Length) : baseName) + tail; }
+                result.Profiles = result.Profiles.Concat(new[] { copy }).ToArray();
+            }
+            ProfileStore.Validate(result, false); return result;
+        }
         public KeyWeaveProfile Find(string name) { return Profiles.FirstOrDefault(p => String.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)); }
         public KeyWeaveProfile ForApplication(string processName)
         {
