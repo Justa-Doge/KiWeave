@@ -24,12 +24,19 @@ namespace FunctionRowRemapper
         static DiscordIpcClient client;
         static string accessToken = "";
         static string refreshToken = LoadRefreshToken();
+        static bool authorizationRefreshWarning;
         static bool restoring;
         static System.Threading.Timer reconnectTimer;
 
         internal static bool Connected { get { lock (Gate) return client != null && client.IsConnected; } }
         internal static bool HasAuthorization { get { lock (Gate) return !String.IsNullOrEmpty(refreshToken) || Connected; } }
-        internal static string Status { get { lock (Gate) return Connected ? "Connected" : (String.IsNullOrEmpty(refreshToken) ? "Not connected" : "Authorized; waiting for Discord"); } }
+        internal static string Status { get { lock (Gate) return StatusText(Connected, !String.IsNullOrEmpty(refreshToken), authorizationRefreshWarning); } }
+        internal static string StatusText(bool connected, bool authorized, bool refreshWarning)
+        {
+            if (connected) return "Connected";
+            if (refreshWarning) return "Authorization refresh failed; reconnect to Discord.";
+            return authorized ? "Authorized; waiting for Discord" : "Not connected";
+        }
 
         internal static void Start(bool networkAllowed)
         {
@@ -73,7 +80,7 @@ namespace FunctionRowRemapper
                     status("Exchanging the short-lived authorization code...");
                     TokenSet tokens = await Task.Run(() => ExchangeCode(code, verifier)).ConfigureAwait(true);
                     var next = new DiscordIpcClient(tokens.AccessToken); next.Connect();
-                    lock (Gate) { if (client != null) client.Dispose(); client = next; accessToken = tokens.AccessToken; if (!String.IsNullOrEmpty(tokens.RefreshToken)) refreshToken = tokens.RefreshToken; SaveRefreshTokenLocked(); StartReconnectMonitorLocked(); }
+                    lock (Gate) { if (client != null) client.Dispose(); client = next; accessToken = tokens.AccessToken; if (!String.IsNullOrEmpty(tokens.RefreshToken)) refreshToken = tokens.RefreshToken; authorizationRefreshWarning = false; SaveRefreshTokenLocked(); StartReconnectMonitorLocked(); }
                     status("Connected to Discord. Authorization will be reused on this Windows account."); return true;
                 } finally { listener.Stop(); }
             }
@@ -139,7 +146,7 @@ namespace FunctionRowRemapper
                 if (String.IsNullOrEmpty(accessToken) && !String.IsNullOrEmpty(refreshToken)) {
                     restoring = true;
                     try { TokenSet tokens = RefreshAccessToken(refreshToken); accessToken = tokens.AccessToken; if (!String.IsNullOrEmpty(tokens.RefreshToken)) refreshToken = tokens.RefreshToken; SaveRefreshTokenLocked(); }
-                    catch { accessToken = ""; return; }
+                    catch { accessToken = ""; authorizationRefreshWarning = true; return; }
                     finally { restoring = false; }
                 }
                 ReconnectLocked(1200);
@@ -171,7 +178,7 @@ namespace FunctionRowRemapper
 
         internal static void ForgetAuthorization()
         {
-            lock (Gate) { Disconnect(); refreshToken = ""; DeleteRefreshTokenLocked(); }
+            lock (Gate) { Disconnect(); refreshToken = ""; authorizationRefreshWarning = false; DeleteRefreshTokenLocked(); }
         }
 
         static string TokenPath { get { return Path.Combine(AppStorage.DataFolder, "discord.refresh.dpapi"); } }

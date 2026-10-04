@@ -526,7 +526,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 56. Offline documentation browser.
 57. Built-in keyboard shortcut reference.
 58. Integration-specific reconnect controls.
-59. Discord authorization-expiry warnings.
+59. Discord authorization-expiry warnings (implemented locally).
 60. PowerToys configuration drift detection.
 61. Monitor capability-change alerts.
 62. Audio-device availability alerts.
