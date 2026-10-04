@@ -200,7 +200,8 @@ namespace FunctionRowRemapper
     }
     internal sealed class DesignToggle : CheckBox
     {
-        internal DesignToggle() { AutoSize = false; Size = new Size(174, 36); Cursor = Cursors.Hand; SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true); }
+        internal DesignToggle() { AutoSize = false; Size = new Size(174, 36); Cursor = Cursors.Hand; AccessibleRole = AccessibleRole.CheckButton; SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true); }
+        protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); if (!String.IsNullOrWhiteSpace(Text)) AccessibleName = Text; }
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.Clear(Design.Background(Parent)); var track = new Rectangle(0, (Height - 22) / 2, 40, 22);
@@ -245,8 +246,10 @@ namespace FunctionRowRemapper
         internal DesignCheckBox()
         {
             AutoSize = true; Cursor = Cursors.Hand;
+            AccessibleRole = AccessibleRole.CheckButton;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         }
+        protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); if (!String.IsNullOrWhiteSpace(Text)) AccessibleName = Text; }
         protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
         protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
         protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
