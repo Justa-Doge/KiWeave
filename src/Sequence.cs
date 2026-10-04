@@ -84,6 +84,18 @@ namespace FunctionRowRemapper
             if (maturity == "App-dependent") return "Requires the selected file, application, or integration to remain available.";
             return "Uses KiWeave's established local action path.";
         }
+        internal static string Dependencies(Mapping mapping)
+        {
+            if (mapping == null) return "No action selected.";
+            if (mapping.Kind == ActionKind.Monitor) return "Requires the selected DDC/CI monitor and a supported hardware control.";
+            if (mapping.Kind == ActionKind.HttpRequest) return "Requires network access to be allowed and the configured endpoint to be reachable when triggered.";
+            if (mapping.Kind == ActionKind.Application || mapping.Kind == ActionKind.Command || mapping.Kind == ActionKind.Python) return "Requires the selected local program or script to remain available; it runs only when triggered.";
+            if (mapping.Kind == ActionKind.FileOrFolder || mapping.Kind == ActionKind.WindowsShortcut) return "Requires the selected local file, folder, or shortcut to remain available.";
+            if (mapping.Kind == ActionKind.SystemAction) return "Requires the target Windows or integration capability to be available.";
+            if (mapping.Kind == ActionKind.Sequence) return "Depends on the applications, network, and hardware requirements of its individual steps.";
+            if (mapping.Kind == ActionKind.Conditional) return "Depends on the current local foreground/running-process condition and the selected branch action.";
+            return "No external application, network, or hardware dependency.";
+        }
     }
     public static class SequenceCodec
     {

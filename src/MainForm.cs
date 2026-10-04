@@ -585,7 +585,7 @@ namespace FunctionRowRemapper
         {
             if (mapping == null) return;
             string maturity = ActionInsights.Maturity(mapping);
-            var text = new System.Text.StringBuilder(); text.AppendLine(mapping.Summary); text.AppendLine(); text.AppendLine("Maturity: " + maturity); text.AppendLine(ActionInsights.MaturityExplanation(maturity)); text.AppendLine(); text.AppendLine("Permission: " + ActionPrivacy.Risk(mapping));
+            var text = new System.Text.StringBuilder(); text.AppendLine(mapping.Summary); text.AppendLine(); text.AppendLine("Maturity: " + maturity); text.AppendLine(ActionInsights.MaturityExplanation(maturity)); text.AppendLine(); text.AppendLine("Dependencies: " + ActionInsights.Dependencies(mapping)); text.AppendLine(); text.AppendLine("Permission: " + ActionPrivacy.Risk(mapping));
             if (mapping.Kind == ActionKind.HttpRequest) text.AppendLine("Master network access: " + (preferences.NetworkAccess ? "allowed" : "blocked"));
             if (mapping.Kind == ActionKind.Sequence) {
                 try {
