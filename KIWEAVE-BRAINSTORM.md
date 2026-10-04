@@ -492,7 +492,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 25. Conflict explanations with suggested fixes and affected integrations.
 26. Mapping, sequence, layer, condition, and profile duplication templates.
 27. Declarative local action-pack gallery with reviewed imports. (implemented locally)
-28. Action-pack trust labels and optional signature verification. (trust labels implemented locally; signatures remain optional)
+28. Action-pack trust labels and optional signature verification. (implemented locally)
 29. Portable-mode improvements with explicit data-location controls.
 30. Windows notification preferences for updates, health, and safety warnings. (implemented locally)
 31. Custom tray-menu profile switching. (implemented locally)
@@ -537,7 +537,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch. (implemented locally)
 69. Separate developer mode for test actions. (implemented locally)
-70. Signed community action-pack repository.
+70. Signed community action-pack repository. (detached signature verification implemented locally; repository publishing remains external)
 71. Action-pack version compatibility checks. (implemented locally)
 72. Profile import merge mode. (implemented locally)
 73. Profile conflict-resolution wizard. (implemented locally)

@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -401,6 +403,7 @@ namespace FunctionRowRemapper
             Test("Monitor mapping scope summarizes redacted targets", delegate { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = "monitor-identifier-12345" }; Assert(MonitorMappingScope.Describe(c).Contains("saved monitor target") && !MonitorMappingScope.Describe(c).Contains("monitor-identifier-12345"), "monitor mapping scope"); });
             Test("Hardware input inventory stays read-only and descriptive", delegate { Assert(HardwareInputInventory.Describe().Length > 0, "hardware inventory"); });
             Test("Remote and VM profile policy requires explicit layout matches", delegate { Assert(SessionAwareness.AllowsAutomaticAppProfile(false, false, false) && !SessionAwareness.AllowsAutomaticAppProfile(true, false, false) && !SessionAwareness.AllowsAutomaticAppProfile(false, true, false) && SessionAwareness.AllowsAutomaticAppProfile(true, true, true), "session profile policy"); });
+            Test("Action-pack detached RSA signatures verify when present", delegate { string path = Path.Combine(scratch, "signed.kiweavepack"); string json = "{\"format\":\"kiweave-action-pack\"}"; File.WriteAllText(path, json); using (var rsa = new RSACryptoServiceProvider(1024)) { File.WriteAllText(path + ".pub", rsa.ToXmlString(false)); File.WriteAllText(path + ".sig", Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(json), CryptoConfig.MapNameToOID("SHA256")))); Assert(ActionPackSignatures.Status(path, json).Contains("verified"), "signature verified"); } });
             Test("Repeated crash guard offers Safe Mode without forcing it early", delegate { Assert(!StartupGuard.ShouldOfferRecovery(0) && !StartupGuard.ShouldOfferRecovery(1) && StartupGuard.ShouldOfferRecovery(2), "threshold"); Assert(StartupGuard.NextAttempts(0) == 1 && StartupGuard.NextAttempts(1) == 2 && StartupGuard.NextAttempts(99) == 4, "bounded attempts"); });
             Test("Audit trail stays redacted and bounded", delegate { string path = Path.Combine(scratch, "audit.log"); AuditTrail.Record(path, "configuration-save"); AuditTrail.Record(path, "configuration-import-staged"); AuditTrail.Record(path, "C:\\private\\secret.exe"); for (int i = 0; i < AuditTrail.MaxEntries + 8; i++) AuditTrail.Record(path, "event-" + (i % 10)); var lines = AuditTrail.Read(path); Assert(lines.Count == AuditTrail.MaxEntries && lines.All(x => !x.Contains("private") && !x.Contains("secret.exe")), "audit redaction/rotation"); });
             Test("Notification severity migrates and gates warnings", delegate { string path = NotificationPreferences.Path; string old = File.Exists(path) ? File.ReadAllText(path) : null; try { File.WriteAllText(path, "{\"version\":2,\"updates\":true,\"health\":true,\"safety\":true,\"severity\":\"Critical only\"}"); var strict = NotificationPreferences.Load(); Assert(!strict.AllowsWarning && strict.Severity == "Critical only", "critical severity"); } finally { if (old == null) { try { File.Delete(path); } catch { } } else File.WriteAllText(path, old); } });

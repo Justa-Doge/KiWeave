@@ -23,7 +23,7 @@ namespace FunctionRowRemapper
         {
             if (!File.Exists(path)) throw new FileNotFoundException("Action pack not found.");
             if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Action pack is too large.");
-            return Parse(File.ReadAllText(path, Encoding.UTF8));
+            string json = File.ReadAllText(path, Encoding.UTF8); ActionPackSignatures.Status(path, json); return Parse(json);
         }
         internal static ActionPack Parse(string json)
         {
