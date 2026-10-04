@@ -465,32 +465,32 @@ Dropped because timing-based behavior can feel inconsistent with modifiers, game
 
 These are approved ideas for future KiWeave updates. They are roadmap entries, not promises that every item is already implemented.
 
-1. Per-application profiles with automatic foreground-app switching.
-2. Modifier layers with user-selected layer keys.
-3. Profile colors and icons, excluding personal images from exports by default.
-4. Crash-safe drafts with clearer recovery prompts.
-5. Global mapping search across profiles, layers, and nested sequences.
-6. Dependency explanations for every app, device, or integration action.
-7. Local profile schedules by time and day, with no network service.
-8. Read-only configuration mode that keeps active mappings running.
-9. A readable configuration diff before restores, imports, profile switches, or migrations.
-10. Migration preview that preserves the untouched original.
-11. Import quarantine with permission and risk review before activation.
-12. Emergency known-good backup beside the normal local backup folder.
-13. Backup rotation and retention controls.
+1. Per-application profiles with automatic foreground-app switching. (implemented locally)
+2. Modifier layers with user-selected layer keys. (implemented locally)
+3. Profile colors and icons, excluding personal images from exports by default. (implemented locally)
+4. Crash-safe drafts with clearer recovery prompts. (implemented locally)
+5. Global mapping search across profiles, layers, and nested sequences. (implemented locally)
+6. Dependency explanations for every app, device, or integration action. (implemented locally)
+7. Local profile schedules by time and day, with no network service. (implemented locally)
+8. Read-only configuration mode that keeps active mappings running. (implemented locally)
+9. A readable configuration diff before restores, imports, profile switches, or migrations. (implemented locally)
+10. Migration preview that preserves the untouched original. (implemented locally)
+11. Import quarantine with permission and risk review before activation. (implemented locally)
+12. Emergency known-good backup beside the normal local backup folder. (implemented locally)
+13. Backup rotation and retention controls. (implemented locally)
 14. Optional encrypted full backups only if the privacy tradeoff is justified.
 15. A local secrets vault for webhook and API credentials, never included in exports. (implemented locally)
-16. Deliberate sequence cancellation with an unmistakable emergency interaction.
-17. Sequence limits for runtime, repeats, launches, network requests, and hardware operations.
-18. Integration health dashboard with refreshable read-only status and repair guidance.
-19. Manually created redacted diagnostic bundles with a complete preview.
+16. Deliberate sequence cancellation with an unmistakable emergency interaction. (implemented locally)
+17. Sequence limits for runtime, repeats, launches, network requests, and hardware operations. (implemented locally)
+18. Integration health dashboard with refreshable read-only status and repair guidance. (implemented locally)
+19. Manually created redacted diagnostic bundles with a complete preview. (implemented locally)
 20. Release checksum and package-integrity verification.
 21. Stable, beta, and alpha update-channel preferences. (implemented locally)
 22. Safe localization using text-only translation files.
 23. Accessibility and keyboard-only navigation pass. (implemented locally)
 24. Live key tester improvements for suppression, translation, and layer state. (implemented locally)
-25. Conflict explanations with suggested fixes and affected integrations.
-26. Mapping, sequence, layer, condition, and profile duplication templates.
+25. Conflict explanations with suggested fixes and affected integrations. (implemented locally)
+26. Mapping, sequence, layer, condition, and profile duplication templates. (implemented locally)
 27. Declarative local action-pack gallery with reviewed imports. (implemented locally)
 28. Action-pack trust labels and optional signature verification. (implemented locally)
 29. Portable-mode improvements with explicit data-location controls. (implemented locally)
@@ -499,12 +499,12 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 32. Local “why did this action run?” explanations without key-history logging. (implemented locally)
 33. Dry-run mode for sequences and imported packs. (implemented locally)
 34. Per-integration permission toggles beneath the master network policy. (implemented locally)
-35. Backup privacy scan before export.
+35. Backup privacy scan before export. (implemented locally)
 36. One-click recovery after a failed startup. (implemented locally)
 37. Admin-only Settings controls visible only in an elevated KiWeave session. (implemented locally)
 38. Restricted elevated local-`.exe` launches, subject to a separate privacy and safety review. (implemented locally)
 39. Read-only Windows admin-console shortcuts with explicit UAC prompts. (implemented locally)
-40. A release-readiness checklist before the eventual 1.0.0 launch.
+40. A release-readiness checklist before the eventual 1.0.0 launch. (implemented locally)
 
 ## Further roadmap backlog
 
@@ -521,7 +521,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 51. Test-without-saving editor mode. (implemented locally)
 52. A visual profile-inheritance tree. (implemented locally)
 53. Modifier-layer conflict visualization. (implemented locally)
-54. Shortcut collision simulation.
+54. Shortcut collision simulation. (implemented locally)
 55. App-path migration assistant. (implemented locally)
 56. Offline documentation browser. (implemented locally)
 57. Built-in keyboard shortcut reference. (implemented locally)
@@ -532,7 +532,7 @@ These are approved ideas for future KiWeave updates. They are roadmap entries, n
 62. Audio-device availability alerts (implemented locally).
 63. Safe startup after repeated crashes (implemented locally).
 64. Automatic rollback after failed configuration activation. (implemented locally)
-65. User-selectable notification severity.
+65. User-selectable notification severity. (implemented locally)
 66. Privacy-dashboard export history. (implemented locally)
 67. Local audit trail with automatic redaction (implemented locally).
 68. Experimental-feature kill switch. (implemented locally)
