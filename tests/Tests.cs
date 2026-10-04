@@ -659,6 +659,12 @@ namespace FunctionRowRemapper
                 Assert(trigger.Matches(1, (ushort)(1 << 10)) && !trigger.Matches(0, (ushort)(1 << 10)) && !trigger.Matches(1, (ushort)(1 << 9)), "controller trigger match");
                 ControllerTriggerStore.Validate(trigger);
             });
+            Test("Stream Deck plugin bundle stays declarative", delegate {
+                string manifest = Path.Combine(Environment.CurrentDirectory, "extensions", "streamdeck", "com.kiweave.streamdeck.sdPlugin", "manifest.json");
+                string plugin = Path.Combine(Environment.CurrentDirectory, "extensions", "streamdeck", "com.kiweave.streamdeck.sdPlugin", "plugin.js");
+                Assert(File.Exists(manifest) && File.Exists(plugin), "plugin bundle files");
+                string source = File.ReadAllText(plugin); Assert(source.Contains("status") && source.Contains("show-settings") && source.Contains("activate-profile") && !source.Contains("child_process"), "plugin action boundary");
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }

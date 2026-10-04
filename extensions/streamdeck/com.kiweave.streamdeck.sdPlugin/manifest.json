@@ -1,0 +1,15 @@
+{
+  "Author": "KiWeave",
+  "CodePath": "plugin.js",
+  "Description": "Safe declarative KiWeave profile and settings controls.",
+  "Name": "KiWeave",
+  "SDKVersion": 2,
+  "Software": { "MinimumVersion": "1.0" },
+  "Version": "1.0.0",
+  "OS": [ { "Platform": "windows", "MinimumVersion": "10" } ],
+  "Actions": [
+    { "Name": "KiWeave status", "UUID": "com.kiweave.status", "Icon": "images/status", "States": [ { "Image": "images/status" } ], "Tooltip": "Show KiWeave status" },
+    { "Name": "Open KiWeave settings", "UUID": "com.kiweave.settings", "Icon": "images/settings", "States": [ { "Image": "images/settings" } ], "Tooltip": "Open KiWeave settings" },
+    { "Name": "Activate KiWeave profile", "UUID": "com.kiweave.profile", "Icon": "images/profile", "States": [ { "Image": "images/profile" } ], "Tooltip": "Activate a named KiWeave profile", "PropertyInspectorPath": "inspector.html" }
+  ]
+}
