@@ -478,9 +478,11 @@ namespace FunctionRowRemapper
                 (customPage.Visible && customHotkeyView.Visible && customSimpleKind.SelectedIndex == 3 && ReferenceEquals(customSpecificKind.SelectedItem, ChooseAction))) {
                 SetFeedback("Choose an action first. Nothing was changed.", true); return false;
             }
+            Configuration previous = saved.Copy(); bool persisted = false;
             try {
                 ConfigStore.Validate(draft, true); draft.Enabled = engine != null && engine.Enabled;
                 if (dirty) CaptureHistory("mapping save"); PersistCurrent(draft); saved = draft.Copy();
+                persisted = true;
                 if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); PopulateCustomList();
                 dirty = false; Text = "KiWeave";
                 try { if (startup.Checked != Startup.Enabled || (startup.Checked && !Startup.IsCurrent)) Startup.Set(startup.Checked); }
@@ -488,7 +490,10 @@ namespace FunctionRowRemapper
                 RecoveryStore.DeleteDraft();
                 try { RecoveryStore.SaveKnownGoodCurrent(); } catch (Exception ex) { AppLog.Record("KnownGoodRecovery", ex); }
                 SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
-            } catch (Exception ex) { SetFeedback("Could not save: " + ex.Message, true); return false; }
+            } catch (Exception ex) {
+                if (persisted) try { PersistCurrent(previous); saved = previous.Copy(); draft = previous.Copy(); if (engine != null) { engine.Apply(previous); ApplyHotkeys(previous); } dirty = false; } catch (Exception rollback) { AppLog.Record("ConfigurationRollback", rollback); }
+                SetFeedback(persisted ? "Activation failed; KiWeave rolled back to the previous saved configuration. " + ex.Message : "Could not save: " + ex.Message, true); return false;
+            }
         }
         void Bulk(bool unbound)
         {
