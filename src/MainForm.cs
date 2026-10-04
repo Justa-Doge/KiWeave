@@ -519,7 +519,7 @@ namespace FunctionRowRemapper
         {
             try {
                 ConfigStore.Validate(draft, false);
-                var pack = new ActionPack { Id = "local.kiweave-pack", Name = "KiWeave local action pack", Publisher = "Local user", Description = "Exported from this KiWeave setup.", Configuration = draft.Copy(), Profiles = new ProfileCollection() };
+                var pack = new ActionPack { Id = "local.kiweave-pack", Name = "KiWeave local action pack", Publisher = "Local user", Description = "Exported from this KiWeave setup.", Configuration = draft.Copy(), Profiles = profiles.Copy() };
                 using (var d = new SaveFileDialog { Filter = "KiWeave action pack|*.kiweavepack", FileName = "kiweave-action-pack.kiweavepack", DefaultExt = "kiweavepack", AddExtension = true })
                     if (d.ShowDialog(this) == DialogResult.OK) { ActionPackStore.Save(d.FileName, pack); SetFeedback("Exported a declarative action pack. It contains no scripts or command actions.", false); }
             } catch (Exception ex) { SetFeedback("Action-pack export failed: " + ex.Message, true); }
