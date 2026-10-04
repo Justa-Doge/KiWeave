@@ -654,6 +654,11 @@ namespace FunctionRowRemapper
                 var cc = new MidiTrigger { Message = "ControlChange", Channel = 0, Number = 7, MinimumValue = 64 };
                 Assert(cc.Matches(0xB0, 7, 64) && !cc.Matches(0x90, 7, 127), "cc trigger match");
             });
+            Test("Controller trigger matching is rising-edge and bounded", delegate {
+                var trigger = new ControllerTrigger { UserIndex = 1, Button = 10, FunctionKey = 4 };
+                Assert(trigger.Matches(1, (ushort)(1 << 10)) && !trigger.Matches(0, (ushort)(1 << 10)) && !trigger.Matches(1, (ushort)(1 << 9)), "controller trigger match");
+                ControllerTriggerStore.Validate(trigger);
+            });
         }
         static Configuration MonitorConfig() { var c = new Configuration(); c.Mappings[0] = new Mapping { Kind = ActionKind.Monitor, MonitorId = new string('a',64), MonitorControl = "VolumeDown", MonitorStep = 5 }; return c; }
         sealed class FakeDdc : IDdcController { public int Calls; public bool Allowed; public Mapping Last; public void Apply(Mapping m, Func<bool> active) { Calls++; Last = m; Allowed = active(); } }

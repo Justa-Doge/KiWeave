@@ -243,6 +243,7 @@ namespace FunctionRowRemapper
             help.Controls.Add(UiStyle.Button("Why did this run?", delegate { ShowActionExplanation(); }));
             help.Controls.Add(UiStyle.Button("Secrets vault", delegate { using (var dialog = new SecretVaultForm()) dialog.ShowDialog(this); }));
             help.Controls.Add(UiStyle.Button("MIDI triggers", delegate { using (var dialog = new MidiTriggersForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("MIDI trigger mappings saved. Restart KiWeave to activate changes.", false); }));
+            help.Controls.Add(UiStyle.Button("Controller triggers", delegate { using (var dialog = new ControllerTriggersForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("Controller trigger mappings saved. Restart KiWeave to activate changes.", false); }));
             help.Controls.Add(UiStyle.Button("Support bundle", delegate { OpenSupportBundle(); })); right.Controls.Add(help);
             help.Controls.Add(UiStyle.Button("Migrate app paths", OpenPathMigration));
             help.Controls.Add(UiStyle.Button("Suspend shortcuts by app", delegate { using (var dialog = new ShortcutSuspensionForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("Shortcut suspension list saved.", false); }));

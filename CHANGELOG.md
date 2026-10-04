@@ -86,3 +86,4 @@
 - 2026-10-03: Added a Settings explanation panel for the latest dispatched action. It retains only one redacted in-memory explanation and explicitly avoids key-history logging; local build passed 128 checks.
 - 2026-10-03: Added a Windows-account-protected local secrets vault. HTTP bodies can reference `{vault:name}`; values stay encrypted locally and are excluded from action-pack/config exports. Local build passed 129 checks.
 - 2026-10-03: Added opt-in MIDI note/CC triggers. The local editor maps a MIDI event to an existing saved function-row action, uses native Windows MIDI input without drivers, and stores no MIDI history; controller/Game Input support remains open. Local build passed 130 checks.
+- 2026-10-03: Added opt-in XInput controller button triggers. Rising button presses invoke existing saved function-row actions, with no controller state history or virtual-device dependency; Windows.Gaming.Input/Game Input remains open. Local build passed 131 checks.
