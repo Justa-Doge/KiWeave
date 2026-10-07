@@ -191,10 +191,17 @@ namespace FunctionRowRemapper
 
         void BuildSettingsPage(Control page)
         {
-            var columns = PageColumns(page);
-            var general = Card(); general.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(general, 0, 0);
-            var generalScroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; general.Controls.Add(generalScroll);
-            var left = UiStyle.Stack(); generalScroll.Controls.Add(left);
+            // Keep Settings on one scroll surface. Nested native scrollbars inside
+            // each card repaint badly when the window is constrained, especially
+            // while wrapped labels are still measuring. A single measured surface
+            // keeps the two-column layout coherent and gives every child one
+            // scrollbar/repaint owner.
+            var outer = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; page.Controls.Add(outer);
+            var columns = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = Padding.Empty };
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 37)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 63));
+            columns.RowStyles.Add(new RowStyle(SizeType.AutoSize)); outer.Controls.Add(columns);
+            var general = Card(); general.Dock = DockStyle.Top; general.AutoSize = true; general.Margin = new Padding(0, 0, 16, 0); columns.Controls.Add(general, 0, 0);
+            var left = UiStyle.Stack(); general.Controls.Add(left);
             left.Controls.Add(UiStyle.Text("General", 15, true));
             var intro = UiStyle.Text("Background behavior saves as soon as you change it.", 9, false); intro.Margin = new Padding(0, 0, 0, 22); left.Controls.Add(intro);
             themeChoice.Items.Clear(); themeChoice.Items.AddRange(new object[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }); themeChoice.SelectedItem = preferences.Theme; themeChoice.SelectedIndexChanged += ThemeChanged; UiStyle.Combo(themeChoice);
@@ -217,9 +224,8 @@ namespace FunctionRowRemapper
             historyRetention.Value = Math.Max(historyRetention.Minimum, Math.Min(historyRetention.Maximum, preferences.HistoryRetention));
             historyRetention.ValueChanged += delegate { ToggleBackgroundPreference(null, EventArgs.Empty); };
 
-            var tools = Card(); columns.Controls.Add(tools, 1, 0);
-            var toolsScroll = new DesignScrollPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) }; tools.Controls.Add(toolsScroll);
-            var right = UiStyle.Stack(); toolsScroll.Controls.Add(right);
+            var tools = Card(); tools.Dock = DockStyle.Top; tools.AutoSize = true; columns.Controls.Add(tools, 1, 0);
+            var right = UiStyle.Stack(); tools.Controls.Add(right);
             right.Controls.Add(UiStyle.Text("Tools and data", 15, true));
             var toolsHelp = UiStyle.Text("Back up your setup, troubleshoot problems, or revisit the basics.", 9, false); toolsHelp.Margin = new Padding(0, 0, 0, 18); right.Controls.Add(toolsHelp);
             AddSettingsSection(right, "Profiles and updates");

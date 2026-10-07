@@ -332,6 +332,9 @@ namespace FunctionRowRemapper
         static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
         Control content;
         bool layingOut;
+        bool layoutPending;
+        bool hidePending;
+        int laidOutWidth = -1, laidOutHeight = -1;
 
         internal int ScrollOffset { get { return -AutoScrollPosition.Y; } }
 
@@ -351,7 +354,25 @@ namespace FunctionRowRemapper
         protected override void OnLayout(LayoutEventArgs e)
         {
             base.OnLayout(e);
-            if (!layingOut) LayoutContent();
+            if (!layingOut) QueueLayout();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
+            try { ShowScrollBar(Handle, 3, false); } catch { }
+            QueueLayout();
+        }
+
+        void QueueLayout()
+        {
+            if (layingOut || IsDisposed) return;
+            if (!IsHandleCreated) { LayoutContent(); return; }
+            if (layoutPending) return;
+            layoutPending = true;
+            try { BeginInvoke((MethodInvoker)delegate { layoutPending = false; LayoutContent(); }); }
+            catch (InvalidOperationException) { layoutPending = false; }
         }
 
         void LayoutContent()
@@ -362,13 +383,30 @@ namespace FunctionRowRemapper
             {
                 if (content == null || content.IsDisposed) return;
                 content.Dock = DockStyle.None;
-                int width = Math.Max(1, ClientSize.Width - Padding.Horizontal);
+                // ClientSize.Width shrinks when the native vertical bar appears.
+                // Measuring wrapped content from that changing value creates a
+                // scrollbar/layout feedback loop. The outer width is stable.
+                int width = Math.Max(1, Width - Padding.Horizontal - 1);
+                content.MinimumSize = new Size(width, 0);
+                content.MaximumSize = new Size(width, 0);
                 int height = Math.Max(ClientSize.Height, content.GetPreferredSize(new Size(width, 0)).Height);
+                if (width == laidOutWidth && height == laidOutHeight && AutoScrollMinSize.Height == height + Padding.Vertical) return;
+                int previousOffset = -AutoScrollPosition.Y;
                 content.SetBounds(Padding.Left, Padding.Top, width, height);
                 AutoScrollMinSize = new Size(0, height + Padding.Vertical);
-                if (IsHandleCreated) ShowScrollBar(Handle, 3, false);
+                laidOutWidth = width; laidOutHeight = height;
+                if (previousOffset > 0) AutoScrollPosition = new Point(0, previousOffset);
+                QueueScrollbarHide();
             }
             finally { layingOut = false; }
+        }
+
+        void QueueScrollbarHide()
+        {
+            if (!IsHandleCreated || hidePending || IsDisposed) return;
+            hidePending = true;
+            try { BeginInvoke((MethodInvoker)delegate { hidePending = false; try { ShowScrollBar(Handle, 3, false); } catch { } }); }
+            catch (InvalidOperationException) { hidePending = false; }
         }
 
         protected override bool IsInputKey(Keys keyData)
@@ -393,6 +431,7 @@ namespace FunctionRowRemapper
 
         internal void ScrollToBottom()
         {
+            LayoutContent();
             SetScrollOffset(Int32.MaxValue);
         }
 
@@ -400,13 +439,6 @@ namespace FunctionRowRemapper
         {
             AutoScrollPosition = new Point(0, Math.Max(0, value));
             Invalidate(true);
-        }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
-            try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
-            try { ShowScrollBar(Handle, 3, false); } catch { }
         }
 
         internal void EnableKeyboardFocus()

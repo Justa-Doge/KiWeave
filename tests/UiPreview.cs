@@ -26,6 +26,7 @@ namespace FunctionRowRemapper
         static void Capture(Form form, string name) { form.PerformLayout(); Application.DoEvents(); CheckDropdownLayout(form); using (var b = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(b, new Rectangle(Point.Empty, form.Size)); b.Save(Path.Combine("bin-designed-ui", name + ".png")); } }
         static DesignScrollPanel FindScroll(Control root)
         {
+            if (root != null && !(root is Form) && !root.Visible) return null;
             var panel = root as DesignScrollPanel;
             if (panel != null) return panel;
             foreach (Control child in root.Controls) { var found = FindScroll(child); if (found != null) return found; }
@@ -49,7 +50,7 @@ namespace FunctionRowRemapper
                 Call(f, "SelectPage", 1); Application.DoEvents();
                 Call(f, "LoadCustomEditor", 0); Capture(f, "custom");
                 f.Size = f.MinimumSize; Capture(f, "custom-minimum");
-                Call(f, "SelectPage", 2); Application.DoEvents(); Capture(f, "settings");
+                Call(f, "SelectPage", 2); Application.DoEvents(); Capture(f, "settings"); CaptureBottom(f, "settings-scrolled");
                 Call(f, "SelectPage", 1); Application.DoEvents();
                 var customList = Field<ListView>(f, "customList");
                 Console.WriteLine("Custom list width: " + customList.ClientSize.Width + "; columns: " + customList.Columns[0].Width + ", " + customList.Columns[1].Width);
