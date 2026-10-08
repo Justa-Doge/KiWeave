@@ -94,3 +94,4 @@
 - 2026-10-03: Expanded the Spanish translation dictionary across Settings, recovery, diagnostics, mapping, and integration labels while preserving English fallback for unknown strings. Local build remained at 134 passing checks.
 - 2026-10-03: Added a safe Windows Game Input API capability probe to Integration Health. Unsupported runtimes fall back cleanly to the tested XInput backend; no virtual devices or drivers are installed. Local build passed 135 checks.
 - 2026-10-03: Controller trigger polling now prefers Windows Game Input readings when the WinRT API is available and falls back to XInput otherwise. The reflection boundary keeps unsupported runtimes safe and dependency-free; local build passed 135 checks.
+- 2026-10-07: Release-readiness cleanup refreshed the local build path, current 139-check verification count, and Computer Use handoff notes. No public version, tag, or release artifact was changed.

@@ -162,8 +162,7 @@ namespace FunctionRowRemapper
             menu.Items.Add("Import action pack...", null, ImportActionPack); menu.Items.Add("Export action pack...", null, ExportActionPack);
             menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Reset function keys", null, delegate { Bulk(false); });
             menu.Items.Add("Disable all function keys", null, delegate { Bulk(true); }); menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("About KiWeave...", null, delegate { using (var about = new AboutForm()) about.ShowDialog(this); });
-            menu.Items.Add("Open log folder", null, delegate { try { AppLog.OpenFolder(); } catch (Exception ex) { SetFeedback("Could not open the log folder: " + ex.Message, true); } });
+            // About and log-folder shortcuts live in Settings, so keep More focused on actions used from every page.
             menu.Items.Add("Exit app", null, delegate { ExitApp(); });
             moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); }; moreButton.Disposed += delegate { menu.Dispose(); };
             hideToTray = UiStyle.Button("Hide to tray", delegate { if (preferences.UseTray) Hide(); });
