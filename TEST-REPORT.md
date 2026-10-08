@@ -5,6 +5,7 @@
 - Removed duplicate **About KiWeave** and **Open log folder** entries from the global **More** menu; both remain available in Settings.
 - `bin-release-cleanup-compile\\KiWeave.exe` and its uninstaller compile successfully with the current source and no compiler diagnostics.
 - The current source test executable in that build passes 139 checks with zero failures. The hang was fixed by preventing preview-mode `MainForm` instances from starting the live Discord reconnect monitor; the user-owned KiWeave process was not touched.
+- The current-source UI preview harness completed successfully, including Settings top/bottom states, extensions, integrations, Privacy Center, Safe Mode, import review, editor preservation, and dropdown-bound checks. Native title-bar darkness is covered by the passing dark-title test; offscreen `DrawToBitmap` previews can still show the Windows non-client caption fallback.
 - No public version, tag, release package, or checksum was changed.
 
 ## Safe Mode and recovery local build, October 2, 2026
