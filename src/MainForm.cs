@@ -130,7 +130,6 @@ namespace FunctionRowRemapper
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
-            DiscordIntegration.Start(NetworkPolicy.Enabled);
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
@@ -146,6 +145,7 @@ namespace FunctionRowRemapper
                 loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; experimentalFeatures.Checked = featureFlags.ExperimentalEnabled; developerMode.Checked = featureFlags.DeveloperMode; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = Startup.Enabled;
                 Text = "KiWeave - Design preview"; hideToTray.Enabled = false; status.Text = "Editor preview"; loading = false; return;
             }
+            DiscordIntegration.Start(NetworkPolicy.Enabled);
             try {
                 engine = new KeyboardEngine(RequestProfileActivation);
                 engine.Error += message => Ui(delegate { AppLog.Record("Mapped action failed"); if (notificationPreferences.Safety && notificationPreferences.AllowsWarning) SetFeedback(message, true); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(4000, "Action could not run", message, ToolTipIcon.Warning); });
