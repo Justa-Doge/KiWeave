@@ -4,6 +4,7 @@
 
 - Added an opt-in Smooth scrolling setting for long KiWeave panels, with bounded animation that stops cleanly at the real top and bottom.
 - Collapsed advanced Settings controls behind a Show advanced settings disclosure so the common controls are easier to scan without removing any options.
+- Renamed the Settings entry point from “Offline guide” to the simpler “Guide”; the guide remains fully local and offline.
 - Preserved backward-compatible preferences migration and added regression coverage for the new setting.
 
 ## 1.0.0-beta.2.5
