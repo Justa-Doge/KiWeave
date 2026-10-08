@@ -335,14 +335,25 @@ namespace FunctionRowRemapper
         bool layoutPending;
         bool hidePending;
         int laidOutWidth = -1, laidOutHeight = -1;
+        int targetOffset;
+        System.Windows.Forms.Timer smoothTimer;
+
+        internal static bool SmoothScrollingEnabled { get; set; }
 
         internal int ScrollOffset { get { return -AutoScrollPosition.Y; } }
+        int MaxScrollOffset { get { return Math.Max(0, AutoScrollMinSize.Height - ClientSize.Height); } }
 
         internal DesignScrollPanel()
         {
             AutoScroll = true;
             BackColor = UiStyle.Surface;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && smoothTimer != null) { smoothTimer.Stop(); smoothTimer.Dispose(); smoothTimer = null; }
+            base.Dispose(disposing);
         }
 
         protected override void OnControlAdded(ControlEventArgs e)
@@ -424,6 +435,13 @@ namespace FunctionRowRemapper
             else if (e.KeyCode == Keys.End) ScrollToBottom();
         }
 
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            if (!SmoothScrollingEnabled) { base.OnMouseWheel(e); return; }
+            int step = Math.Max(48, ClientSize.Height / 3);
+            AnimateTo(ScrollOffset - Math.Sign(e.Delta) * step);
+        }
+
         internal void ScrollBy(int amount)
         {
             SetScrollOffset(ScrollOffset + amount);
@@ -437,8 +455,23 @@ namespace FunctionRowRemapper
 
         internal void SetScrollOffset(int value)
         {
-            AutoScrollPosition = new Point(0, Math.Max(0, value));
+            targetOffset = Math.Max(0, Math.Min(MaxScrollOffset, value));
+            AutoScrollPosition = new Point(0, targetOffset);
             Invalidate(true);
+        }
+
+        void AnimateTo(int value)
+        {
+            targetOffset = Math.Max(0, Math.Min(MaxScrollOffset, value));
+            if (smoothTimer == null) {
+                smoothTimer = new System.Windows.Forms.Timer { Interval = 15 };
+                smoothTimer.Tick += delegate {
+                    int current = ScrollOffset, distance = targetOffset - current;
+                    if (Math.Abs(distance) <= 2) { SetScrollOffset(targetOffset); smoothTimer.Stop(); return; }
+                    SetScrollOffset(current + distance / 3);
+                };
+            }
+            smoothTimer.Start();
         }
 
         internal void EnableKeyboardFocus()

@@ -65,7 +65,7 @@ namespace FunctionRowRemapper
         readonly ComboBox customKind = new ComboBox(), customMedia = new ComboBox();
         readonly List<SequenceStep> sequenceSteps = new List<SequenceStep>();
         Button customBrowse;
-        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), gameMode = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
+        readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), gameMode = new DesignCheckBox(), smoothScrolling = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly ComboBox updateChannel = new DesignComboBox();
@@ -130,6 +130,7 @@ namespace FunctionRowRemapper
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
+            DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling;
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
@@ -771,7 +772,7 @@ namespace FunctionRowRemapper
         }
         UserPreferences NewPreferencesFromUi()
         {
-            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value };
+            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value, SmoothScrolling = smoothScrolling.Checked };
         }
         void ToggleBackgroundPreference(object sender, EventArgs e)
         {
@@ -782,6 +783,7 @@ namespace FunctionRowRemapper
             }
             try {
                 UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next;
+                DesignScrollPanel.SmoothScrollingEnabled = next.SmoothScrolling;
                 NetworkPolicy.Enabled = next.NetworkAccess;
                 DiscordIntegration.SetNetworkAccess(NetworkPolicy.Enabled);
                 checkUpdates.Enabled = next.NetworkAccess;
@@ -931,7 +933,7 @@ namespace FunctionRowRemapper
         }
         void ApplyRestoredBackup(KeyWeaveBackup backup)
         {
-            saved = backup.Configuration.Copy(); draft = saved.Copy(); profiles = backup.Profiles.Copy(); preferences = new UserPreferences { UseTray = backup.Preferences.UseTray, CheckUpdates = backup.Preferences.CheckUpdates, AutomaticProfiles = backup.Preferences.AutomaticProfiles, NetworkAccess = backup.Preferences.NetworkAccess, Theme = backup.Preferences.Theme, CustomAccent = backup.Preferences.CustomAccent, HistoryRetention = backup.Preferences.HistoryRetention }; UiStyle.ApplyTheme(preferences.Theme); UiStyle.ApplyAccent(preferences.CustomAccent); NetworkPolicy.Enabled = preferences.NetworkAccess; currentProfile = "Default"; automaticProfileActive = false; pinnedProfile = ""; automaticProfileProcess = ""; profileReason = "Restored backup selected the Default profile."; selectedLayer = -1; customSelected = -1;
+            saved = backup.Configuration.Copy(); draft = saved.Copy(); profiles = backup.Profiles.Copy(); preferences = new UserPreferences { UseTray = backup.Preferences.UseTray, CheckUpdates = backup.Preferences.CheckUpdates, AutomaticProfiles = backup.Preferences.AutomaticProfiles, NetworkAccess = backup.Preferences.NetworkAccess, Theme = backup.Preferences.Theme, CustomAccent = backup.Preferences.CustomAccent, HistoryRetention = backup.Preferences.HistoryRetention, SmoothScrolling = backup.Preferences.SmoothScrolling }; UiStyle.ApplyTheme(preferences.Theme); UiStyle.ApplyAccent(preferences.CustomAccent); NetworkPolicy.Enabled = preferences.NetworkAccess; DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling; currentProfile = "Default"; automaticProfileActive = false; pinnedProfile = ""; automaticProfileProcess = ""; profileReason = "Restored backup selected the Default profile."; selectedLayer = -1; customSelected = -1;
             if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = backup.StartWithWindows; loading = false;

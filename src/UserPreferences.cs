@@ -15,6 +15,7 @@ namespace FunctionRowRemapper
         public string Theme = "KiWeave Dark";
         public string CustomAccent = "";
         public int HistoryRetention = 20;
+        public bool SmoothScrolling = false;
         public static string DefaultPath { get { return Path.Combine(Path.GetDirectoryName(ConfigStore.DefaultPath), "preferences.json"); } }
         public static UserPreferences Parse(string json)
         {
@@ -47,24 +48,25 @@ namespace FunctionRowRemapper
                 if (!(d["customAccent"] is string) || ((string)d["customAccent"]).Length > 7 || ((string)d["customAccent"]).Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch((string)d["customAccent"], "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException("Invalid custom accent color.");
                 return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"] };
             }
-            if (version != 6 || d.Count != 8 || !d.ContainsKey("useTray") || !d.ContainsKey("checkUpdates") || !d.ContainsKey("automaticProfiles") || !d.ContainsKey("networkAccess") || !d.ContainsKey("theme") || !d.ContainsKey("customAccent") || !d.ContainsKey("historyRetention") ||
-                !(d["useTray"] is bool) || !(d["checkUpdates"] is bool) || !(d["automaticProfiles"] is bool) || !(d["networkAccess"] is bool) || !(d["historyRetention"] is int) || (int)d["historyRetention"] < 5 || (int)d["historyRetention"] > 100)
-                throw new ArgumentException("Invalid preferences. Expected version 6 settings.");
+            if ((version != 6 && version != 7) || d.Count != (version == 7 ? 9 : 8) || !d.ContainsKey("useTray") || !d.ContainsKey("checkUpdates") || !d.ContainsKey("automaticProfiles") || !d.ContainsKey("networkAccess") || !d.ContainsKey("theme") || !d.ContainsKey("customAccent") || !d.ContainsKey("historyRetention") || (version == 7 && !d.ContainsKey("smoothScrolling")) ||
+                !(d["useTray"] is bool) || !(d["checkUpdates"] is bool) || !(d["automaticProfiles"] is bool) || !(d["networkAccess"] is bool) || !(d["historyRetention"] is int) || (int)d["historyRetention"] < 5 || (int)d["historyRetention"] > 100 || (version == 7 && !(d["smoothScrolling"] is bool)))
+                throw new ArgumentException("Invalid preferences. Expected version 6 or 7 settings.");
             if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
             if (!(d["customAccent"] is string) || ((string)d["customAccent"]).Length > 7 || ((string)d["customAccent"]).Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch((string)d["customAccent"], "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException("Invalid custom accent color.");
-            return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"], HistoryRetention = (int)d["historyRetention"] };
+            return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"], HistoryRetention = (int)d["historyRetention"], SmoothScrolling = version == 7 && (bool)d["smoothScrolling"] };
         }
         public static string Serialize(UserPreferences preferences)
         {
             if (preferences == null) throw new ArgumentNullException("preferences");
             if (preferences.HistoryRetention < 5 || preferences.HistoryRetention > 100) throw new ArgumentException("History retention must be between 5 and 100 snapshots.");
-            return "{\r\n  \"version\": 6,\r\n  \"useTray\": " + (preferences.UseTray ? "true" : "false") +
+            return "{\r\n  \"version\": 7,\r\n  \"useTray\": " + (preferences.UseTray ? "true" : "false") +
                 ",\r\n  \"checkUpdates\": " + (preferences.CheckUpdates ? "true" : "false") +
                 ",\r\n  \"automaticProfiles\": " + (preferences.AutomaticProfiles ? "true" : "false") +
                 ",\r\n  \"networkAccess\": " + (preferences.NetworkAccess ? "true" : "false") +
                 ",\r\n  \"theme\": \"" + (preferences.Theme ?? "KiWeave Dark").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"" +
                 ",\r\n  \"customAccent\": \"" + (preferences.CustomAccent ?? "") + "\"" +
-                ",\r\n  \"historyRetention\": " + preferences.HistoryRetention + "\r\n}\r\n";
+                ",\r\n  \"historyRetention\": " + preferences.HistoryRetention +
+                ",\r\n  \"smoothScrolling\": " + (preferences.SmoothScrolling ? "true" : "false") + "\r\n}\r\n";
         }
         public static UserPreferences Load(string path)
         {

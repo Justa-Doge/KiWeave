@@ -1,5 +1,14 @@
 # Verification report
 
+## Settings cleanup and smooth scrolling, October 7, 2026
+
+- Added the opt-in Smooth scrolling preference and clamped its animation target to the measured scroll range so repeated wheel input cannot stall at either edge.
+- Reduced Settings clutter by keeping everyday controls visible and moving safety, notification, update-channel, and history-retention controls behind Show advanced settings.
+- `bin-smooth-scroll-settings-final\\KiWeave.exe` and its uninstaller compile successfully.
+- The full local suite passes **140 checks with zero failures**, including preference v7 round-trip and v6 migration coverage.
+- The UI preview harness completed successfully and the Settings top/bottom renders were visually inspected; no new clipping or blank-band defects were found.
+- No mappings, public version, tag, release package, or checksum were changed.
+
 ## Release-readiness cleanup, October 7, 2026
 
 - Removed duplicate **About KiWeave** and **Open log folder** entries from the global **More** menu; both remain available in Settings.

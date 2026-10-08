@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.3 (local development, October 7, 2026)
+
+- Added an opt-in Smooth scrolling setting for long KiWeave panels, with bounded animation that stops cleanly at the real top and bottom.
+- Collapsed advanced Settings controls behind a Show advanced settings disclosure so the common controls are easier to scan without removing any options.
+- Preserved backward-compatible preferences migration and added regression coverage for the new setting.
+
 ## 1.0.0-beta.2.5
 
 - Applied the dark native theme consistently to list, text, combo, and scrollable controls so scrollbars match KiWeave's dark panels.
