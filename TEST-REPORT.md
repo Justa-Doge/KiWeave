@@ -1,5 +1,12 @@
 # Verification report
 
+## Release-readiness cleanup, October 7, 2026
+
+- Removed duplicate **About KiWeave** and **Open log folder** entries from the global **More** menu; both remain available in Settings.
+- `bin-release-cleanup-compile\\KiWeave.exe` and its uninstaller compile successfully with the current source and no compiler diagnostics.
+- The most recent completed full local build remains `bin-diff-fix-final`, with 139 checks passing. A later full build attempt entered the native-hook runner without producing output and was stopped; the user-owned KiWeave process was not touched.
+- No public version, tag, release package, or checksum was changed.
+
 ## Safe Mode and recovery local build, October 2, 2026
 
 The non-hook suite passes 89 checks with zero failures and the real Windows-hook suite passes 7 checks with zero failures. New checks cover explicit `--safe-mode`, Shift-at-launch, the deliberate normal-restart override, forced network blocking, absence-of-hook/hotkey diagnostics, redaction of local paths and account identity, and dark-title consistency. Existing action, conditional, privacy, history, backup, profile, layer, and dispatcher coverage remains green.
