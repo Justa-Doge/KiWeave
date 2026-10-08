@@ -8,6 +8,7 @@
 - The full local suite passes **140 checks with zero failures**, including preference v7 round-trip and v6 migration coverage.
 - The UI preview harness completed successfully and the Settings top/bottom renders were visually inspected; no new clipping or blank-band defects were found.
 - The Settings help entry now presents as **Guide** while retaining the same offline documentation behavior.
+- The live inspection exposed a nested-scroll offset/hit-region defect; the source fix was rebuilt and the full suite plus UI preview harness passed. Installation was intentionally deferred when Computer Use detected user input.
 - No mappings, public version, tag, release package, or checksum were changed.
 
 ## Release-readiness cleanup, October 7, 2026

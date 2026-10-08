@@ -331,23 +331,23 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll")]
         static extern bool ShowScrollBar(IntPtr hwnd, int bar, bool show);
         Control content;
+        int offset;
         bool layingOut;
-        bool layoutPending;
-        bool hidePending;
-        int laidOutWidth = -1, laidOutHeight = -1;
         int targetOffset;
         System.Windows.Forms.Timer smoothTimer;
 
         internal static bool SmoothScrollingEnabled { get; set; }
 
-        internal int ScrollOffset { get { return -AutoScrollPosition.Y; } }
-        int MaxScrollOffset { get { return Math.Max(0, AutoScrollMinSize.Height - ClientSize.Height); } }
+        internal int ScrollOffset { get { return offset; } }
+        int MaxScrollOffset { get { return Math.Max(0, (content == null ? 0 : content.Height) + Padding.Vertical - ClientSize.Height); } }
 
         internal DesignScrollPanel()
         {
-            AutoScroll = true;
+            AutoScroll = false;
             BackColor = UiStyle.Surface;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+            ControlAdded += delegate(object sender, ControlEventArgs e) { AttachWheel(e.Control); LayoutContent(); };
+            ControlRemoved += delegate { LayoutContent(); };
         }
 
         protected override void Dispose(bool disposing)
@@ -360,12 +360,12 @@ namespace FunctionRowRemapper
         {
             base.OnControlAdded(e);
             if (content == null) content = e.Control;
+            AttachWheel(e.Control);
         }
 
         protected override void OnLayout(LayoutEventArgs e)
         {
-            base.OnLayout(e);
-            if (!layingOut) QueueLayout();
+            if (!layingOut) LayoutContent();
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -373,17 +373,7 @@ namespace FunctionRowRemapper
             base.OnHandleCreated(e);
             try { SetWindowTheme(Handle, "DarkMode_Explorer", null); } catch { }
             try { ShowScrollBar(Handle, 3, false); } catch { }
-            QueueLayout();
-        }
-
-        void QueueLayout()
-        {
-            if (layingOut || IsDisposed) return;
-            if (!IsHandleCreated) { LayoutContent(); return; }
-            if (layoutPending) return;
-            layoutPending = true;
-            try { BeginInvoke((MethodInvoker)delegate { layoutPending = false; LayoutContent(); }); }
-            catch (InvalidOperationException) { layoutPending = false; }
+            LayoutContent();
         }
 
         void LayoutContent()
@@ -394,30 +384,34 @@ namespace FunctionRowRemapper
             {
                 if (content == null || content.IsDisposed) return;
                 content.Dock = DockStyle.None;
-                // ClientSize.Width shrinks when the native vertical bar appears.
-                // Measuring wrapped content from that changing value creates a
-                // scrollbar/layout feedback loop. The outer width is stable.
-                int width = Math.Max(1, Width - Padding.Horizontal - 1);
-                content.MinimumSize = new Size(width, 0);
-                content.MaximumSize = new Size(width, 0);
+                int width = Math.Max(1, ClientSize.Width - Padding.Horizontal);
                 int height = Math.Max(ClientSize.Height, content.GetPreferredSize(new Size(width, 0)).Height);
-                if (width == laidOutWidth && height == laidOutHeight && AutoScrollMinSize.Height == height + Padding.Vertical) return;
-                int previousOffset = -AutoScrollPosition.Y;
-                content.SetBounds(Padding.Left, Padding.Top, width, height);
-                AutoScrollMinSize = new Size(0, height + Padding.Vertical);
-                laidOutWidth = width; laidOutHeight = height;
-                if (previousOffset > 0) AutoScrollPosition = new Point(0, previousOffset);
-                QueueScrollbarHide();
+                offset = Math.Max(0, Math.Min(offset, Math.Max(0, height + Padding.Vertical - ClientSize.Height)));
+                content.SetBounds(Padding.Left, Padding.Top - offset, width, height);
             }
             finally { layingOut = false; }
         }
 
-        void QueueScrollbarHide()
+        void AttachWheel(Control control)
         {
-            if (!IsHandleCreated || hidePending || IsDisposed) return;
-            hidePending = true;
-            try { BeginInvoke((MethodInvoker)delegate { hidePending = false; try { ShowScrollBar(Handle, 3, false); } catch { } }); }
-            catch (InvalidOperationException) { hidePending = false; }
+            if (control == null) return;
+            control.MouseWheel -= ChildMouseWheel;
+            control.MouseWheel += ChildMouseWheel;
+            foreach (Control child in control.Controls) AttachWheel(child);
+            control.ControlAdded -= ChildControlAdded;
+            control.ControlAdded += ChildControlAdded;
+        }
+
+        void ChildControlAdded(object sender, ControlEventArgs e)
+        {
+            AttachWheel(e.Control);
+            LayoutContent();
+        }
+
+        void ChildMouseWheel(object sender, MouseEventArgs e)
+        {
+            if (SmoothScrollingEnabled) AnimateTo(offset - Math.Sign(e.Delta) * Math.Max(48, ClientSize.Height / 3));
+            else ScrollBy(-(e.Delta / 3));
         }
 
         protected override bool IsInputKey(Keys keyData)
@@ -437,9 +431,8 @@ namespace FunctionRowRemapper
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            if (!SmoothScrollingEnabled) { base.OnMouseWheel(e); return; }
-            int step = Math.Max(48, ClientSize.Height / 3);
-            AnimateTo(ScrollOffset - Math.Sign(e.Delta) * step);
+            base.OnMouseWheel(e);
+            ChildMouseWheel(this, e);
         }
 
         internal void ScrollBy(int amount)
@@ -455,9 +448,12 @@ namespace FunctionRowRemapper
 
         internal void SetScrollOffset(int value)
         {
-            targetOffset = Math.Max(0, Math.Min(MaxScrollOffset, value));
-            AutoScrollPosition = new Point(0, targetOffset);
+            offset = Math.Max(0, Math.Min(MaxScrollOffset, value));
+            targetOffset = offset;
+            LayoutContent();
             Invalidate(true);
+            if (content != null) { content.Invalidate(true); content.Update(); }
+            Update();
         }
 
         void AnimateTo(int value)
