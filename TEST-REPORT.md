@@ -9,6 +9,7 @@
 - The UI preview harness completed successfully and the Settings top/bottom renders were visually inspected; no new clipping or blank-band defects were found.
 - The Settings help entry now presents as **Guide** while retaining the same offline documentation behavior.
 - The live inspection exposed a nested-scroll offset/hit-region defect; the source fix was rebuilt and the full suite plus UI preview harness passed. Installation was intentionally deferred when Computer Use detected user input.
+- Settings now has one Guide entry instead of separate Welcome guide and Guide buttons; the merged guide includes a Getting started topic. The 140-check build remains green.
 - No mappings, public version, tag, release package, or checksum were changed.
 
 ## Release-readiness cleanup, October 7, 2026

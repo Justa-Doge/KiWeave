@@ -6,6 +6,7 @@
 - Collapsed advanced Settings controls behind a Show advanced settings disclosure so the common controls are easier to scan without removing any options.
 - Renamed the Settings entry point from “Offline guide” to the simpler “Guide”; the guide remains fully local and offline.
 - Repaired the shared scroll panel to use a bounded manual content offset, avoiding the live nested-scroll blank-space and hit-region drift seen in Settings.
+- Merged the separate Welcome guide entry into the single Guide entry and added its setup walkthrough as a searchable Getting started topic; first-run auto-welcome remains unchanged.
 - Preserved backward-compatible preferences migration and added regression coverage for the new setting.
 
 ## 1.0.0-beta.2.5

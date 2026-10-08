@@ -238,7 +238,6 @@ namespace FunctionRowRemapper
             backup.Controls.Add(UiStyle.Field("History snapshots", historyRetention)); right.Controls.Add(backup);
             AddSettingsSection(right, "Inspect and troubleshoot");
             var help = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
-            help.Controls.Add(UiStyle.Button("Welcome guide", delegate { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); }));
             help.Controls.Add(UiStyle.Button("Guide", delegate { using (var guide = new DocumentationForm()) guide.ShowDialog(this); }));
             help.Controls.Add(UiStyle.Button("Privacy center", delegate { OpenPrivacyCenter(); }));
             help.Controls.Add(UiStyle.Button("Find mappings", delegate { OpenMappingSearch(); }));

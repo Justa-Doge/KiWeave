@@ -10,6 +10,7 @@ namespace FunctionRowRemapper
         readonly TextBox search = new DesignTextBox();
         readonly RichTextBox text = new RichTextBox();
         readonly string[] topics = {
+            "Getting started|Choose a function key or create a global hotkey, test the action, then save it. Build profiles for games or apps as your setup grows. Shortcuts start paused until you enable them.",
             "Function keys|F1-F12 mappings run through the low-level keyboard hook. Pass through leaves the key unchanged; Unbound consumes it without an action.",
             "Custom hotkeys|Global hotkeys require Ctrl, Alt, Shift, or Win. Capture records only the combination being reviewed and never keeps a key history.",
             "Modifier layers|Hold the configured layer key while pressing a function key. Release pairing is preserved and layers remain local to KiWeave.",
