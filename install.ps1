@@ -32,16 +32,40 @@ function Invoke-KiWeaveChecker([string]$argument) {
         Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
     }
 }
+function Get-KiWeaveStateText {
+    $processes = @(@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue) + @(Get-Process -Name FunctionRowRemapper -ErrorAction SilentlyContinue))
+    if ($processes.Count -eq 0) { return 'KiWeave is not running.' }
+    if (-not ('KiWeaveInstaller.NativeWindow' -as [type])) {
+        Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+namespace KiWeaveInstaller { public static class NativeWindow {
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+} }
+"@
+    }
+    $foreground = [KiWeaveInstaller.NativeWindow]::GetForegroundWindow(); [uint32]$foregroundPid = 0; [KiWeaveInstaller.NativeWindow]::GetWindowThreadProcessId($foreground, [ref]$foregroundPid) | Out-Null
+    $frontmost = $false; $dirty = $false
+    foreach ($process in $processes) {
+        if ($process.Id -eq $foregroundPid) { $frontmost = $true }
+        if ([string]$process.MainWindowTitle -match '\*') { $dirty = $true }
+    }
+    if ($frontmost -and $dirty) { return 'KiWeave is open and frontmost with unsaved changes.' }
+    if ($frontmost) { return 'KiWeave is open and frontmost with no unsaved changes.' }
+    if ($dirty) { return 'KiWeave is open but not frontmost with unsaved changes.' }
+    return 'KiWeave is open but not frontmost with no unsaved changes.'
+}
 $running = @(@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue) + @(Get-Process -Name FunctionRowRemapper -ErrorAction SilentlyContinue))
 if ($running.Count -gt 0) {
     $localCheckerMarker = Join-Path $sourceDir 'KiWeave.LocalOnly'
     if (-not (Test-Path -LiteralPath $localCheckerMarker -PathType Leaf)) { throw 'KiWeave is running. Exit the visible app or tray copy before installing a public build.' }
     $state = Invoke-KiWeaveChecker '--inspect-state'
-    if ($state.ExitCode -ne 0) { $stateText = [string]$state.Output; $stateError = [string]$state.Error; throw ('KiWeave is running but is not safe to close automatically. ' + $stateText + ' ' + $stateError) }
+    if ($state.ExitCode -ne 0) { $stateText = [string]$state.Output; $stateError = [string]$state.Error; throw ((Get-KiWeaveStateText) + ' The private checker refused the update. ' + $stateText + ' ' + $stateError) }
     $close = Invoke-KiWeaveChecker '--exit-for-update'
     if ($close.ExitCode -ne 0) { $closeText = [string]$close.Output; $closeError = [string]$close.Error; throw ('KiWeave did not close cleanly for the update. ' + $closeText + ' ' + $closeError) }
     Start-Sleep -Milliseconds 250
-    if (@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue).Count -gt 0) { throw 'KiWeave is still running after the clean-close request.' }
+    if (@(Get-Process -Name KiWeave -ErrorAction SilentlyContinue).Count -gt 0) { throw ((Get-KiWeaveStateText) + ' It remained running after the clean-close request.') }
 }
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 if (Test-Path -LiteralPath $installedExe) { Copy-Item -LiteralPath $installedExe -Destination (Join-Path $installDir 'KiWeave.previous.exe') -Force }

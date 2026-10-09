@@ -296,6 +296,7 @@ namespace FunctionRowRemapper
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
             connect = UiStyle.Button("Connect Discord", delegate { Connect(owner); }, true); buttons.Controls.Add(connect);
             forget = UiStyle.Button("Forget authorization", delegate { DiscordIntegration.ForgetAuthorization(); status.Text = DiscordIntegration.Status; forget.Enabled = DiscordIntegration.HasAuthorization; }, false); forget.Enabled = DiscordIntegration.HasAuthorization; buttons.Controls.Add(forget);
+            buttons.Controls.Add(UiStyle.Button("Discord setup guide", delegate { DocumentationForm.OpenDiscordSetupGuide(this); }, false));
             root.Controls.Add(buttons); root.Controls.Add(UiStyle.Text("Authorization is encrypted for this Windows account and reused across KiWeave launches. Beta voice control may remain unavailable until the KiWeave Discord app is public/approved.", 8.5f, false));
         }
         async void Connect(IWin32Window owner)
