@@ -125,10 +125,18 @@ namespace FunctionRowRemapper
 
         internal static bool TryToggleVoice(string field)
         {
+            bool state; return TryToggleVoice(field, out state);
+        }
+
+        internal static bool TryToggleVoice(string field, out bool enabled)
+        {
+            enabled = false;
             lock (Gate) {
-                if (!Connected && !String.IsNullOrEmpty(accessToken)) ReconnectLocked(250);
+                // Never make a hotkey wait on reconnect attempts. The background monitor
+                // owns reconnects; an unavailable IPC session falls back immediately to
+                // Discord's normal keyboard shortcut path.
                 if (!Connected) return false;
-                try { client.ToggleVoice(field); return true; } catch { return false; }
+                try { enabled = client.ToggleVoice(field); return true; } catch { return false; }
             }
         }
 
@@ -226,7 +234,7 @@ namespace FunctionRowRemapper
             var args = new Dictionary<string, object>(); args[field] = value;
             Send(1, json.Serialize(new Dictionary<string, object> { { "cmd", "SET_VOICE_SETTINGS" }, { "nonce", NextNonce() }, { "args", args } })); Read();
         }
-        internal void ToggleVoice(string field)
+        internal bool ToggleVoice(string field)
         {
             bool current;
             if (field == "mute" && muteState.HasValue) current = muteState.Value;
@@ -235,6 +243,7 @@ namespace FunctionRowRemapper
             SetVoice(field, !current);
             if (field == "mute") muteState = !current;
             if (field == "deaf") deafState = !current;
+            return !current;
         }
         void RefreshVoiceState()
         {
@@ -257,7 +266,17 @@ namespace FunctionRowRemapper
         Dictionary<string, object> Read()
         {
             byte[] header = ReadExact(8); int opcode = BitConverter.ToInt32(header, 0); int length = BitConverter.ToInt32(header, 4); if (length < 0 || length > 1024 * 1024) throw new InvalidOperationException("Discord returned an invalid RPC frame.");
-            var data = json.DeserializeObject(Encoding.UTF8.GetString(ReadExact(length))) as Dictionary<string, object>; if (data != null && data.ContainsKey("evt") && (data["evt"] as string) == "ERROR") throw new InvalidOperationException("Discord rejected the RPC request."); return data;
+            var data = json.DeserializeObject(Encoding.UTF8.GetString(ReadExact(length))) as Dictionary<string, object>;
+            if (data != null && data.ContainsKey("evt") && (data["evt"] as string) == "ERROR") {
+                string detail = ""; object error;
+                if (data.TryGetValue("data", out error) && error is Dictionary<string, object>) {
+                    var errorData = (Dictionary<string, object>)error; object message; object code;
+                    if (errorData.TryGetValue("message", out message) && message != null) detail = message.ToString();
+                    if (errorData.TryGetValue("code", out code) && code != null) detail += (detail.Length == 0 ? "" : " ") + "(code " + code + ")";
+                }
+                throw new InvalidOperationException("Discord rejected the RPC request." + (detail.Length == 0 ? "" : " " + detail));
+            }
+            return data;
         }
         byte[] ReadExact(int length)
         {

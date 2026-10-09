@@ -67,6 +67,7 @@ namespace FunctionRowRemapper
         Button customBrowse;
         readonly CheckBox enabled = new DesignToggle(), startup = new DesignCheckBox(), useTray = new DesignCheckBox(), checkUpdates = new DesignCheckBox(), automaticProfiles = new DesignCheckBox(), networkAccess = new DesignCheckBox(), experimentalFeatures = new DesignCheckBox(), developerMode = new DesignCheckBox(), gameMode = new DesignCheckBox(), smoothScrolling = new DesignCheckBox(), notifyUpdates = new DesignCheckBox(), notifyHealth = new DesignCheckBox(), notifySafety = new DesignCheckBox();
         readonly ComboBox themeChoice = new DesignComboBox();
+        readonly ComboBox toastStyleChoice = new DesignComboBox();
         readonly ComboBox notificationSeverity = new DesignComboBox();
         readonly ComboBox updateChannel = new DesignComboBox();
         readonly ComboBox languageChoice = new DesignComboBox();
@@ -120,6 +121,7 @@ namespace FunctionRowRemapper
             Text = "KiWeave"; Font = new Font("Segoe UI", 10F); ForeColor = ink; BackColor = UiStyle.Canvas;
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(1200, 900); MinimumSize = new Size(1200, 900); MaximumSize = new Size(1200, 900); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false; StartPosition = FormStartPosition.CenterScreen; DoubleBuffered = true;
             Icon = Program.AppIcon();
+            StatusOverlay.SetOwner(this);
             saved = new Configuration();
             try { preferences = UserPreferences.Load(UserPreferences.DefaultPath); }
             catch (Exception ex) { preferences = new UserPreferences { UseTray = false }; initialError = "Tray preference could not be loaded; the window will stay accessible. " + ex.Message; }
@@ -130,7 +132,7 @@ namespace FunctionRowRemapper
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
-            DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling;
+            DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling; StatusOverlay.Style = preferences.ToastStyle;
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
@@ -712,6 +714,7 @@ namespace FunctionRowRemapper
             }
             var keep = new HashSet<int>();
             for (int i = 0; i < config.CustomHotkeys.Length; i++) {
+                if (HotkeyChord.IsHardwareMediaShortcut(config.CustomHotkeys[i].Shortcut)) continue;
                 int id = 3000 + i; CustomHotkey old;
                 if (registeredHotkeys.TryGetValue(id, out old) && String.Equals(HotkeyChord.Normalize(old.Shortcut), HotkeyChord.Normalize(config.CustomHotkeys[i].Shortcut), StringComparison.OrdinalIgnoreCase)) {
                     registeredHotkeys[id] = config.CustomHotkeys[i].Copy(); keep.Add(id);
@@ -720,6 +723,7 @@ namespace FunctionRowRemapper
             foreach (int id in registeredHotkeys.Keys.ToArray()) if (!keep.Contains(id)) { Native.UnregisterHotKey(Handle, id); registeredHotkeys.Remove(id); }
             try {
                 for (int i = 0; i < config.CustomHotkeys.Length; i++) {
+                    if (HotkeyChord.IsHardwareMediaShortcut(config.CustomHotkeys[i].Shortcut)) continue;
                     int id = 3000 + i; if (keep.Contains(id)) continue;
                     HotkeyChord chord = HotkeyChord.Parse(config.CustomHotkeys[i].Shortcut);
                     if (!Native.RegisterHotKey(Handle, id, (uint)(chord.Modifiers | HotkeyChord.NoRepeat), (uint)chord.Key)) {
@@ -772,7 +776,7 @@ namespace FunctionRowRemapper
         }
         UserPreferences NewPreferencesFromUi()
         {
-            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value, SmoothScrolling = smoothScrolling.Checked };
+            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value, SmoothScrolling = smoothScrolling.Checked, ToastStyle = toastStyleChoice.SelectedItem == null ? preferences.ToastStyle : toastStyleChoice.SelectedItem.ToString() };
         }
         void ToggleBackgroundPreference(object sender, EventArgs e)
         {
@@ -782,7 +786,7 @@ namespace FunctionRowRemapper
                 loading = true; networkAccess.Checked = preferences.NetworkAccess; loading = false; SetFeedback("Administrator approval is required to change the master network switch.", true); return;
             }
             try {
-                UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next;
+                UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next; StatusOverlay.Style = next.ToastStyle;
                 DesignScrollPanel.SmoothScrollingEnabled = next.SmoothScrolling;
                 NetworkPolicy.Enabled = next.NetworkAccess;
                 DiscordIntegration.SetNetworkAccess(NetworkPolicy.Enabled);
@@ -794,6 +798,13 @@ namespace FunctionRowRemapper
                 loading = true; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; loading = false;
                 SetFeedback("Could not save settings: " + ex.Message, true);
             }
+        }
+        void ToggleToastStyle(object sender, EventArgs e)
+        {
+            if (loading || isPreview || toastStyleChoice.SelectedItem == null) return;
+            var next = NewPreferencesFromUi();
+            try { UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next; StatusOverlay.Style = next.ToastStyle; SetFeedback("Toast style set to " + next.ToastStyle + ".", false); }
+            catch (Exception ex) { loading = true; toastStyleChoice.SelectedItem = preferences.ToastStyle; loading = false; SetFeedback("Toast style could not be saved: " + ex.Message, true); }
         }
         void ToggleFeatureFlag(object sender, EventArgs e)
         {
@@ -874,6 +885,14 @@ namespace FunctionRowRemapper
             });
         }
         void ShowSettings() { Show(); WindowState = FormWindowState.Normal; Activate(); CheckMissingTargets(); }
+        void OpenPrivateUiEditor()
+        {
+            try {
+                Type editorType = System.Reflection.Assembly.GetExecutingAssembly().GetType("FunctionRowRemapper.PrivateUiEditorForm", false);
+                if (editorType == null) { SetFeedback("The private UI editor is available only in the local debug build.", true); return; }
+                using (var editor = (Form)Activator.CreateInstance(editorType, new object[] { this, this })) editor.ShowDialog(this);
+            } catch (Exception ex) { SetFeedback("Private UI editor could not open: " + ex.Message, true); }
+        }
         void UpdateStatus()
         {
             bool active = engine != null && engine.Installed;

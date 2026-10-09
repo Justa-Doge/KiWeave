@@ -206,6 +206,7 @@ namespace FunctionRowRemapper
             AddSetting(left, networkAccess, "Allow network access", "Administrator approval is required. Master switch for GitHub update checks and user-triggered HTTP actions; local remapping stays available when off.", ToggleBackgroundPreference);
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
             smoothScrolling.Checked = preferences.SmoothScrolling; AddSetting(left, smoothScrolling, "Smooth scrolling", "Animate long panels instead of jumping between scroll positions.", ToggleBackgroundPreference);
+            toastStyleChoice.Items.Clear(); toastStyleChoice.Items.AddRange(new object[] { "KiWeave", "Compact flyout" }); toastStyleChoice.SelectedItem = preferences.ToastStyle; UiStyle.Combo(toastStyleChoice); toastStyleChoice.SelectedIndexChanged += ToggleToastStyle; left.Controls.Add(UiStyle.Field("Toast style", toastStyleChoice));
             var advanced = UiStyle.Stack(); advanced.Visible = false;
             Button advancedToggle = null; advancedToggle = UiStyle.Button("Show advanced settings", delegate { advanced.Visible = !advanced.Visible; advancedToggle.Text = advanced.Visible ? "Hide advanced settings" : "Show advanced settings"; left.PerformLayout(); generalScroll.PerformLayout(); }); advancedToggle.Margin = new Padding(0, 0, 0, 14); left.Controls.Add(advancedToggle);
             AddSettingsSection(advanced, "Safety and notifications");
@@ -265,6 +266,8 @@ namespace FunctionRowRemapper
             AddSettingsSection(right, "App controls");
             var appControls = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 12, 0, 12) };
             readOnlyButton = UiStyle.Button("Lock editing", delegate { ToggleReadOnlyMode(); }); appControls.Controls.Add(readOnlyButton);
+            appControls.Controls.Add(UiStyle.Button("Toast debug editor", delegate { StatusOverlay.ShowDebugMenu(this); }));
+            appControls.Controls.Add(UiStyle.Button("Private UI editor", delegate { OpenPrivateUiEditor(); }));
             appControls.Controls.Add(UiStyle.Button("Restart KiWeave", delegate { RestartApp(); }));
             var exit = UiStyle.Button("Exit KiWeave", delegate { ExitApp(); }); ((DesignButton)exit).Danger = true; appControls.Controls.Add(exit); right.Controls.Add(appControls);
 
@@ -433,7 +436,7 @@ namespace FunctionRowRemapper
             customEditorHost.Dock = DockStyle.Fill; right.Controls.Add(customEditorHost); customEmpty.Dock = DockStyle.Fill; right.Controls.Add(customEmpty);
             var scroll = new DesignScrollPanel { Dock = DockStyle.Fill }; customEditorHost.Controls.Add(scroll); customStack = UiStyle.Stack(); scroll.Controls.Add(customStack); scroll.SizeChanged += delegate { UiStyle.Wrap(customStack); };
             customShortcutRecord = UiStyle.Button("Record", delegate { RecordShortcut(customShortcut, true); });
-            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut (e.g. Ctrl+Alt+K)", PathRow(customShortcut, customShortcutRecord)));
+            customStack.Controls.Add(customTitle); customStack.Controls.Add(UiStyle.Field("Shortcut or media button", PathRow(customShortcut, customShortcutRecord)));
             customKind.Items.AddRange(Mapping.Labels); UiStyle.Combo(customSimpleKind); customSimpleKind.Items.AddRange(CustomGroups);
             customStack.Controls.Add(UiStyle.Field("Action category", customSimpleKind));
             customSimpleKind.SelectedIndexChanged += delegate { if (!loading) { loading = true; PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, null); loading = false; ApplyCustomChoice(); } };

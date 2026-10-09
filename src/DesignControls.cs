@@ -208,7 +208,8 @@ namespace FunctionRowRemapper
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.Clear(Design.Background(Parent)); var track = new Rectangle(0, (Height - 22) / 2, 40, 22);
-            Design.Box(e.Graphics, track, Checked ? UiStyle.AccentFill : UiStyle.Border, Checked ? UiStyle.AccentFill : UiStyle.Border, 11);
+            // Keep the disabled face neutral even when a custom accent makes the theme border purple.
+            Design.Box(e.Graphics, track, Checked ? UiStyle.AccentFill : UiStyle.Input, Checked ? UiStyle.AccentFill : UiStyle.Border, 11);
             e.Graphics.FillEllipse(Brushes.White, Checked ? 22 : 3, track.Y + 3, 16, 16);
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(50, 0, Width - 50, Height), UiStyle.Ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle);

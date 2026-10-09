@@ -1,6 +1,6 @@
 # KiWeave
 
-Current development build: **1.0.0-beta.3**. This is a beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
+Current development build: **1.0.0-beta.4**. This is a beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
 
 A Windows tray app for turning F1 through F12 and custom global hotkeys into personal actions, profiles, app integrations, and automations. Remapping works offline; an optional background check looks for newer versions on GitHub.
 
@@ -16,9 +16,9 @@ Copyright does not cover a general software idea. If KiWeave inspires a separate
 
 The interface uses a charcoal dark theme with purple accents, a sidebar for switching editors, rounded controls, and keycap-style mapping rows. Action labels use sentence case. The library and sequence windows share the same theme; standard Windows file/message dialogs still follow Windows' own appearance.
 
-The **Custom hotkeys** sidebar page also lets you assign up to 32 global Ctrl, Alt, Shift, or Win shortcuts to the same actions. It includes **Run a Python script** for a local `.py` file. Python runs with the signed-in Windows account only, never changes execution/security policy, and needs the normal Python launcher (`py.exe`) already installed.
+The **Custom hotkeys** sidebar page also lets you assign up to 32 global Ctrl, Alt, Shift, or Win shortcuts to the same actions. In the alpha build, a dedicated Volume up, Volume down, Mute, Play/pause, Next track, or Previous track hardware button can be assigned by itself, letting media-first keyboards trigger any KiWeave action. It includes **Run a Python script** for a local `.py` file. Python runs with the signed-in Windows account only, never changes execution/security policy, and needs the normal Python launcher (`py.exe`) already installed.
 
-Use **Record** beside a shortcut field to capture a key combination instead of typing its name. Capture exists only while the review dialog is open, suppresses the physical keys so the shortcut does not fire during recording, keeps no history, and writes no log. Nothing is applied until the exact captured combination is reviewed and accepted; custom global hotkeys still require Ctrl, Alt, Shift, or Win, and reserved security combinations are rejected.
+Use **Record** beside a shortcut field to capture a key combination or dedicated media button instead of typing its name. Capture exists only while the review dialog is open, suppresses the physical keys so the shortcut does not fire during recording, keeps no history, and writes no log. Nothing is applied until the exact captured input is reviewed and accepted; ordinary custom global hotkeys still require Ctrl, Alt, Shift, or Win, and reserved security combinations are rejected.
 
 Both editors start with a short category menu instead of a long raw action list. Choose Keyboard input, Media and sound, Open or run something, or Custom action, then select the specific action beneath it. Custom action includes ready-made lock, sleep, Explorer, Settings, Task Manager, clipboard history, screenshot, desktop, app-switching, editing, Calculator, sign-out, restart, and shut-down actions. System-changing presets only run if the assigned key is pressed.
 
@@ -48,7 +48,7 @@ Profiles can also be selected manually from the tray menu. The header badge and 
 
 ## Windows and app integrations
 
-The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 3 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
+The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 4 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
 
 **Call an HTTP endpoint** performs an eight-second GET when its body is empty or a JSON POST when a body is supplied. It is intended for local dashboards, webhooks, and Stream Deck-style tools. The URL cannot contain embedded credentials. HTTP actions contact the configured server only when their assigned key is pressed and the master network switch is on; KiWeave does not send them automatically.
 
@@ -131,14 +131,14 @@ Commands run with your account's permissions. Only use commands and shortcuts yo
 - A press already in progress keeps its original suppression decision through release. After disabling, release any held F key; new presses pass through. This avoids mismatched key-down/key-up events.
 - Windows volume up/down and DDC monitor adjustments repeat while held. All other actions, including shortcuts, key taps, launches, and mute, fire once per physical press. Sent shortcuts are complete down/up taps, not held keys or macros.
 - Held Ctrl/Alt/Shift/Win modifiers also apply to the destination action. The app does not release modifiers you are holding. For example, holding Shift while triggering a mapped A can produce uppercase A. Release a physically held destination key before triggering its mapping.
-- Synthetic input is ignored, including this app's output and other automation tools' injected function keys. This prevents recursive remapping. Only physical standard F1–F12 input is remapped in the production app.
+- Synthetic input is ignored, including this app's output and other automation tools' injected function or media keys. This prevents recursive remapping. Only physical standard F1–F12 input and explicitly assigned standard media buttons are remapped in the production app.
 - Disabling cancels pending queued actions; a process that already began launching may still open. The action queue is bounded; extremely rapid input can drop excess queued actions.
 
 ## Save, import, and export
 
 Configuration is human-readable JSON: version 1 for original actions, version 2 when it contains monitor actions, version 3 when it contains custom hotkeys, and version 4 when it contains modifier layers. All four versions import. It is stored at:
 
-Saving at least one custom hotkey uses version 3 and adds a `customHotkeys` section. Adding a modifier layer uses version 4 and adds a `layers` section while preserving the base mappings and custom hotkeys. A custom hotkey must include at least one modifier so ordinary typing cannot be captured. Windows-reserved or already-used combinations are reported when you save.
+Saving at least one custom hotkey uses version 3 and adds a `customHotkeys` section. Adding a modifier layer uses version 4 and adds a `layers` section while preserving the base mappings and custom hotkeys. An ordinary custom hotkey must include at least one modifier so ordinary typing cannot be captured; the six supported dedicated media buttons are the only unmodified inputs accepted. Windows-reserved or already-used combinations are reported when you save.
 
 `%LOCALAPPDATA%\KiWeave\config.json`
 
@@ -160,7 +160,7 @@ The value is the quoted executable path followed by `--tray`. Untick it to remov
 
 ## Windows and keyboard limitations
 
-The app captures standard Windows F1–F12 virtual-key events. Apple/Boot Camp keyboards and laptop Fn modes may generate media events instead, or handle brightness/media functions in firmware. Try Fn+F5 if plain F5 produces a hardware action. The app does not intercept dedicated media keys, change Fn mode, alter firmware, install drivers, or intercept actions handled entirely by keyboard firmware. It cannot reliably identify the source hardware when firmware handles an event entirely outside Windows.
+The app captures standard Windows F1–F12 virtual-key events and the six standard Windows volume/playback virtual keys. Apple/Boot Camp keyboards and laptop Fn modes may generate those media events instead of F-keys; assign the observed media button under **Custom hotkeys** to repurpose it. KiWeave does not change Fn mode, alter firmware, install drivers, intercept brightness controls, or intercept actions handled entirely by keyboard firmware. It cannot reliably identify the source hardware when firmware handles an event entirely outside Windows.
 
 Windows integrity boundaries can block a normal-privilege remapper from sending input into elevated apps. UAC secure-desktop prompts and Ctrl+Alt+Delete are outside its scope. Games, anti-cheat systems, raw-input apps, and other keyboard hooks may behave differently. No security boundary is bypassed.
 

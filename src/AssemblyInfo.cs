@@ -6,4 +6,4 @@ using System.Reflection;
 [assembly: AssemblyProduct("KiWeave")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: AssemblyInformationalVersion("1.0.0-beta.3")]
+[assembly: AssemblyInformationalVersion("1.0.0-beta.4")]

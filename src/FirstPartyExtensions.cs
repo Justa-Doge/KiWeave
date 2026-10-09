@@ -135,7 +135,7 @@ namespace FunctionRowRemapper
             var root = UiStyle.Stack(); scroll.Controls.Add(root);
             root.Controls.Add(UiStyle.Text(item.Name, 24, true));
             var state = UiStyle.Text(FirstPartyExtensionCatalog.IsEnabled(item.Id) ? "Enabled" : "Disabled", 10, true); state.ForeColor = FirstPartyExtensionCatalog.IsEnabled(item.Id) ? Color.FromArgb(127, 214, 169) : UiStyle.Muted; root.Controls.Add(state);
-            Add(root, "Description", item.Description); Add(root, "Current status", FirstPartyExtensionCatalog.Status(item)); Add(root, "Version", "Built into KiWeave 1.0.0-beta.3"); Add(root, "Compatibility", "KiWeave 1.0.0 beta series and newer compatible releases"); Add(root, "Permissions", item.Permissions); Add(root, "Maturity", item.Maturity);
+            Add(root, "Description", item.Description); Add(root, "Current status", FirstPartyExtensionCatalog.Status(item)); Add(root, "Version", "Built into KiWeave 1.0.0-beta.4"); Add(root, "Compatibility", "KiWeave 1.0.0 beta series and newer compatible releases"); Add(root, "Permissions", item.Permissions); Add(root, "Maturity", item.Maturity);
             root.Controls.Add(UiStyle.Text("No extension code is downloaded or executed from this view. Existing mappings remain local and are preserved if the extension is disabled.", 9, false));
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 18, 0, 0) };
             if (item.Id == "discord") buttons.Controls.Add(UiStyle.Button("Reconnect", delegate { DiscordIntegration.Reconnect(); MessageBox.Show(this, DiscordIntegration.Status, "Discord", MessageBoxButtons.OK, MessageBoxIcon.Information); }));

@@ -64,7 +64,11 @@ namespace FunctionRowRemapper
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
                 bool cleanExit = false;
                 try {
-                    if (!safeMode && StartupGuard.RecordStart() && MessageBox.Show("KiWeave did not close cleanly twice in a row. Open Safe Mode to review recovery tools before loading keyboard hooks?", "KiWeave recovery", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes) safeMode = true;
+                    if (!safeMode && StartupGuard.RecordStart()) {
+                        DialogResult recoveryChoice = MessageBox.Show("KiWeave did not close cleanly twice in a row. Open Safe Mode to review recovery tools before loading keyboard hooks?", "KiWeave recovery", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        if (recoveryChoice == DialogResult.Yes) safeMode = true;
+                        else StartupGuard.MarkClean();
+                    }
                     if (safeMode) using (var form = new SafeModeForm()) { Application.Run(form); restartNormally = form.RestartNormallyRequested; }
                     else using (var wake = new EventWaitHandle(false, EventResetMode.AutoReset, wakeName))
                         using (var form = new MainForm(Array.IndexOf(args, "--tray") >= 0)) {

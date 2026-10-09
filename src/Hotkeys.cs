@@ -9,6 +9,15 @@ namespace FunctionRowRemapper
     {
         public const int Alt = 1, Ctrl = 2, Shift = 4, Win = 8, NoRepeat = 0x4000;
         public int Modifiers; public int Key;
+        public static bool IsHardwareMediaKey(int key)
+        {
+            return Shortcuts.MediaLabels.Keys.Any(name => (int)(Keys)Enum.Parse(typeof(Keys), name, false) == key);
+        }
+        public static bool IsHardwareMediaShortcut(string text)
+        {
+            try { HotkeyChord chord = Parse(text); return chord.Modifiers == 0 && IsHardwareMediaKey(chord.Key); }
+            catch { return false; }
+        }
         public static HotkeyChord Parse(string text)
         {
             int[] keys = Shortcuts.Parse(text, false);
@@ -19,7 +28,7 @@ namespace FunctionRowRemapper
                 else if (k == 0x10) modifiers |= Shift;
                 else if (k == 0x5B) modifiers |= Win;
             }
-            if (modifiers == 0) throw new ArgumentException("Custom hotkeys need Ctrl, Alt, Shift or Win so normal typing is never captured.");
+            if (modifiers == 0 && !IsHardwareMediaKey(keys[keys.Length - 1])) throw new ArgumentException("Custom hotkeys need Ctrl, Alt, Shift or Win. Dedicated media buttons can be used by themselves.");
             return new HotkeyChord { Modifiers = modifiers, Key = keys[keys.Length - 1] };
         }
         public static string Normalize(string text)

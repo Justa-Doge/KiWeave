@@ -14,7 +14,7 @@ namespace FunctionRowRemapper
             if (virtualKey < 8 || virtualKey > 254 || IsModifier(virtualKey)) throw new ArgumentException("Press a regular key after the modifiers.");
             var parts = new List<string>();
             if (ctrl) parts.Add("Ctrl"); if (alt) parts.Add("Alt"); if (shift) parts.Add("Shift"); if (win) parts.Add("Win");
-            if (requireModifier && parts.Count == 0) throw new ArgumentException("Custom hotkeys need Ctrl, Alt, Shift or Win so ordinary typing is never captured.");
+            if (requireModifier && parts.Count == 0 && !HotkeyChord.IsHardwareMediaKey(virtualKey)) throw new ArgumentException("Custom hotkeys need Ctrl, Alt, Shift or Win. Dedicated media buttons can be used by themselves.");
             string key = ((Keys)virtualKey).ToString();
             if (key.StartsWith("D", StringComparison.Ordinal) && key.Length == 2 && Char.IsDigit(key[1])) key = key.Substring(1);
             if (key == "Escape") key = "Esc";
@@ -53,7 +53,7 @@ namespace FunctionRowRemapper
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), RowCount = 4 };
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Controls.Add(root);
             var header = UiStyle.Stack(); header.Controls.Add(UiStyle.Text("Record shortcut", 22, true));
-            header.Controls.Add(UiStyle.Text(requireModifier ? "Hold one or more modifiers, then press the final key." : "Press the key or shortcut you want this action to send.", 10, false)); root.Controls.Add(header, 0, 0);
+            header.Controls.Add(UiStyle.Text(requireModifier ? "Hold one or more modifiers, then press the final key, or press a dedicated media button by itself." : "Press the key or shortcut you want this action to send.", 10, false)); root.Controls.Add(header, 0, 0);
             var card = new DesignCard { Dock = DockStyle.Fill, Margin = new Padding(0, 20, 0, 14) }; root.Controls.Add(card, 0, 1);
             var values = UiStyle.Stack(); values.Dock = DockStyle.Fill; card.Controls.Add(values);
             var current = UiStyle.Text("Captured shortcut", 9, true); values.Controls.Add(current);

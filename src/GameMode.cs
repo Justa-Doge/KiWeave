@@ -13,5 +13,15 @@ namespace FunctionRowRemapper
         {
             try { var window = Native.GetForegroundWindow(); Native.Rect rect; Native.MonitorInfo monitor = new Native.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf(typeof(Native.MonitorInfo)) }; return window != IntPtr.Zero && Native.GetWindowRect(window, out rect) && Native.GetMonitorInfo(Native.MonitorFromWindow(window, 2), ref monitor) && rect.Left <= monitor.Monitor.Left && rect.Top <= monitor.Monitor.Top && rect.Right >= monitor.Monitor.Right && rect.Bottom >= monitor.Monitor.Bottom; } catch { return false; }
         }
+        internal static bool AllowsControl(Configuration configuration, int virtualKey)
+        {
+            if (HotkeyChord.IsHardwareMediaKey(virtualKey)) return true;
+            if (virtualKey < 0x70 || virtualKey > 0x7B || configuration == null || configuration.Mappings == null || configuration.Mappings.Length != 12) return false;
+            Mapping mapping = configuration.Mappings[virtualKey - 0x70];
+            if (mapping == null) return false;
+            if (mapping.Kind == ActionKind.Media) return true;
+            if (mapping.Kind != ActionKind.SystemAction) return false;
+            return mapping.Target == "DiscordMute" || mapping.Target == "DiscordDeafen" || mapping.Target == "CycleAudioOutput" || mapping.Target == "SpotifyPlayPause" || mapping.Target == "SpotifyNext" || mapping.Target == "SpotifyPrevious";
+        }
     }
 }

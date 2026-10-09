@@ -39,8 +39,8 @@ namespace FunctionRowRemapper
             if (name == "CenterWindow") { CenterForegroundWindow(); return; }
             if (name == "ToggleAlwaysOnTop") { ToggleAlwaysOnTop(); return; }
             if (name == "CycleAudioOutput") { AudioDevices.CycleDefaultOutput(); return; }
-            if (name == "DiscordMute") { if (!DiscordIntegration.TryToggleVoice("mute")) sink.Send(Shortcuts.Parse("Ctrl+Shift+M", false)); return; }
-            if (name == "DiscordDeafen") { if (!DiscordIntegration.TryToggleVoice("deaf")) sink.Send(Shortcuts.Parse("Ctrl+Shift+D", false)); return; }
+            if (name == "DiscordMute") { bool muted; bool discordFocused = IsDiscordForeground(); if (DiscordIntegration.TryToggleVoice("mute", out muted)) { if (!discordFocused) ShowDiscordToast(muted ? "Muted" : "Unmuted", "mute", muted); } else { sink.Send(Shortcuts.Parse("Ctrl+Shift+M", false)); if (!discordFocused) ShowDiscordToast("Mute shortcut sent", "mute", false); } return; }
+            if (name == "DiscordDeafen") { bool deafened; bool discordFocused = IsDiscordForeground(); if (DiscordIntegration.TryToggleVoice("deaf", out deafened)) { if (!discordFocused) ShowDiscordToast(deafened ? "Deafened" : "Undeafened", "deaf", deafened); } else { sink.Send(Shortcuts.Parse("Ctrl+Shift+D", false)); if (!discordFocused) ShowDiscordToast("Deafen shortcut sent", "deaf", false); } return; }
             if (name == "SpotifyPlayPause") { sink.Send(Shortcuts.Parse("MediaPlayPause", true)); return; }
             if (name == "SpotifyNext") { sink.Send(Shortcuts.Parse("MediaNextTrack", true)); return; }
             if (name == "SpotifyPrevious") { sink.Send(Shortcuts.Parse("MediaPreviousTrack", true)); return; }
@@ -57,6 +57,17 @@ namespace FunctionRowRemapper
             int x = monitor.Work.Left + Math.Max(0, (monitor.Work.Right - monitor.Work.Left - width) / 2);
             int y = monitor.Work.Top + Math.Max(0, (monitor.Work.Bottom - monitor.Work.Top - height) / 2);
             if (!Native.SetWindowPos(window, IntPtr.Zero, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010)) throw new InvalidOperationException("Windows would not move the active window.");
+        }
+        static bool IsDiscordForeground()
+        {
+            string process = Native.ForegroundProcessName();
+            return String.Equals(process, "Discord", StringComparison.OrdinalIgnoreCase)
+                || String.Equals(process, "DiscordPTB", StringComparison.OrdinalIgnoreCase)
+                || String.Equals(process, "DiscordCanary", StringComparison.OrdinalIgnoreCase);
+        }
+        static void ShowDiscordToast(string message, string icon, bool active)
+        {
+            StatusOverlay.ShowStyled("Discord", message, icon, active);
         }
         static void ToggleAlwaysOnTop()
         {

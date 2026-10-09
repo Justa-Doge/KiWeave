@@ -1,7 +1,29 @@
 # Changelog
 
+## 1.0.0-beta.4 (October 9, 2026)
+- Added a persisted Settings → Toast style choice with KiWeave and Compact flyout options.
+- Added the compact centered Discord flyout with full Muted, Unmuted, Deafened, and Undeafened labels, eased fly-in/fly-out motion, and in-place replacement when another state arrives while it is visible.
+- Clarified and documented the private checker decision table for every install/update/replace operation.
+- Improved Discord RPC diagnostics for multi-user readiness: rejected RPC responses now include Discord’s returned message/code when available. Installed as `bin-local-discord-public-ready`.
+- Applied the user-approved private toast baseline from the live editor: 230×72 size, 18px left offset, 28px bottom offset, content X 40, content Y 16, and 1500ms hold. Installed as `bin-local-toast-baseline`.
+- Fixed private asset installation to copy the transparent PNGs into the actual runtime `overlay-icons` folder instead of nesting them one directory too deep. Installed transparent asset build after verification.
+- Restored the user-supplied composite state images exactly as provided and made the toast draw those images directly, without cropping, recoloring, or an extra icon render layer. Installed as `bin-local-user-images-exact`.
+- Cropped all four user state renders to the actual purple tile bounds, removing the remaining white canvas/outline while preserving the white glyphs. Installed as `bin-local-user-icons-cropped`.
+- Re-rendered the user artwork at 1024px, removed the opaque white canvas, and enabled high-quality bicubic downsampling in the toast. Installed as `bin-local-user-icons-hq`.
+- The private toast now renders the user-supplied mute/unmute/deafen/undeafen artwork at runtime from packaged PNG exports, with the old vector drawing retained only as a missing-asset fallback. Installed as `bin-local-user-icons`.
+- Packaged the user-supplied high-resolution mute/unmute/deafen/undeafen SVG state assets and explicit state map into the private build. Installed as `bin-local-private-editor-assets`.
+- Added the private live UI editor under Settings → App controls. It inspects the live control tree and can edit selected control text, visibility, enabled state, bounds, and colors without rebuilding. The editor source is local-only and is excluded from the public source build.
+- Improved the private checker’s foreground detection to distinguish tray/background KiWeave from the main window or any KiWeave-owned dialog being foreground. Installed as private build `bin-local-private-editor-checker`.
+- Centered the complete toast content group horizontally inside the overlay so the icon tile and text no longer sit left-heavy. Built and installed as private local build `bin-local-overlay-centered2`.
+- Discord RPC behavior remains strict: KiWeave does not silently downgrade voice control when Discord rejects the RPC request. The real-RPC build was restored and installed as private local build `bin-local-discord-rpc-real`; Discord approval for `rpc.voice.read`/`rpc.voice.write` is still required.
+- Removed the unsupported named-pipe timeout setting that caused Discord connection dialogs to report “Timeouts are not supported on this stream.” Rebuilt and installed as private local build `bin-local-overlay-responsive2`.
+- Discord mute/deafen actions no longer block on foreground reconnect attempts; unavailable IPC falls back to the normal Discord shortcut immediately. Built and installed as private local build `bin-local-overlay-responsive`.
+- Rebalanced the Discord status toast layout so the KiWeave icon tile, custom glyph, title, and detail line share a centered vertical alignment. Built and installed as private local build `bin-local-overlay-centered`.
+- Discord mute/deafen toasts stay hidden when the actual Discord desktop app (including PTB/Canary) is the foreground app; when another app is foreground, the action still runs globally and the toast provides feedback.
+
 ## 1.0.0-beta.3 (local development, October 7, 2026)
 
+- Added alpha support for assigning the six standard Windows hardware media buttons as custom inputs. Assigned buttons are intercepted by the low-level hook, suppress their original action, preserve press/release pairing, and can trigger any existing KiWeave action without allowing ordinary unmodified typing keys.
 - Added an opt-in Smooth scrolling setting for long KiWeave panels, with bounded animation that stops cleanly at the real top and bottom.
 - Collapsed advanced Settings controls behind a Show advanced settings disclosure so the common controls are easier to scan without removing any options.
 - Renamed the Settings entry point from “Offline guide” to the simpler “Guide”; the guide remains fully local and offline.
@@ -105,3 +127,8 @@
 - 2026-10-03: Controller trigger polling now prefers Windows Game Input readings when the WinRT API is available and falls back to XInput otherwise. The reflection boundary keeps unsupported runtimes safe and dependency-free; local build passed 135 checks.
 - 2026-10-07: Release-readiness cleanup refreshed the local build path, current 139-check verification count, and Computer Use handoff notes. No public version, tag, or release artifact was changed.
 - 2026-10-07: Preview-mode MainForm instances no longer start the live Discord reconnect monitor, preventing background integration work from stalling UI previews and tests. Current local build passes 139 checks.
+- 2026-10-09: Fixed repeated Safe Mode prompts and neutralized the disabled toggle track styling in `bin-startup-toggle-fix`; 142 checks pass. Installation is pending an open unsaved draft.
+- 2026-10-09: Added a non-activating, auto-dismissing always-on-top status overlay for Discord mute/unmute and deafen/undeafen actions, including fallback-shortcut feedback. `bin-discord-overlay` passes 142 checks; installation is pending the open draft.
+- 2026-10-09: Installed the combined private local build with overlay, toggle styling, Safe Mode recovery, and current checker protocol after the old tray-only build was closed. State inspection correctly refuses to close the visible foreground window.
+- 2026-10-09: Corrected the private checker decision table for all install/update/replace operations: clean non-frontmost, clean frontmost, and clean tray/background are allowed; any open instance with unsaved changes is refused.
+- 2026-10-09: Installed the final compact Windows 11-style Discord flyout: centered above the taskbar, 160×48, no volume bar, and full Muted/Unmuted/Deafened/Undeafened labels. Final build passed 143 checks with a matching SHA-256.

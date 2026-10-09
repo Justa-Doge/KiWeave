@@ -10,8 +10,8 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    // No full keyboard history is retained. State consists only of twelve current F-key presses
-    // and the currently held layer key.
+    // No full keyboard history is retained. State consists only of current mapped F-key/media-button
+    // presses and the currently held layer key.
     public sealed class KeyDecision
     {
         public bool Suppress;
@@ -29,6 +29,7 @@ namespace FunctionRowRemapper
     {
         sealed class Press { public bool Suppress; public Mapping Mapping; public bool Cancelled; }
         readonly Press[] pressed = new Press[12];
+        readonly Dictionary<int, Press> mediaPressed = new Dictionary<int, Press>();
         int activeLayerKey;
         bool suppressLayerRelease;
         public KeyDecision Process(int vk, bool down, bool injected, Configuration config)
@@ -44,6 +45,27 @@ namespace FunctionRowRemapper
                     d.Suppress = suppressLayerRelease; activeLayerKey = 0; suppressLayerRelease = false;
                 }
                 return d;
+            }
+            if (HotkeyChord.IsHardwareMediaKey(vk)) {
+                Press mediaPress;
+                if (!down) {
+                    if (mediaPressed.TryGetValue(vk, out mediaPress)) { d.Suppress = mediaPress.Suppress; mediaPressed.Remove(vk); }
+                    return d;
+                }
+                if (!mediaPressed.TryGetValue(vk, out mediaPress)) {
+                    CustomHotkey hotkey = (config.CustomHotkeys ?? new CustomHotkey[0]).FirstOrDefault(h => {
+                        HotkeyChord chord;
+                        try { chord = HotkeyChord.Parse(h.Shortcut); } catch { return false; }
+                        return chord.Modifiers == 0 && chord.Key == vk;
+                    });
+                    if (hotkey == null || !config.Enabled) return d;
+                    mediaPress = new Press { Suppress = true, Mapping = hotkey.Action.Copy() };
+                    mediaPressed[vk] = mediaPress; d.Suppress = true; d.Action = mediaPress.Mapping;
+                    d.ResolvedAction = mediaPress.Mapping.Summary; return d;
+                }
+                d.Suppress = mediaPress.Suppress;
+                if (config.Enabled && !mediaPress.Cancelled && mediaPress.Mapping.Repeats) d.Action = mediaPress.Mapping;
+                d.ResolvedAction = mediaPress.Mapping.Summary; return d;
             }
             if (vk < 0x70 || vk > 0x7B) return d;
             int i = vk - 0x70; Press p = pressed[i];
@@ -67,7 +89,7 @@ namespace FunctionRowRemapper
             ModifierLayer active = activeLayerKey == 0 || config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == activeLayerKey);
             return active == null ? "Base" : active.Name;
         }
-        public void CancelHeldActions() { foreach (Press p in pressed) if (p != null) p.Cancelled = true; }
+        public void CancelHeldActions() { foreach (Press p in pressed) if (p != null) p.Cancelled = true; foreach (Press p in mediaPressed.Values) p.Cancelled = true; }
     }
 
     public sealed class EmergencyHold
@@ -234,9 +256,8 @@ namespace FunctionRowRemapper
                 bool ignore = k.ExtraInfo == Native.Tag || (injected && (!testInjected || k.ExtraInfo != Native.TestTag));
                 bool down = msg == 0x100 || msg == 0x104;
 
-                if (!ignore && (ShortcutSuspension.IsSuspended() || (GameMode.Enabled && GameMode.IsFullscreenForeground()))) return Native.CallNextHookEx(hook, code, wParam, lParam);
-
                 Configuration snapshot = Volatile.Read(ref config);
+                if (!ignore && (ShortcutSuspension.IsSuspended() || (GameMode.Enabled && GameMode.IsFullscreenForeground() && !GameMode.AllowsControl(snapshot, (int)k.Vk)))) return Native.CallNextHookEx(hook, code, wParam, lParam);
                 KeyDecision d = machine.Process((int)k.Vk, down, ignore, snapshot);
                 var observed = KeyObserved;
                 if (observed != null && down) {

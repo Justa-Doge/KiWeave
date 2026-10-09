@@ -50,6 +50,8 @@ Copy-Item -LiteralPath $SourceExe -Destination $installedExe -Force
 if ((Get-FileHash -LiteralPath $SourceExe).Hash -ne (Get-FileHash -LiteralPath $installedExe).Hash) { throw 'Installed executable verification failed.' }
 Copy-Item -LiteralPath $sourceUninstaller -Destination $installedUninstaller -Force
 if ((Get-FileHash -LiteralPath $sourceUninstaller).Hash -ne (Get-FileHash -LiteralPath $installedUninstaller).Hash) { throw 'Installed uninstaller verification failed.' }
+ $sourceOverlayIcons = Join-Path $sourceDir 'overlay-icons'
+ if (Test-Path -LiteralPath $sourceOverlayIcons) { $overlayInstallDir = Join-Path $installDir 'overlay-icons'; New-Item -ItemType Directory -Force -Path $overlayInstallDir | Out-Null; Copy-Item -Path (Join-Path $sourceOverlayIcons '*') -Destination $overlayInstallDir -Recurse -Force }
 foreach ($name in @('LICENSE', 'NOTICE')) {
     $sourceDocument = Join-Path $sourceDir $name
     if (-not (Test-Path -LiteralPath $sourceDocument -PathType Leaf)) { throw "The build is missing $name." }

@@ -1,5 +1,5 @@
 #define MyAppName "KiWeave"
-#define MyAppVersion "1.0.0-beta.3"
+#define MyAppVersion "1.0.0-beta.4"
 #define MyAppPublisher "Justa-Doge"
 #define MyAppURL "https://github.com/Justa-Doge/KeyWeave"
 #define MyAppExeName "KiWeave.exe"
