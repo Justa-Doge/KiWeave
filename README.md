@@ -24,7 +24,7 @@ Copyright does not cover a general software idea. If KiWeave inspires a separate
 
 The interface uses a charcoal dark theme with purple accents, a sidebar for switching editors, rounded controls, and keycap-style mapping rows. Action labels use sentence case. The library and sequence windows share the same theme; standard Windows file/message dialogs still follow Windows' own appearance.
 
-The **Custom hotkeys** sidebar page also lets you assign up to 32 global Ctrl, Alt, Shift, or Win shortcuts to the same actions. In the alpha build, a dedicated Volume up, Volume down, Mute, Play/pause, Next track, or Previous track hardware button can be assigned by itself, letting media-first keyboards trigger any KiWeave action. It includes **Run a Python script** for a local `.py` file. Python runs with the signed-in Windows account only, never changes execution/security policy, and needs the normal Python launcher (`py.exe`) already installed.
+The **Custom hotkeys** page lets you assign up to 32 global Ctrl, Alt, Shift, or Win shortcuts to the same actions. Dedicated media buttons, Windows consumer controls such as Eject, and Windows-reported extended keys such as F13–F24, Apps, navigation keys, Print Screen, Scroll Lock, and Pause can be assigned on their own when the keyboard exposes them. Vendor-specific macro keys that Windows does not report cannot be enumerated. It includes **Run a Python script** for a local `.py` file. Python runs with the signed-in Windows account only, never changes execution/security policy, and needs the normal Python launcher (`py.exe`) already installed.
 
 Use **Record** beside a shortcut field to capture a key combination or dedicated media button instead of typing its name. Capture exists only while the review dialog is open, suppresses the physical keys so the shortcut does not fire during recording, keeps no history, and writes no log. Nothing is applied until the exact captured input is reviewed and accepted; ordinary custom global hotkeys still require Ctrl, Alt, Shift, or Win, and reserved security combinations are rejected.
 
@@ -44,9 +44,9 @@ For a Custom hotkey, choose **Build sequence...** to open the separate sequence 
 
 Both editor pages share **Shortcuts enabled** and **Save changes**. Use the gear button at the bottom-left for **Settings**, including Windows startup, tray behavior, automatic profile switching, the master network switch, update checks, the Privacy Center, full backups, diagnostics, data/log folders, the welcome guide, and About. Background-behavior settings apply immediately; mapping edits still wait for **Save changes**. **More** retains quick access to profiles, import/export, function-key reset/disable, and **Exit app**. The editor panels scroll when needed at smaller window sizes.
 
-Open **Settings → Undo and history** to review the last 20 local snapshots created before mapping saves, enable-state changes, profile edits, backup restores, and history restores. The comparison names changed controls without revealing action targets or URLs. Restoring requires selecting an entry and confirming it; KiWeave first preserves the current setup in history and also creates its normal rollback folder. History never syncs or restores automatically, but its `.keyweave` files can contain private mappings and remain visible in the Privacy Center's local-data inventory.
+Open **Settings → Undo and history** to review the last 20 local snapshots created before mapping saves, enable-state changes, profile edits, backup restores, and history restores. The comparison names changed controls without revealing action targets or URLs. Restoring requires selecting an entry and confirming it; KiWeave first preserves the current setup in history and also creates its normal rollback folder. History never syncs or restores automatically, but its `.kiweave` files can contain private mappings and remain visible in the Privacy Center's local-data inventory.
 
-**More → Back up everything** creates a versioned `.keyweave` file containing saved mappings, profiles, preferences, startup preference, and a read-only inventory of discovered PowerToys shortcuts. Restore validates the entire bundle, summarizes its contents, asks before replacing anything, and creates a local rollback copy. PowerToys settings are never changed by restore. Because action targets, arguments, URLs, or HTTP bodies may be private, treat backup files as sensitive.
+**More → Back up everything** creates a versioned `.kiweave` file containing saved mappings, profiles, preferences, startup preference, and a read-only inventory of discovered PowerToys shortcuts. Restore validates the entire bundle, summarizes its contents, asks before replacing anything, and creates a local rollback copy. PowerToys settings are never changed by restore. Older `.keyweave` backups remain importable. Because action targets, arguments, URLs, or HTTP bodies may be private, treat backup files as sensitive.
 
 ## Profiles and automatic switching
 
@@ -56,7 +56,7 @@ Profiles can also be selected manually from the tray menu. The header badge and 
 
 ## Windows and app integrations
 
-The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, and opening PowerToys settings. Existing snap, monitor-move, media, DDC/CI, Windows Settings, and PowerToys shortcut actions remain available. Discord voice control is experimental in beta 4 and may not work until the KiWeave Discord application is public/approved; the normal Discord shortcut fallback remains available.
+The action library includes window centering, always-on-top, switching to the next active Windows audio output, Discord mute/deafen, Spotify media control, OBS recording/streaming controls, PowerToys actions, and Windows snap, monitor-move, media, and Settings actions. Discord voice control is experimental and may require an approved KiWeave Discord application; the normal Discord shortcut fallback remains available. Media Play/Pause is a no-op when Windows reports no active controllable media session. When a session changes state, its toast can show the track title, available album art, and confirmed Playing/Paused state; the toast is suppressed while that media app is foreground.
 
 **Call an HTTP endpoint** performs an eight-second GET when its body is empty or a JSON POST when a body is supplied. It is intended for local dashboards, webhooks, and Stream Deck-style tools. The URL cannot contain embedded credentials. HTTP actions contact the configured server only when their assigned key is pressed and the master network switch is on; KiWeave does not send them automatically.
 
@@ -67,6 +67,10 @@ Open **Settings → Live key tester** to inspect the latest key event, modifiers
 Open **Settings → Conflict center** for a read-only scan of overlapping KiWeave hotkeys, common Windows-owned shortcuts, active PowerToys shortcuts, modifier-layer activation keys, invalid profile rules, and ambiguous automatic-profile matches. Each finding explains what currently wins and can open the relevant editor. The scan never executes an action, reveals private action targets, changes a mapping, or rewrites another application's settings.
 
 KiWeave also keeps a small rotating local error log. Entries contain only a UTC timestamp, component name, exception type, and numeric error code. Raw error messages, keys, targets, arguments, URLs, and typed text are never written. Use **More → Open log folder** when troubleshooting.
+
+## Extensions and hardware triggers
+
+The **Extensions** page lets you enable or disable optional Discord, Spotify, OBS Studio, PowerToys, Stream Deck, and Controller/MIDI integrations and inspect their runtime status. Controller buttons and MIDI NoteOn/ControlChange inputs can trigger saved function-row actions; support depends on the connected device and Windows services. The Stream Deck bridge uses a local named pipe for its supported plugin commands. These integrations are optional and do not install drivers or alter another app's settings unless an explicitly described PowerToys edit is requested.
 
 ## PowerToys shortcuts
 
@@ -82,7 +86,7 @@ Run **bin/KiWeave.exe**, or use the installed **KiWeave** entry in Windows Searc
 
 When both **Allow network access** and update checks are enabled in Settings, KiWeave quietly checks public, stable `vX.Y.Z` releases through GitHub's HTTPS API at launch. **Check for updates** runs the same check on demand. If a release is newer than the installed version, it shows a Windows notification linking to that release. It never downloads or installs an update, needs no Git installation or GitHub account, and uses an eight-second limit. Alpha and beta GitHub prereleases are ignored by the stable update checker. If the repository is private, GitHub is unavailable, or the PC is offline, the launch check is skipped without delaying startup. A release needs a matching version bump in `src/UpdateChecker.cs` and a published GitHub release. Ordinary commits and tags alone do not trigger notifications.
 
-DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.
+DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions, plus separate backlight-minimum/maximum and monitor-standby/wake actions on compatible displays. Backlight minimum means 0% brightness and does not power off the display; maximum does not restore a previous level. Standby/wake uses the monitor power-mode control and is distinct from brightness. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.
 
 ## Run it
 
@@ -148,11 +152,11 @@ Configuration is human-readable JSON: version 1 for original actions, version 2 
 
 Saving at least one custom hotkey uses version 3 and adds a `customHotkeys` section. Adding a modifier layer uses version 4 and adds a `layers` section while preserving the base mappings and custom hotkeys. An ordinary custom hotkey must include at least one modifier so ordinary typing cannot be captured; the six supported dedicated media buttons are the only unmodified inputs accepted. Windows-reserved or already-used combinations are reported when you save.
 
-`%LOCALAPPDATA%\KiWeave\config.json`
+`%LOCALAPPDATA%\KiWeave\config.kiweave`
 
-Saves write and flush a temporary file in the same directory, then atomically replace the current file. `config.json.bak` retains the previous saved version. A corrupt existing file is not overwritten just by opening the app; the app opens with safe defaults and an error. You can inspect or restore the backup while the app is closed.
+The file remains readable JSON; `.kiweave` is the native configuration extension. Saves write and flush a temporary file in the same directory, then atomically replace the current file. `config.kiweave.bak` retains the previous saved version. Existing `config.json` files are copied forward on migration and left intact as a recovery copy. A corrupt existing file is not overwritten just by opening the app; the app opens with safe defaults and an error. You can inspect or restore the backup while the app is closed.
 
-**Export configuration** writes the current editor draft, including unsaved edits, without activating it. **Import configuration** checks size, JSON syntax, duplicate/unknown fields, version, exactly twelve unique function keys, actions, paths, and shortcut syntax, then keeps the result quarantined in a private review dialog. The review lists every non-default mapping, target, command, URL/body, and permission label before the user can stage it in the editor. Cancelling or rejecting an invalid import leaves both the editor and live mappings intact. The maximum file size is 64 KB.
+**Export configuration** writes the current editor draft as `.kiweave`, including unsaved edits, without activating it. **Import configuration** accepts `.kiweave` and older `.json` files, checks size, JSON syntax, duplicate/unknown fields, version, exactly twelve unique function keys, actions, paths, and shortcut syntax, then keeps the result quarantined in a private review dialog. The review lists every non-default mapping, target, command, URL/body, and permission label before the user can stage it in the editor. Cancelling or rejecting an invalid import leaves both the editor and live mappings intact. The maximum file size is 64 KB.
 
 Imports never execute commands, enable remapping, or change startup. Review all twelve mappings, especially launch targets and commands, then Save. A missing target may be imported for review, but Save and dispatch report an error until it is fixed. A target removed after saving is checked again when invoked.
 
@@ -176,15 +180,15 @@ The status shows **Active in background**, **Shortcuts paused**, or **Unavailabl
 
 No account, analytics, telemetry, advertising identifier, cloud sync, or key logs are used. New installations begin with the master network switch off. When allowed, KiWeave's own network access is limited to the optional GitHub update check and user-created HTTP actions. HTTP action URLs and bodies stay in the user's local configuration; they are transmitted only to the configured endpoint when the assigned action runs. Layer names, activation keys, profiles, inheritance masks, mappings, and backups stay local. The hook examines event metadata to identify function keys and injected events; normally it retains only twelve active press states and the currently held layer key. The optional live tester temporarily exposes only the latest event to its open window and clears it on close. Emergency polling reads only Ctrl/Alt/Shift key state. No general typed text or key history is persisted.
 
-The **Privacy Center** lists every network-capable KiWeave feature, the current master-network state, local storage categories and sizes, and whether a cache exists. It can open the data folder, delete only the bounded local diagnostic logs, preview safe diagnostics, and export that redacted report. Safe diagnostics exclude mapping targets, commands, arguments, paths, URLs, request bodies, typed text, key history, and custom profile names. Full `.keyweave` backups remain private and are never safe-diagnostic exports.
+The **Privacy Center** lists every network-capable KiWeave feature, the current master-network state, local storage categories and sizes, and whether a cache exists. It can open the data folder, delete only the bounded local diagnostic logs, preview safe diagnostics, and export that redacted report. Safe diagnostics exclude mapping targets, commands, arguments, paths, URLs, request bodies, typed text, key history, and custom profile names. Full `.kiweave` backups remain private and are never safe-diagnostic exports.
 
 ## Build and test
 
 Tagged `vX.Y.Z` pushes run the Windows release workflow, repeat the normal and native-hook tests, build a per-user installer with uninstall support, create a portable ZIP, generate SHA-256 checksums, and publish the files as a GitHub release. The installer preserves mappings and profiles when updating or uninstalling. Release binaries are currently unsigned, so Windows may show an unfamiliar-publisher warning.
 
-### Expanded action library (2026-09-22)
+### Expanded action library
 
-The searchable library now contains 442 entries across 16 categories, including Windows/window management, audio devices, Discord, Spotify, OBS Studio, PowerToys, text editing, File Explorer, Chrome, VS Code, taskbar, Settings pages, folders, and Windows tools. Filter by category or search by name, category, context, shortcut, or target. The sequence builder shares the expanded catalog. Existing saved hotkeys are unchanged.
+The searchable library now contains 458 unique actions across categories including Windows and window management, audio devices, Discord, Spotify, OBS Studio, PowerToys, text editing, File Explorer, Chrome, VS Code, taskbar, Settings pages, folders, monitor controls, and Windows tools. Filter by category or search by name, category, context, shortcut, or target. The sequence builder shares the same catalog. Existing saved hotkeys are unchanged.
 
 App-specific shortcuts require that app to be focused and use its default key bindings. Settings pages depend on Windows version and hardware; presets open pages rather than automatically changing settings. Tools are included only when their executable exists. Catalog definitions live in `src/ExpandedActions.cs`.
 
@@ -203,7 +207,7 @@ Close the running remapper before rebuilding. The script uses the built-in 64-bi
 
 The build defaults to `bin`. `Ddc.cs` implements detection and the Windows dxva2 monitor operations, with scoped physical-monitor handles and a separate monitor dispatcher. `UserPreferences.cs` stores tray, update-check, and automatic-profile preferences separately from mappings, while the Windows startup choice remains in the per-user Run key.
 
-The implementation uses C# WinForms and Win32 `WH_KEYBOARD_LL`/`SendInput`. This was chosen because it produces a compact native Windows UI and a single executable with the toolchain already present here. `Configuration.cs` and `JsonSyntax.cs` handle persistence/validation; `Engine.cs` contains key state, dispatch, and native interop; `MainForm.cs` contains the editor/tray; `tests/Tests.cs` exercises the core and native hook.
+The application uses C# and Win32 `WH_KEYBOARD_LL`/`SendInput` for low-level input handling. `Configuration.cs` and `JsonSyntax.cs` handle persistence and validation; `Engine.cs` contains key state, dispatch, and native interop; `tests/Tests.cs` exercises the shared core and native hook.
 
 The native tests use a test-only constructor that accepts a particular injected-event tag, plus an observation hook that consumes the test keys so they do not reach other applications. **They verify the Win32 hook path, not physical hardware input.** The shipping app has no switch or configuration field for enabling that test mode.
 
