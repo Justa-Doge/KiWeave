@@ -1,8 +1,16 @@
 # KiWeave
 
-Current development build: **1.0.0-beta.4**. This is a beta checkpoint, not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
+Current development build: **1.0.0-beta.5**. This beta is still under active validation and is not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
 
 A Windows tray app for turning F1 through F12 and custom global hotkeys into personal actions, profiles, app integrations, and automations. Remapping works offline; an optional background check looks for newer versions on GitHub.
+
+## What KiWeave can do
+
+- Remap F1–F12 and up to 32 custom global hotkeys. Record key combinations and supported dedicated media buttons, then choose what each input does.
+- Browse a searchable action library for keyboard shortcuts, media controls, launching apps/files/folders, local commands and scripts, HTTP requests, and Windows actions. Build conditional actions or sequences of up to 20 steps.
+- Keep separate setups with named profiles, app-based automatic profile switching, profile inheritance, and up to four hold-to-activate modifier layers.
+- Control supported system media/audio actions, Discord voice, Spotify, OBS Studio, and PowerToys. On compatible monitors, DDC/CI actions can adjust brightness, contrast, hardware volume, and backlight, or switch monitor standby/wake.
+- Use the tray, emergency pause shortcut, `.kiweave` import/export, backups and undo history, plus Safe Mode, diagnostics, and the Privacy Center for recovery and control.
 
 Previously called Function Row Remapper. The application is now fully installed as **KiWeave**, including `KiWeave.exe`, its Start-menu entries, startup identity, install folder, and `%LOCALAPPDATA%\KiWeave` data folder. Existing Function Row Remapper data is copied forward without overwriting newer KiWeave files; the old folder is left untouched as a recovery copy.
 
