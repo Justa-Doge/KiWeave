@@ -23,7 +23,7 @@ jobs:
     outputs:
       label: ${{ steps.version.outputs.label }}
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Check out public verification tools
         uses: actions/checkout@v4
