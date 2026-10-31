@@ -182,38 +182,20 @@ No account, analytics, telemetry, advertising identifier, cloud sync, or key log
 
 The **Privacy Center** lists every network-capable KiWeave feature, the current master-network state, local storage categories and sizes, and whether a cache exists. It can open the data folder, delete only the bounded local diagnostic logs, preview safe diagnostics, and export that redacted report. Safe diagnostics exclude mapping targets, commands, arguments, paths, URLs, request bodies, typed text, key history, and custom profile names. Full `.kiweave` backups remain private and are never safe-diagnostic exports.
 
-## Build and test
+## Beta 5 releases
 
-Tagged `vX.Y.Z` pushes run the Windows release workflow, repeat the normal and native-hook tests, build a per-user installer with uninstall support, create a portable ZIP, generate SHA-256 checksums, and publish the files as a GitHub release. The installer preserves mappings and profiles when updating or uninstalling. Release binaries are currently unsigned, so Windows may show an unfamiliar-publisher warning.
+Download the **KiWeave Setup** installer or portable ZIP from [Releases](https://github.com/Justa-Doge/KiWeave/releases). The portable archive includes the runtime; neither package needs a separate .NET installation. Each release includes `SHA256SUMS.txt` so you can verify the downloads.
+
+Beta 5 uses the WPF desktop build distributed as release binaries. Its source stays out of this repository. The release workflow verifies the exact uploaded installer, portable archive, and checksums; it does not rebuild the app. Publishing is a separate manual action after the draft package is reviewed.
 
 ### Expanded action library
 
 The searchable library now contains 458 unique actions across categories including Windows and window management, audio devices, Discord, Spotify, OBS Studio, PowerToys, text editing, File Explorer, Chrome, VS Code, taskbar, Settings pages, folders, monitor controls, and Windows tools. Filter by category or search by name, category, context, shortcut, or target. The sequence builder shares the same catalog. Existing saved hotkeys are unchanged.
 
-App-specific shortcuts require that app to be focused and use its default key bindings. Settings pages depend on Windows version and hardware; presets open pages rather than automatically changing settings. Tools are included only when their executable exists. Catalog definitions live in `src/ExpandedActions.cs`.
+App-specific shortcuts require that app be focused and use its default key bindings. Settings pages depend on Windows version and hardware; presets open pages rather than automatically changing settings. Tools are included only when their executable exists. Catalog definitions live in the previous public source tree.
 
 References: [Windows shortcuts](https://support.microsoft.com/en-us/accessibility/windows/keyboard-shortcuts-in-windows), [Settings URIs](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings), [Chrome shortcuts](https://support.google.com/chrome/answer/157179?hl=en), and [VS Code defaults](https://code.visualstudio.com/shortcuts/keyboard-shortcuts-windows.pdf).
 
-
-From this project directory in PowerShell 7 (`pwsh`, already available on this machine):
-
-```powershell
-.\build.ps1
-.\bin\KiWeave.Tests.exe --native
-.\bin\KiWeave.Tests.exe --ddc-detect
-```
-
-Close the running remapper before rebuilding. The script uses the built-in 64-bit C# compiler at `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, without downloading dependencies or changing script execution policy. It compiles the application and tests and runs the non-hook suite. Windows PowerShell 5 on this computer blocks .ps1 files under its existing policy; the verified build used PowerShell 7. No policy change is required to run the compiled app. `KiWeave.csproj` is also supplied for Visual Studio/MSBuild with the .NET Framework 4.8 targeting pack.
-
-The build defaults to `bin`. `Ddc.cs` implements detection and the Windows dxva2 monitor operations, with scoped physical-monitor handles and a separate monitor dispatcher. `UserPreferences.cs` stores tray, update-check, and automatic-profile preferences separately from mappings, while the Windows startup choice remains in the per-user Run key.
-
-The application uses C# and Win32 `WH_KEYBOARD_LL`/`SendInput` for low-level input handling. `Configuration.cs` and `JsonSyntax.cs` handle persistence and validation; `Engine.cs` contains key state, dispatch, and native interop; `tests/Tests.cs` exercises the shared core and native hook.
-
-The native tests use a test-only constructor that accepts a particular injected-event tag, plus an observation hook that consumes the test keys so they do not reach other applications. **They verify the Win32 hook path, not physical hardware input.** The shipping app has no switch or configuration field for enabling that test mode.
-
-See `TEST-REPORT.md` for completed verification and `MANUAL-TESTS.md` for the physical acceptance checklist.
-
-Microsoft references: [LowLevelKeyboardProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc) and [SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).
 
 ## Remove it
 
