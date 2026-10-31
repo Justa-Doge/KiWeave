@@ -1,3 +1,9 @@
+## 1.0.0-beta.5 (October 30, 2026)
+- Replaced the previous desktop interface with the WPF build distributed in the Beta 5 release packages; the WPF source remains local.
+- Added .kiweave configuration export, tray launch controls, and the expanded action picker, while retaining existing mappings and profiles.
+- Added media-session toasts, Discord voice controls, and monitor DDC/CI actions including explicit backlight off/on commands.
+- Improved display-refresh-aware rendering and smooth scrolling, plus stability for profiles, action queues, integrations, and recovery.
+
 # Changelog
 
 ## 1.0.0-beta.4 (October 9, 2026)
