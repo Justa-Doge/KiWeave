@@ -1,5 +1,13 @@
 # KiWeave
 
+## Beta 5 highlights
+
+- WPF desktop interface with keyboard-first editing, updated action picker, and smooth scrolling synchronized to the display refresh rate.
+- Remap F1–F12 and custom hotkeys with profiles, modifier layers, sequences, and conditional actions.
+- Expanded monitor controls, including DDC/CI backlight on/off, brightness, contrast, and monitor volume; media actions, Discord controls, and media-session toasts with app or album artwork.
+- .kiweave configuration files, local backups and history, tray controls, and integrations for Discord, Spotify, OBS, PowerToys, and supported media sessions.
+
+
 Current development build: **1.0.0-beta.5**. This beta is still under active validation and is not the final 1.0 release. Optional update checks run at launch and every 12 hours while KiWeave stays open; they remain blocked by the master network switch and only notify.
 
 A Windows tray app for turning F1 through F12 and custom global hotkeys into personal actions, profiles, app integrations, and automations. Remapping works offline; an optional background check looks for newer versions on GitHub.
