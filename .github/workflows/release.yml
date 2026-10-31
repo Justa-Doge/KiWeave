@@ -50,17 +50,26 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $repo = $env:GITHUB_REPOSITORY
           $tag = $env:RELEASE_TAG
-          $json = gh api "repos/$repo/releases/tags/$tag"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not read the Beta 5 draft release.' }
-          $draft = ConvertFrom-Json -InputObject $json
-          if ($draft.tag_name -cne $tag -or -not $draft.draft) { throw "Publishing requires an existing draft release for $tag." }
+          $json = gh api "repos/$repo/releases?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not list Beta 5 releases.' }
+          $releases = ConvertFrom-Json -InputObject $json
+          $matching = @($releases | Where-Object { $_.tag_name -ceq $tag })
+          if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw "Publishing requires one existing draft release for $tag." }
+          $draft = $matching[0]
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
           $actual = @($draft.assets | ForEach-Object name)
           if ($actual.Count -ne 3 -or @($actual | Where-Object { $_ -notin $expected }).Count -gt 0 -or @($expected | Where-Object { $_ -notin $actual }).Count -gt 0) { throw 'Draft assets must exactly match the locally verified Beta 5 package and checksum manifest.' }
           $package = Join-Path $env:GITHUB_WORKSPACE 'release\prebuilt-beta5'
           New-Item -ItemType Directory -Path $package -Force | Out-Null
-          gh release download $tag --repo $repo --dir $package --pattern $expected[0] --pattern $expected[1] --pattern $expected[2]
-          if ($LASTEXITCODE -ne 0) { throw 'Could not download the exact Beta 5 draft assets.' }
+          foreach ($asset in $draft.assets) {
+            $assetPath = Join-Path $package $asset.name
+            Invoke-WebRequest -Uri "https://api.github.com/repos/$repo/releases/assets/$($asset.id)" -Headers @{
+              Authorization = "Bearer $env:GH_TOKEN"
+              Accept = 'application/octet-stream'
+              'X-GitHub-Api-Version' = '2022-11-28'
+            } -OutFile $assetPath
+            if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf) -or (Get-Item -LiteralPath $assetPath).Length -ne $asset.size) { throw "Downloaded asset size mismatch: $($asset.name)" }
+          }
           & ./tools/VerifyReleaseArtifact.ps1 -PackageDirectory $package -BuildLabel $env:BUILD_LABEL
           if ($LASTEXITCODE -ne 0) { throw 'The downloaded Beta 5 package did not pass verification.' }
           'Verified locally built WPF package assets. WPF source remains private; this job did not rebuild or upload binaries.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
@@ -86,18 +95,27 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $repo = $env:GITHUB_REPOSITORY
           $tag = $env:RELEASE_TAG
-          $json = gh api "repos/$repo/releases/tags/$tag"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not re-read the Beta 5 draft release.' }
-          $draft = ConvertFrom-Json -InputObject $json
-          if ($draft.tag_name -cne $tag -or -not $draft.draft) { throw 'The Beta 5 release is no longer a draft; refusing to publish.' }
+          $json = gh api "repos/$repo/releases?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not re-list Beta 5 releases.' }
+          $releases = ConvertFrom-Json -InputObject $json
+          $matching = @($releases | Where-Object { $_.tag_name -ceq $tag })
+          if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw 'The Beta 5 release is no longer a single draft; refusing to publish.' }
+          $draft = $matching[0]
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
           $actual = @($draft.assets | ForEach-Object name)
           if ($actual.Count -ne 3 -or @($actual | Where-Object { $_ -notin $expected }).Count -gt 0 -or @($expected | Where-Object { $_ -notin $actual }).Count -gt 0) { throw 'Draft assets changed after verification; refusing to publish.' }
           $assetStamp = @($draft.assets | Sort-Object name | ForEach-Object { "$($_.id)|$($_.name)|$($_.size)|$($_.updated_at)" }) -join "`n"
           $package = Join-Path $env:GITHUB_WORKSPACE 'release\prebuilt-beta5'
           New-Item -ItemType Directory -Path $package -Force | Out-Null
-          gh release download $tag --repo $repo --dir $package --pattern $expected[0] --pattern $expected[1] --pattern $expected[2]
-          if ($LASTEXITCODE -ne 0) { throw 'Could not download the exact Beta 5 draft assets.' }
+          foreach ($asset in $draft.assets) {
+            $assetPath = Join-Path $package $asset.name
+            Invoke-WebRequest -Uri "https://api.github.com/repos/$repo/releases/assets/$($asset.id)" -Headers @{
+              Authorization = "Bearer $env:GH_TOKEN"
+              Accept = 'application/octet-stream'
+              'X-GitHub-Api-Version' = '2022-11-28'
+            } -OutFile $assetPath
+            if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf) -or (Get-Item -LiteralPath $assetPath).Length -ne $asset.size) { throw "Downloaded asset size mismatch: $($asset.name)" }
+          }
           & ./tools/VerifyReleaseArtifact.ps1 -PackageDirectory $package -BuildLabel $env:BUILD_LABEL
           if ($LASTEXITCODE -ne 0) { throw 'The Beta 5 assets failed the final hash check.' }
           $updatedJson = gh api "repos/$repo/releases/$($draft.id)"
@@ -106,7 +124,7 @@ jobs:
           $updatedAssets = @($updated.assets | ForEach-Object name)
           $updatedStamp = @($updated.assets | Sort-Object name | ForEach-Object { "$($_.id)|$($_.name)|$($_.size)|$($_.updated_at)" }) -join "`n"
           if (-not $updated.draft -or $updatedAssets.Count -ne 3 -or @($updatedAssets | Where-Object { $_ -notin $expected }).Count -gt 0 -or @($expected | Where-Object { $_ -notin $updatedAssets }).Count -gt 0 -or $assetStamp -cne $updatedStamp) { throw 'Draft assets changed during verification; the release remains a draft.' }
-          gh release edit $tag --draft=false --prerelease --title "KiWeave $tag"
+          gh api --method PATCH "repos/$repo/releases/$($draft.id)" -F draft=false -F prerelease=true -f "name=KiWeave $tag"
           if ($LASTEXITCODE -ne 0) { throw 'GitHub could not publish the validated draft.' }
           "Published $tag from the locally verified WPF package." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
