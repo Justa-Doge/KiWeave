@@ -15,7 +15,7 @@ namespace FunctionRowRemapper
         // Bump this when publishing a matching vX.Y.Z tag for an installed build.
         internal const string CurrentVersion = "1.0.0-beta.4";
         internal const int CheckIntervalMilliseconds = 12 * 60 * 60 * 1000;
-        internal const string ReleasesApi = "https://api.github.com/repos/Justa-Doge/KeyWeave/releases";
+        internal const string ReleasesApi = "https://api.github.com/repos/Justa-Doge/KiWeave/releases";
         static readonly Regex TagPattern = new Regex(@"^v?(\d{1,5})\.(\d{1,5})\.(\d{1,5})(?:-(alpha|beta)\.(\d{1,5}))?$", RegexOptions.CultureInvariant);
 
         internal static string NewestUpdate(string lsRemoteOutput, string installedVersion)
