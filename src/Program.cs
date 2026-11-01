@@ -10,10 +10,11 @@ namespace FunctionRowRemapper
 {
     internal static class Program
     {
+        internal const int ElevatedNetworkWaitTimeoutMilliseconds = 30000;
         [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
         [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(uint processId);
         [DllImport("user32.dll")] static extern short GetAsyncKeyState(int virtualKey);
-        internal static bool SafeModeRequested(string[] args, bool shiftHeld) { string[] values = args ?? new string[0]; if (Array.IndexOf(values, "--normal-mode") >= 0) return false; return shiftHeld || Array.IndexOf(values, "--safe-mode") >= 0; }
+        internal static bool SafeModeRequested(string[] args, bool shiftHeld) { return SafeStartupPolicy.SafeModeRequested(args, shiftHeld); }
         internal static bool IsElevated()
         {
             try { using (var identity = WindowsIdentity.GetCurrent()) { var principal = new WindowsPrincipal(identity); return principal.IsInRole(WindowsBuiltInRole.Administrator); } }
@@ -21,8 +22,16 @@ namespace FunctionRowRemapper
         }
         internal static bool RequestElevatedNetworkChange(bool enabled)
         {
-            try { using (var p = Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--elevated-network " + (enabled ? "on" : "off")) { UseShellExecute = true, Verb = "runas" })) { p.WaitForExit(); return p.ExitCode == 0; } }
+            try { using (var p = Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--elevated-network " + (enabled ? "on" : "off")) { UseShellExecute = true, Verb = "runas" })) { if (p == null || !WaitForElevatedHelper(p.WaitForExit, p.Kill, p.WaitForExit)) return false; return p.ExitCode == 0; } }
             catch { return false; }
+        }
+        internal static bool WaitForElevatedHelper(Func<int, bool> waitForExit, Action terminate, Func<int, bool> waitAfterTerminate)
+        {
+            if (waitForExit == null || terminate == null || waitAfterTerminate == null) return false;
+            try { if (waitForExit(ElevatedNetworkWaitTimeoutMilliseconds)) return true; } catch { }
+            try { terminate(); } catch { }
+            try { waitAfterTerminate(1000); } catch { }
+            return false;
         }
         internal static Icon AppIcon()
         {

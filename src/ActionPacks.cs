@@ -12,6 +12,7 @@ namespace FunctionRowRemapper
     internal sealed class ActionPack
     {
         internal string Id = "", Name = "", Version = "1.0.0", Publisher = "", Description = "";
+        internal string SignatureStatus = "Unsigned detached pack";
         internal Configuration Configuration = new Configuration();
         internal ProfileCollection Profiles = new ProfileCollection();
     }
@@ -22,8 +23,10 @@ namespace FunctionRowRemapper
         internal static ActionPack Load(string path)
         {
             if (!File.Exists(path)) throw new FileNotFoundException("Action pack not found.");
-            if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Action pack is too large.");
-            string json = File.ReadAllText(path, Encoding.UTF8); ActionPackSignatures.Status(path, json); return Parse(json);
+            string json;
+            try { json = AtomicFile.ReadAllTextBounded(path, MaxBytes, new UTF8Encoding(true, true)); }
+            catch (InvalidDataException ex) { throw new ArgumentException("Action pack is too large.", ex); }
+            string signatureStatus = ActionPackSignatures.Status(path, json); ActionPack pack = Parse(json); pack.SignatureStatus = signatureStatus; return pack;
         }
         internal static ActionPack Parse(string json)
         {
@@ -50,12 +53,23 @@ namespace FunctionRowRemapper
         }
         internal static void Save(string path, ActionPack pack)
         {
-            File.WriteAllText(path, Serialize(pack), new UTF8Encoding(false));
+            AtomicFile.WriteAllText(path, Serialize(pack), new UTF8Encoding(false));
         }
         internal static string Review(ActionPack pack)
         {
             Validate(pack);
-            return ActionPrivacy.Review(pack.Configuration, pack.Name) + "\r\nPACK ID: " + pack.Id + "\r\nPACK VERSION: " + pack.Version + "\r\nCOMPATIBILITY: " + Compatibility(pack) + "\r\nTRUST: Unverified declarative pack\r\nPUBLISHER: " + pack.Publisher + " (informational; not a safety guarantee)\r\nPROFILES: " + pack.Profiles.Profiles.Length;
+            var review = new StringBuilder();
+            review.AppendLine(ActionPrivacy.Review(pack.Configuration, pack.Name));
+            review.AppendLine("PACK ID: " + pack.Id); review.AppendLine("PACK VERSION: " + pack.Version); review.AppendLine("COMPATIBILITY: " + Compatibility(pack));
+            review.AppendLine("SIGNATURE: " + (String.IsNullOrWhiteSpace(pack.SignatureStatus) ? "Unsigned detached pack" : pack.SignatureStatus));
+            review.AppendLine("TRUST: Publisher identity is informational and is not proof the pack is harmless.");
+            review.AppendLine("PUBLISHER: " + pack.Publisher); review.AppendLine("PROFILES: " + pack.Profiles.Profiles.Length);
+            foreach (KeyWeaveProfile profile in pack.Profiles.Profiles)
+            {
+                review.AppendLine(); review.AppendLine("PROFILE: " + profile.Name);
+                review.AppendLine(ActionPrivacy.Review(profile.Configuration, "profile " + profile.Name));
+            }
+            return review.ToString();
         }
         internal static void Validate(ActionPack pack)
         {
@@ -63,12 +77,15 @@ namespace FunctionRowRemapper
             if (!System.Text.RegularExpressions.Regex.IsMatch(pack.Version ?? "", "\\A[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?\\z")) throw new ArgumentException("Action-pack version must be semantic version text.");
             if (Compatibility(pack).StartsWith("Incompatible", StringComparison.Ordinal)) throw new ArgumentException(Compatibility(pack));
             ConfigStore.Validate(pack.Configuration, false); ProfileStore.Validate(pack.Profiles, false);
-            foreach (var item in ActionPrivacy.Mappings(pack.Configuration).SelectMany(x => ActionPrivacy.Effects(x.Value)))
-                if (item.Kind == ActionKind.Command || item.Kind == ActionKind.Python) throw new ArgumentException("Action packs cannot contain scripts or command actions.");
+            KeyWeaveProfile[] profileArray = pack.Profiles == null || pack.Profiles.Profiles == null ? new KeyWeaveProfile[0] : pack.Profiles.Profiles;
+            IEnumerable<Configuration> configurations = new[] { pack.Configuration }.Concat(profileArray.Select(profile => profile.Configuration));
+            foreach (var configuration in configurations)
+                foreach (var item in ActionPrivacy.Mappings(configuration).SelectMany(x => ActionPrivacy.Effects(x.Value)))
+                    if (item.Kind == ActionKind.Command || item.Kind == ActionKind.Python) throw new ArgumentException("Action packs cannot contain scripts or command actions.");
         }
         internal static string Compatibility(ActionPack pack)
         {
-            int packMajor, currentMajor; string[] p = (pack == null ? "" : pack.Version ?? "").Split('.'); string[] c = UpdateChecker.CurrentVersion.Split('.');
+            int packMajor, currentMajor; string[] p = (pack == null ? "" : pack.Version ?? "").Split('.'); string[] c = KiWeaveBuildIdentity.CurrentVersion.Split('.');
             if (p.Length < 1 || !Int32.TryParse(p[0], out packMajor) || c.Length < 1 || !Int32.TryParse(c[0], out currentMajor)) return "Unknown version";
             return packMajor > currentMajor ? "Incompatible: requires a newer major KiWeave format." : "Compatible with this KiWeave major version.";
         }

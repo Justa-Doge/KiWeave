@@ -17,6 +17,8 @@
   <ItemGroup>
     <EmbeddedResource Include="app.ico"><LogicalName>KiWeave.AppIcon</LogicalName></EmbeddedResource>
     <Compile Include="src\AssemblyInfo.cs" />
+    <Compile Include="src\ProcessProbe.cs" />
+    <Compile Include="src\ForegroundChangeMonitor.cs" />
     <Compile Include="src\UpdateChecker.cs" /><Compile Include="src\UpdateNotification.cs" /><Compile Include="src\NotificationPreferences.cs" />
     <Compile Include="src\PowerToysIntegration.cs" /><Compile Include="src\PowerToysPanel.cs" />
     <Compile Include="src\PowerToysDrift.cs" />
@@ -29,6 +31,7 @@
     <Compile Include="src\PathMigration.cs" />
     <Compile Include="src\ShortcutSuspension.cs" />
     <Compile Include="src\ShortcutSuspensionForm.cs" />
+    <Compile Include="src\SafeStartupPolicy.cs" />
     <Compile Include="src\ReleaseReadiness.cs" />
     <Compile Include="src\ReleaseReadinessForm.cs" />
     <Compile Include="src\GameMode.cs" />
@@ -36,6 +39,9 @@
     <Compile Include="src\MonitorTopology.cs" />
     <Compile Include="src\MonitorMappingScope.cs" />
     <Compile Include="src\HardwareInputInventory.cs" />
+    <Compile Include="src\KeyboardDeviceInventory.cs" />
+    <Compile Include="src\RawConsumerInput.cs" />
+    <Compile Include="src\ConsumerControlDecoder.cs" />
     <Compile Include="src\ActionPackSignatures.cs" />
     <Compile Include="src\StreamDeckBridge.cs" />
     <Compile Include="src\BackupPrivacyForm.cs" />
@@ -43,7 +49,10 @@
     <Compile Include="src\StartupGuard.cs" />
     <Compile Include="src\AuditTrail.cs" />
     <Compile Include="src\FirstPartyExtensions.cs" />
+    <Compile Include="src\FirstPartyExtensionCatalog.cs" />
     <Compile Include="src\ActionPacks.cs" />
+    <Compile Include="src\ActionPrivacy.cs" />
+    <Compile Include="src\ShortcutExplanation.cs" />
     <Compile Include="src\ProfileSchedules.cs" />
     <Compile Include="src\Profiles.cs" /><Compile Include="src\ProfileManagerForm.cs" /><Compile Include="src\ProfileSnapshots.cs" /><Compile Include="src\DiagnosticsForm.cs" />
     <Compile Include="src\MappingNotes.cs" />
@@ -51,14 +60,14 @@
     <Compile Include="src\ConditionalActions.cs" /><Compile Include="src\ConditionalActionForm.cs" />
     <Compile Include="src\SafeModeForm.cs" /><Compile Include="src\RecoveryStore.cs" />
     <Compile Include="src\LayerManagerForm.cs" /><Compile Include="src\ConflictCenterForm.cs" />
-    <Compile Include="src\ShortcutCaptureForm.cs" /><Compile Include="src\ConfigurationHistory.cs" />
+    <Compile Include="src\ShortcutCaptureForm.cs" /><Compile Include="src\ConfigurationHistory.cs" /><Compile Include="src\ConfigurationHistoryComparison.cs" />
     <Compile Include="src\LiveKeyTesterForm.cs" /><Compile Include="src\MappingSearchForm.cs" />
     <Compile Include="src\PrivacyCenterForm.cs" /><Compile Include="src\ImportReviewForm.cs" />
     <Compile Include="src\SystemActions.cs" /><Compile Include="src\BackupBundle.cs" />
     <Compile Include="src\AboutForm.cs" /><Compile Include="src\WelcomeForm.cs" /><Compile Include="src\DocumentationForm.cs" /><Compile Include="src\AppLog.cs" />
-    <Compile Include="src\MainForm.Layout.cs" /><Compile Include="src\ActionPickerForm.cs" /><Compile Include="src\DesignControls.cs" /><Compile Include="src\ExpandedActions.cs" />
+    <Compile Include="src\MainForm.Layout.cs" /><Compile Include="src\ActionPickerForm.cs" /><Compile Include="src\DesignControls.cs" /><Compile Include="src\ExpandedActions.cs" /><Compile Include="src\ActionPickerChoice.cs" /><Compile Include="src\ActionPickerCatalog.cs" />
     <Reference Include="System" /><Reference Include="System.Core" /><Reference Include="System.Drawing" /><Reference Include="System.Windows.Forms" /><Reference Include="System.Web.Extensions" /><Reference Include="System.Security" />
-    <Compile Include="src\Configuration.cs" /><Compile Include="src\Ddc.cs" /><Compile Include="src\Engine.cs" /><Compile Include="src\Hotkeys.cs" /><Compile Include="src\JsonSyntax.cs" /><Compile Include="src\MainForm.cs" /><Compile Include="src\Program.cs" /><Compile Include="src\Sequence.cs" /><Compile Include="src\SequenceBuilderForm.cs" /><Compile Include="src\UserPreferences.cs" />
+    <Compile Include="src\AtomicFile.cs" /><Compile Include="src\Configuration.cs" /><Compile Include="src\Ddc.cs" /><Compile Include="src\Engine.cs" /><Compile Include="src\FirstPartyExtensionState.cs" /><Compile Include="src\Hotkeys.cs" /><Compile Include="src\JsonSyntax.cs" /><Compile Include="src\MainForm.cs" /><Compile Include="src\Program.cs" /><Compile Include="src\Sequence.cs" /><Compile Include="src\SequenceBuilderForm.cs" /><Compile Include="src\UserPreferences.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

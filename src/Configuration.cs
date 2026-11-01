@@ -9,24 +9,25 @@ using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    internal static class AppStorage
+    public static class AppStorage
     {
+        static string testDataFolder;
         internal static string DefaultDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave"); } }
         internal static string PortableRoot { get { return Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "KiWeaveData"); } }
         internal static string PortableMarkerPath { get { return Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "portable.mode"); } }
-        internal static bool IsPortable { get { try { return File.Exists(PortableMarkerPath); } catch { return false; } } }
-        internal static string DataFolder { get { return IsPortable ? PortableRoot : DefaultDataFolder; } }
-        internal static void EnablePortableMode()
+        public static bool IsPortable { get { try { return File.Exists(PortableMarkerPath); } catch { return false; } } }
+        public static string DataFolder { get { return testDataFolder ?? (IsPortable ? PortableRoot : DefaultDataFolder); } }
+        internal static void SetTestDataFolder(string folder)
+        {
+            if (String.IsNullOrWhiteSpace(folder)) throw new ArgumentException("A test data folder is required.");
+            string fullPath = Path.GetFullPath(folder), tempRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Test data must stay under the system temp folder.");
+            testDataFolder = fullPath;
+        }
+        public static void EnablePortableMode()
         {
             Directory.CreateDirectory(PortableRoot);
-            if (Directory.Exists(DefaultDataFolder))
-                foreach (string file in Directory.GetFiles(DefaultDataFolder, "*", SearchOption.AllDirectories))
-                {
-                    string relative = file.Substring(DefaultDataFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    string target = Path.Combine(PortableRoot, relative);
-                    Directory.CreateDirectory(Path.GetDirectoryName(target));
-                    if (!File.Exists(target)) File.Copy(file, target);
-                }
+            CopyDirectoryIfMissing(DefaultDataFolder, PortableRoot);
             File.WriteAllText(PortableMarkerPath, "KiWeave portable data location\r\n", Encoding.ASCII);
         }
         internal static string ControlCommandPath { get { return Path.Combine(DataFolder, "control.command"); } }
@@ -37,7 +38,7 @@ namespace FunctionRowRemapper
         }
         internal static string TakeControlCommand()
         {
-            try { if (!File.Exists(ControlCommandPath)) return ""; string command = File.ReadAllText(ControlCommandPath, Encoding.UTF8).Trim(); File.Delete(ControlCommandPath); return command; } catch { return ""; }
+            try { if (!File.Exists(ControlCommandPath)) return ""; string command = AtomicFile.ReadAllTextBounded(ControlCommandPath, 64, Encoding.UTF8).Trim(); File.Delete(ControlCommandPath); return command; } catch { return ""; }
         }
         internal static string LegacyDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FunctionRowRemapper"); } }
         internal static string LegacyBrandDataFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KeyWeave"); } }
@@ -48,18 +49,125 @@ namespace FunctionRowRemapper
         }
         internal static void MigrateLegacy(string legacyDataFolder, string dataFolder)
         {
-            if (!Directory.Exists(legacyDataFolder) || String.Equals(dataFolder, legacyDataFolder, StringComparison.OrdinalIgnoreCase)) return;
+            if (!Directory.Exists(legacyDataFolder) || String.Equals(dataFolder, legacyDataFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                MigrateConfigurationExtension(dataFolder);
+                return;
+            }
             Directory.CreateDirectory(dataFolder);
-            foreach (string name in new[] { "config.json", "config.json.bak", "profiles.json", "profiles.json.bak", "preferences.json", "preferences.json.bak", "first-run.seen" }) CopyIfMissing(Path.Combine(legacyDataFolder, name), Path.Combine(dataFolder, name));
+            foreach (string name in new[] { "config.json", "config.json.bak", "profiles.json", "profiles.json.bak", "preferences.json", "preferences.json.bak", "language.json", "language.json.bak", "first-run.seen" }) CopyIfMissing(Path.Combine(legacyDataFolder, name), Path.Combine(dataFolder, name));
             foreach (string name in new[] { "Backups", "History", "Drafts", "Logs" }) CopyDirectoryIfMissing(Path.Combine(legacyDataFolder, name), Path.Combine(dataFolder, name));
+            MigrateConfigurationExtension(dataFolder);
             string marker = Path.Combine(dataFolder, ".migrated-from-function-row-remapper"); if (!File.Exists(marker)) File.WriteAllText(marker, DateTime.UtcNow.ToString("o"));
+        }
+        static void MigrateConfigurationExtension(string dataFolder)
+        {
+            string oldPath = Path.Combine(dataFolder, "config.json"), newPath = Path.Combine(dataFolder, "config.kiweave");
+            if (File.Exists(oldPath) && !File.Exists(newPath)) File.Copy(oldPath, newPath, false);
+            string oldBackup = oldPath + ".bak", newBackup = newPath + ".bak";
+            if (File.Exists(oldBackup) && !File.Exists(newBackup)) File.Copy(oldBackup, newBackup, false);
         }
         static void CopyIfMissing(string source, string destination) { if (File.Exists(source) && !File.Exists(destination)) { Directory.CreateDirectory(Path.GetDirectoryName(destination)); File.Copy(source, destination, false); } }
         static void CopyDirectoryIfMissing(string source, string destination)
         {
-            if (!Directory.Exists(source)) return; Directory.CreateDirectory(destination);
-            foreach (string directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories)) Directory.CreateDirectory(destination + directory.Substring(source.Length));
-            foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories)) CopyIfMissing(file, destination + file.Substring(source.Length));
+            if (!Directory.Exists(source)) return;
+            string sourceRoot = NormalizeDirectoryPath(source), destinationRoot = NormalizeDirectoryPath(destination);
+            if (IsReparsePoint(sourceRoot) || (Directory.Exists(destinationRoot) && IsReparsePoint(destinationRoot)) || IsWithin(destinationRoot, sourceRoot)) return;
+            Directory.CreateDirectory(destinationRoot);
+            var pending = new Stack<string>(); pending.Push(sourceRoot);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                foreach (string directory in Directory.GetDirectories(current))
+                {
+                    if (IsReparsePoint(directory)) continue;
+                    string targetDirectory = GetSafeMigrationTarget(sourceRoot, destinationRoot, directory);
+                    if (targetDirectory == null || (Directory.Exists(targetDirectory) && IsReparsePoint(targetDirectory))) continue;
+                    Directory.CreateDirectory(targetDirectory);
+                    pending.Push(directory);
+                }
+                foreach (string file in Directory.GetFiles(current))
+                {
+                    if (IsReparsePoint(file)) continue;
+                    string targetFile = GetSafeMigrationTarget(sourceRoot, destinationRoot, file);
+                    if (targetFile == null || File.Exists(targetFile) || Directory.Exists(targetFile)) continue;
+                    Directory.CreateDirectory(Path.GetDirectoryName(targetFile));
+                    File.Copy(file, targetFile, false);
+                }
+            }
+        }
+        static string NormalizeDirectoryPath(string path)
+        {
+            string full = Path.GetFullPath(path), root = Path.GetPathRoot(full);
+            return full.Length > root.Length ? full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) : root;
+        }
+        static bool IsWithin(string path, string root)
+        {
+            string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal) || root.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                ? root : root + Path.DirectorySeparatorChar;
+            return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+        static string GetSafeMigrationTarget(string sourceRoot, string destinationRoot, string sourcePath)
+        {
+            string sourcePrefix = sourceRoot.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal) || sourceRoot.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                ? sourceRoot : sourceRoot + Path.DirectorySeparatorChar;
+            if (!sourcePath.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase)) return null;
+            string relative = sourcePath.Substring(sourcePrefix.Length);
+            string target = Path.GetFullPath(Path.Combine(destinationRoot, relative));
+            return IsWithin(target, destinationRoot) ? target : null;
+        }
+        static bool IsReparsePoint(string path)
+        {
+            try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+            catch { return true; }
+        }
+        internal static bool HasReparsePointInPath(string path)
+        {
+            if (String.IsNullOrWhiteSpace(path)) return true;
+            string current;
+            try { current = Path.GetFullPath(path); } catch { return true; }
+            while (!String.IsNullOrEmpty(current))
+            {
+                try { if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true; }
+                catch { if (Directory.Exists(current) || File.Exists(current)) return true; }
+                string parent = Path.GetDirectoryName(current);
+                if (String.IsNullOrEmpty(parent) || String.Equals(parent, current, StringComparison.OrdinalIgnoreCase)) break;
+                current = parent;
+            }
+            return false;
+        }
+        internal static void EnsureNoReparsePointInPath(string path)
+        {
+            if (HasReparsePointInPath(path)) throw new IOException("Refusing to use a KiWeave data path that traverses a symbolic link or junction.");
+        }
+        internal static IEnumerable<string> EnumerateDirectFilesWithoutFollowingReparsePoints(string root, string pattern)
+        {
+            if (String.IsNullOrWhiteSpace(root)) yield break;
+            string fullRoot = null;
+            try { fullRoot = Path.GetFullPath(root); } catch { }
+            if (fullRoot == null || !Directory.Exists(fullRoot) || HasReparsePointInPath(fullRoot)) yield break;
+            string[] files = null;
+            try { files = Directory.GetFiles(fullRoot, String.IsNullOrWhiteSpace(pattern) ? "*" : pattern, SearchOption.TopDirectoryOnly); } catch { }
+            if (files == null) yield break;
+            foreach (string file in files) if (!HasReparsePointInPath(file)) yield return file;
+        }
+        internal static IEnumerable<string> EnumerateFilesWithoutFollowingReparsePoints(string root, string pattern)
+        {
+            if (String.IsNullOrWhiteSpace(root)) yield break;
+            string fullRoot = null;
+            try { fullRoot = NormalizeDirectoryPath(root); } catch { }
+            if (fullRoot == null || !Directory.Exists(fullRoot) || HasReparsePointInPath(fullRoot)) yield break;
+            var pending = new Stack<string>(); pending.Push(fullRoot);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                if (HasReparsePointInPath(current)) continue;
+                string[] directories, files;
+                try { directories = Directory.GetDirectories(current); } catch { directories = new string[0]; }
+                foreach (string directory in directories) if (!HasReparsePointInPath(directory)) pending.Push(directory);
+                try { files = Directory.GetFiles(current, String.IsNullOrWhiteSpace(pattern) ? "*" : pattern); } catch { files = new string[0]; }
+                foreach (string file in files) if (!HasReparsePointInPath(file)) yield return file;
+            }
         }
     }
 
@@ -72,7 +180,7 @@ namespace FunctionRowRemapper
         public string MonitorId = "", MonitorControl = "";
         public int MonitorStep = 5;
         public Mapping Copy() { return (Mapping)MemberwiseClone(); }
-        public bool Repeats { get { return Kind == ActionKind.Monitor || (Kind == ActionKind.Media && (Target == "VolumeUp" || Target == "VolumeDown")); } }
+        public bool Repeats { get { return (Kind == ActionKind.Monitor && (DdcOperation.Find(MonitorControl) == null || !DdcOperation.Find(MonitorControl).IsOneShotCommand)) || (Kind == ActionKind.Media && (Target == "VolumeUp" || Target == "VolumeDown")); } }
         public string Summary
         {
             get
@@ -89,7 +197,7 @@ namespace FunctionRowRemapper
                     return SystemActionLabels.ContainsKey(Target) ? SystemActionLabels[Target] : "System action";
                 }
                 if (Kind == ActionKind.HttpRequest) return "HTTP request: " + Target;
-                if (Kind == ActionKind.Monitor) return "DDC/CI: " + (DdcOperation.Find(MonitorControl) == null ? "Choose a control" : DdcOperation.Find(MonitorControl).Label) + " (" + MonitorStep + "%)";
+                if (Kind == ActionKind.Monitor) { var operation = DdcOperation.Find(MonitorControl); return "DDC/CI: " + (operation == null ? "Choose a control" : operation.Label) + (operation != null && operation.IsOneShotCommand ? "" : " (" + MonitorStep + "%)"); }
                 if (Kind == ActionKind.SendKey || Kind == ActionKind.SendShortcut) return Target;
                 return Labels[(int)Kind] + ": " + Path.GetFileName(Target.TrimEnd('\\'));
             }
@@ -148,7 +256,7 @@ namespace FunctionRowRemapper
     {
         public static readonly Dictionary<string, string> MediaLabels = new Dictionary<string, string> {
             { "VolumeDown", "Volume down" }, { "VolumeUp", "Volume up" }, { "VolumeMute", "Mute / unmute" },
-            { "MediaPlayPause", "Play / pause" }, { "MediaNextTrack", "Next track" }, { "MediaPreviousTrack", "Previous track" }
+            { "MediaPlayPause", "Play / pause" }, { "MediaNextTrack", "Next track" }, { "MediaPreviousTrack", "Previous track" }, { "MediaEject", "Eject" }
         };
         public static int[] Parse(string text, bool single)
         {
@@ -174,6 +282,7 @@ namespace FunctionRowRemapper
                     if (t.Length == 1 && t[0] >= '0' && t[0] <= '9') t = "D" + t;
                     if (t.Equals("Esc", StringComparison.OrdinalIgnoreCase)) t = "Escape";
                     if (t.Equals("Plus", StringComparison.OrdinalIgnoreCase)) t = "Oemplus";
+                    if (t.Equals("MediaEject", StringComparison.OrdinalIgnoreCase)) { vk = 0xB8; result.Add(vk); continue; }
                     Keys k;
                     if (!Enum.TryParse<Keys>(t, true, out k) || !Enum.IsDefined(typeof(Keys), k) || t.Length == 0 || Char.IsDigit(t[0]))
                         throw new ArgumentException("Unknown key. Examples: A, F5, Enter, Tab, Escape, Left, Space, Oemplus.");
@@ -201,7 +310,7 @@ namespace FunctionRowRemapper
     public static class ConfigStore
     {
         public const int MaxBytes = 65536;
-        public static string DefaultPath { get { return Path.Combine(AppStorage.DataFolder, "config.json"); } }
+        public static string DefaultPath { get { return Path.Combine(AppStorage.DataFolder, "config.kiweave"); } }
         public static void Validate(Mapping m, bool checkExists)
         {
             if (m == null || !Enum.IsDefined(typeof(ActionKind), m.Kind)) throw new ArgumentException("Unknown action type.");
@@ -274,7 +383,7 @@ namespace FunctionRowRemapper
                 if (h == null || String.IsNullOrWhiteSpace(h.Shortcut) || h.Shortcut.Length > 80) throw new ArgumentException("Custom hotkey " + (i + 1) + " is incomplete.");
                 string normalized = HotkeyChord.Normalize(h.Shortcut);
                 if (!seen.Add(normalized)) throw new ArgumentException("Custom hotkey conflict: " + normalized + " is assigned more than once. Give each entry a different shortcut.");
-                if (h.Action == null || h.Action.Kind == ActionKind.PassThrough || h.Action.Kind == ActionKind.Unbound) throw new ArgumentException("Custom hotkey " + (i + 1) + " needs a real action.");
+                if (h.Action == null) throw new ArgumentException("Custom hotkey " + (i + 1) + " needs an action.");
                 try { Validate(h.Action, checkExists); } catch (Exception e) { throw new ArgumentException("Custom hotkey " + (i + 1) + ": " + e.Message); }
             }
             if (c.Layers == null || c.Layers.Length > 4) throw new ArgumentException("Use up to four modifier layers.");
@@ -286,6 +395,10 @@ namespace FunctionRowRemapper
                 int layerKey = LayerKeys.VirtualKey(layer.ActivationKey); if (!layerKeys.Add(layerKey)) throw new ArgumentException("Each layer needs a different activation key.");
                 if (layer.Mappings == null || layer.Mappings.Length != 12) throw new ArgumentException("Layer " + layer.Name + " needs exactly twelve mappings.");
                 for (int i = 0; i < 12; i++) try { Validate(layer.Mappings[i], checkExists); } catch (Exception e) { throw new ArgumentException(layer.Name + " F" + (i + 1) + ": " + e.Message); }
+            }
+            foreach (CustomHotkey hotkey in c.CustomHotkeys) {
+                HotkeyChord chord = HotkeyChord.Parse(hotkey.Shortcut);
+                if (layerKeys.Contains(chord.Key)) throw new ArgumentException("Custom hotkey " + hotkey.Shortcut + " conflicts with a modifier-layer activation key. Change one of the bindings.");
             }
         }
         static Dictionary<string, object> Object(object x, string[] fields)
@@ -327,10 +440,17 @@ namespace FunctionRowRemapper
                 var hotkeys = root["customHotkeys"] as object[];
                 if (hotkeys == null || hotkeys.Length > 32) throw new ArgumentException("Custom hotkeys must be an array of up to 32 entries.");
                 c.CustomHotkeys = hotkeys.Select(item => {
-                    var d = Object(item, new[] { "shortcut", "action", "target", "arguments", "workingDirectory" });
-                    ActionKind kind; string action = Text(d["action"]);
-                    if (!Enum.TryParse<ActionKind>(action, false, out kind) || kind == ActionKind.Monitor || !Enum.IsDefined(typeof(ActionKind), kind)) throw new ArgumentException("Unknown custom hotkey action.");
-                    return new CustomHotkey { Shortcut = Text(d["shortcut"]), Action = new Mapping { Kind = kind, Target = Text(d["target"]), Arguments = Text(d["arguments"]), WorkingDirectory = Text(d["workingDirectory"]) } };
+                    var raw = item as Dictionary<string, object>;
+                    string action = raw != null && raw.ContainsKey("action") ? Text(raw["action"]) : "";
+                    ActionKind kind;
+                    if (!Enum.TryParse<ActionKind>(action, false, out kind) || !Enum.IsDefined(typeof(ActionKind), kind)) throw new ArgumentException("Unknown custom hotkey action.");
+                    if (kind == ActionKind.Monitor) {
+                        var monitor = Object(item, new[] { "shortcut", "action", "monitorId", "control", "step" });
+                        if (!(monitor["step"] is int)) throw new ArgumentException("Custom DDC/CI hotkeys require an integer step.");
+                        return new CustomHotkey { Shortcut = Text(monitor["shortcut"]), Action = new Mapping { Kind = kind, MonitorId = Text(monitor["monitorId"]), MonitorControl = Text(monitor["control"]), MonitorStep = (int)monitor["step"] } };
+                    }
+                    var standard = Object(item, new[] { "shortcut", "action", "target", "arguments", "workingDirectory" });
+                    return new CustomHotkey { Shortcut = Text(standard["shortcut"]), Action = new Mapping { Kind = kind, Target = Text(standard["target"]), Arguments = Text(standard["arguments"]), WorkingDirectory = Text(standard["workingDirectory"]) } };
                 }).ToArray();
             }
             if (version == 4) {
@@ -374,7 +494,8 @@ namespace FunctionRowRemapper
                 b.Append(",\r\n  \"customHotkeys\": [\r\n");
                 for (int i = 0; i < c.CustomHotkeys.Length; i++) {
                     var h = c.CustomHotkeys[i];
-                    b.Append("    " + s.Serialize(new { shortcut = HotkeyChord.Normalize(h.Shortcut), action = h.Action.Kind.ToString(), target = h.Action.Target, arguments = h.Action.Arguments, workingDirectory = h.Action.WorkingDirectory }));
+                    if (h.Action.Kind == ActionKind.Monitor) b.Append("    " + s.Serialize(new { shortcut = HotkeyChord.Normalize(h.Shortcut), action = "Monitor", monitorId = h.Action.MonitorId, control = h.Action.MonitorControl, step = h.Action.MonitorStep }));
+                    else b.Append("    " + s.Serialize(new { shortcut = HotkeyChord.Normalize(h.Shortcut), action = h.Action.Kind.ToString(), target = h.Action.Target, arguments = h.Action.Arguments, workingDirectory = h.Action.WorkingDirectory }));
                     b.Append(i == c.CustomHotkeys.Length - 1 ? "\r\n" : ",\r\n");
                 }
                 b.Append("  ]");
@@ -400,12 +521,11 @@ namespace FunctionRowRemapper
         }
         public static Configuration Load(string path)
         {
-            if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Configuration exceeds 64 KB.");
-            return Parse(File.ReadAllText(path, Encoding.UTF8));
+            return Parse(AtomicFile.ReadAllTextBounded(path, MaxBytes, Encoding.UTF8));
         }
         public static string MigrationPreview(string path)
         {
-            string json = File.ReadAllText(path, Encoding.UTF8); JsonSyntax.Check(json);
+            string json = AtomicFile.ReadAllTextBounded(path, MaxBytes, Encoding.UTF8); JsonSyntax.Check(json);
             var root = new JavaScriptSerializer().DeserializeObject(json) as Dictionary<string, object>;
             if (root == null || !(root.ContainsKey("version")) || !(root["version"] is int)) throw new ArgumentException("Configuration version is missing or invalid.");
             int version = (int)root["version"];

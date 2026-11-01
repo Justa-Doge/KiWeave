@@ -5,12 +5,13 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace FunctionRowRemapper
 {
     public sealed class DdcOperation
     {
-        public string Id, Label; public byte Code; public int Direction;
+        public string Id, Label; public byte Code; public int Direction; public int FixedValue = -1;
         public override string ToString() { return Label; }
         public static readonly DdcOperation[] All = {
             new DdcOperation { Id = "BrightnessUp", Label = "Brightness up", Code = 0x10, Direction = 1 },
@@ -18,9 +19,34 @@ namespace FunctionRowRemapper
             new DdcOperation { Id = "ContrastUp", Label = "Contrast up", Code = 0x12, Direction = 1 },
             new DdcOperation { Id = "ContrastDown", Label = "Contrast down", Code = 0x12, Direction = -1 },
             new DdcOperation { Id = "VolumeUp", Label = "Monitor volume up", Code = 0x62, Direction = 1 },
-            new DdcOperation { Id = "VolumeDown", Label = "Monitor volume down", Code = 0x62, Direction = -1 }
+            new DdcOperation { Id = "VolumeDown", Label = "Monitor volume down", Code = 0x62, Direction = -1 },
+            new DdcOperation { Id = "MonitorStandby", Label = "Monitor power: request standby (may turn display off)", Code = 0xD6, FixedValue = 4 },
+            new DdcOperation { Id = "MonitorWake", Label = "Monitor power: request normal operation (wake)", Code = 0xD6, FixedValue = 1 },
+            new DdcOperation { Id = "BacklightOff", Label = "Backlight off", Code = 0xD6, FixedValue = 5 },
+            new DdcOperation { Id = "BacklightOn", Label = "Backlight on", Code = 0xD6, FixedValue = 1 }
         };
-        public static DdcOperation Find(string id) { return All.FirstOrDefault(o => o.Id == id); }
+        public static DdcOperation Find(string id)
+        {
+            // Preserve IDs from the earlier picker.
+            if (String.Equals(id, "BacklightLevelOff", StringComparison.Ordinal)) id = "BacklightOff";
+            else if (String.Equals(id, "BacklightLevelOn", StringComparison.Ordinal)) id = "BacklightOn";
+            return All.FirstOrDefault(o => o.Id == id);
+        }
+        public static bool SameControl(string first, string second)
+        {
+            var firstOperation = Find(first);
+            var secondOperation = Find(second);
+            return firstOperation != null && secondOperation != null
+                ? Object.ReferenceEquals(firstOperation, secondOperation)
+                : String.Equals(first, second, StringComparison.OrdinalIgnoreCase);
+        }
+        public bool IsOneShotCommand { get { return Id == "BacklightOn" || Id == "BacklightOff" || Id == "MonitorWake" || Id == "MonitorStandby"; } }
+        public uint ValueFor(uint maximum)
+        {
+            if (FixedValue >= 0) return (uint)FixedValue;
+            if (maximum == 0 || maximum > 65535) throw new ArgumentException("The monitor returned an invalid maximum value.");
+            return maximum;
+        }
         public static uint Next(uint current, uint maximum, int step, int direction)
         {
             if (maximum == 0 || maximum > 65535 || current > maximum || step < 1 || step > 20 || (direction != -1 && direction != 1)) throw new ArgumentException("Invalid monitor range or step.");
@@ -39,47 +65,73 @@ namespace FunctionRowRemapper
     public sealed class DdcService : IDdcController
     {
         public static readonly DdcService Shared = new DdcService();
+        internal static bool HasBacklightControls { get { return true; } }
         readonly object gate = new object();
         DdcMonitor[] monitors = new DdcMonitor[0];
-        static readonly byte[] AllowedCodes = { 0x10, 0x12, 0x62 };
+        static readonly byte[] AllowedCodes = { 0x10, 0x12, 0x62, 0x6B, 0xD6 };
         public DdcMonitor[] Scan()
         {
             lock (gate) {
-                var found = new List<DdcMonitor>();
-                using (var list = PhysicalSet.Open()) foreach (var p in list.Items) {
-                    var supported = new List<byte>(); string caps = ReadCapabilities(p.Handle);
-                    var model = Regex.Match(caps ?? "", @"\bmodel\(([^()]{1,80})\)", RegexOptions.IgnoreCase);
-                    if (model.Success) p.Name = model.Groups[1].Value.Trim() + " " + p.Name.Substring(p.Name.LastIndexOf('('));
-                    HashSet<byte> advertised = ParseVcpCodes(caps);
-                    foreach (byte code in AllowedCodes) {
-                        if (advertised != null && !advertised.Contains(code)) continue;
-                        uint type, current, maximum;
-                        if (GetVCPFeatureAndVCPFeatureReply(p.Handle, code, out type, out current, out maximum) && maximum > 0 && maximum <= 65535 && current <= maximum) supported.Add(code);
-                    }
-                    found.Add(new DdcMonitor { Id = p.Id, Name = p.Name, Codes = supported.ToArray(), Status = supported.Count == 0 ? "No supported DDC/CI controls responded. Check the monitor's DDC/CI setting and cable." : "Detected: " + String.Join(", ", supported.Select(c => c == 0x10 ? "brightness" : c == 0x12 ? "contrast" : "monitor volume")) + "." });
+                using (var list = PhysicalSet.Open()) {
+                    var physical = list.Items.ToArray();
+                    var found = new DdcMonitor[physical.Length];
+                    // Each display has its own DXVA2 handle. Query a few monitors
+                    // concurrently so one slow DDC response does not stall all others.
+                    Parallel.For(0, physical.Length,
+                        new ParallelOptions { MaxDegreeOfParallelism = Math.Min(4, Math.Max(1, physical.Length)) }, index => {
+                            var p = physical[index];
+                            var supported = new List<byte>(); string caps = ReadCapabilities(p.Handle);
+                            var model = Regex.Match(caps ?? "", @"\bmodel\(([^()]{1,80})\)", RegexOptions.IgnoreCase);
+                            if (model.Success) p.Name = model.Groups[1].Value.Trim() + " " + p.Name.Substring(p.Name.LastIndexOf('('));
+                            HashSet<byte> advertised = ParseVcpCodes(caps);
+                            foreach (byte code in AllowedCodes) {
+                                if (advertised != null && !advertised.Contains(code)) continue;
+                                uint type, current, maximum;
+                                bool responded = GetVCPFeatureAndVCPFeatureReply(p.Handle, code, out type, out current, out maximum);
+                                if (IsSupportedProbe(code, responded, type, current, maximum)) supported.Add(code);
+                            }
+                            found[index] = new DdcMonitor { Id = p.Id, Name = p.Name, Codes = supported.ToArray(), Status = supported.Count == 0 ? "No supported DDC/CI controls responded. Check the monitor's DDC/CI setting and cable." : "Detected: " + String.Join(", ", supported.Select(CodeLabel)) + "." };
+                        });
+                    monitors = found; return monitors.ToArray();
                 }
-                monitors = found.ToArray(); return monitors.ToArray();
             }
+        }
+        internal static bool IsSupportedProbe(byte code, bool responded, uint type, uint current, uint maximum)
+        {
+            if (!responded) return false;
+            // VCP 0xD6 is a discrete power-mode control (values such as 1=on and
+            // 4=off), not a continuous slider. Its max/current fields do not have
+            // the same range semantics as brightness, contrast, or volume.
+            if (code == 0xD6) return type == 1;
+            return maximum > 0 && maximum <= 65535 && current <= maximum;
         }
         public void Apply(Mapping mapping, Func<bool> stillActive)
         {
             ConfigStore.Validate(mapping, false);
             lock (gate) {
                 if (!stillActive()) return;
-                var known = monitors.FirstOrDefault(m => m.Id == mapping.MonitorId);
                 var operation = DdcOperation.Find(mapping.MonitorControl);
-                if (known == null || !known.Codes.Contains(operation.Code)) throw new InvalidOperationException("Monitor control unavailable. Open settings and click Detect monitors.");
+                byte code = operation.Code;
+                // Discovery is UI information, not a prerequisite for executing a
+                // saved binding. Resolve its stable monitor identity on every call
+                // and let the actual VCP request determine whether it is supported.
                 using (var list = PhysicalSet.Open()) {
                     var p = list.Items.SingleOrDefault(m => m.Id == mapping.MonitorId);
                     if (p == null) throw new InvalidOperationException("The selected monitor is disconnected. Reconnect it or choose another monitor.");
+                    if (code == 0xD6) {
+                        if (!stillActive()) return;
+                        if (!SetVCPFeature(p.Handle, code, operation.ValueFor(0))) throw new InvalidOperationException("The monitor rejected the DDC/CI power-mode command.");
+                        return;
+                    }
                     uint type, current, maximum;
-                    if (!GetVCPFeatureAndVCPFeatureReply(p.Handle, operation.Code, out type, out current, out maximum)) throw new InvalidOperationException("The monitor stopped responding to DDC/CI. Check its power, cable and DDC/CI setting.");
+                    if (!GetVCPFeatureAndVCPFeatureReply(p.Handle, code, out type, out current, out maximum)) throw new InvalidOperationException("The monitor stopped responding to DDC/CI. Check its power, cable and DDC/CI setting.");
                     uint next = DdcOperation.Next(current, maximum, mapping.MonitorStep, operation.Direction);
                     if (!stillActive() || next == current) return;
-                    if (!SetVCPFeature(p.Handle, operation.Code, next)) throw new InvalidOperationException("The monitor rejected the DDC/CI adjustment.");
+                    if (!SetVCPFeature(p.Handle, code, next)) throw new InvalidOperationException("The monitor rejected the DDC/CI adjustment.");
                 }
             }
         }
+        static string CodeLabel(byte code) { return code == 0x10 ? "brightness" : code == 0x12 ? "contrast" : code == 0x62 ? "monitor volume" : code == 0x6B ? "backlight level" : code == 0xD6 ? "monitor power mode" : "VCP 0x" + code.ToString("X2"); }
         // Parse only top-level tokens within vcp(...), excluding enumerated values such as 60(10 12).
         internal static HashSet<byte> ParseVcpCodes(string caps)
         {

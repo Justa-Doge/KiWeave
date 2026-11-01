@@ -206,13 +206,13 @@ namespace FunctionRowRemapper
             AddSetting(left, networkAccess, "Allow network access", "Administrator approval is required. Master switch for GitHub update checks and user-triggered HTTP actions; local remapping stays available when off.", ToggleBackgroundPreference);
             AddSetting(left, checkUpdates, "Check for updates automatically", "Requires Allow network access. Checks GitHub at launch and every 12 hours; only notifies, never downloads.", ToggleBackgroundPreference);
             smoothScrolling.Checked = preferences.SmoothScrolling; AddSetting(left, smoothScrolling, "Smooth scrolling", "Animate long panels instead of jumping between scroll positions.", ToggleBackgroundPreference);
-            toastStyleChoice.Items.Clear(); toastStyleChoice.Items.AddRange(new object[] { "KiWeave", "Compact flyout" }); toastStyleChoice.SelectedItem = preferences.ToastStyle; UiStyle.Combo(toastStyleChoice); toastStyleChoice.SelectedIndexChanged += ToggleToastStyle; left.Controls.Add(UiStyle.Field("Toast style", toastStyleChoice));
+            toastStyleChoice.Items.Clear(); toastStyleChoice.Items.Add("Compact flyout"); if (IsPreRelease) toastStyleChoice.Items.Add(PreReleaseToastLabel); toastStyleChoice.SelectedItem = IsPreRelease && preferences.ToastStyle == "KiWeave" ? PreReleaseToastLabel : "Compact flyout"; UiStyle.Combo(toastStyleChoice); toastStyleChoice.SelectedIndexChanged += ToggleToastStyle; left.Controls.Add(UiStyle.Field("Toast style", toastStyleChoice));
             var advanced = UiStyle.Stack(); advanced.Visible = false;
             Button advancedToggle = null; advancedToggle = UiStyle.Button("Show advanced settings", delegate { advanced.Visible = !advanced.Visible; advancedToggle.Text = advanced.Visible ? "Hide advanced settings" : "Show advanced settings"; left.PerformLayout(); generalScroll.PerformLayout(); }); advancedToggle.Margin = new Padding(0, 0, 0, 14); left.Controls.Add(advancedToggle);
             AddSettingsSection(advanced, "Safety and notifications");
             AddSetting(advanced, experimentalFeatures, "Allow experimental actions", "Master kill switch for HTTP, command/script, Python, and monitor actions.", ToggleFeatureFlag);
             AddSetting(advanced, developerMode, "Developer mode", "Enables explicit one-shot Test action buttons.", ToggleFeatureFlag);
-            AddSetting(advanced, gameMode, "Game mode", "Fullscreen foreground windows receive normal function and layer keys.", ToggleGameMode);
+            AddSetting(advanced, gameMode, "Game mode", "Configured F-key and custom bindings stay active in fullscreen; other keys pass through normally. KiWeave does not inject into games.", ToggleGameMode);
             notifyUpdates.Checked = notificationPreferences.Updates; AddSetting(advanced, notifyUpdates, "Show update notifications", "Keep update checks enabled but silence tray popups.", ToggleNotificationPreference);
             notifyHealth.Checked = notificationPreferences.Health; AddSetting(advanced, notifyHealth, "Show health warnings", "Show local configuration-health findings in the status area.", ToggleNotificationPreference);
             notifySafety.Checked = notificationPreferences.Safety; AddSetting(advanced, notifySafety, "Show safety warnings", "Allow non-destructive safety notices.", ToggleNotificationPreference);
@@ -252,7 +252,7 @@ namespace FunctionRowRemapper
             help.Controls.Add(UiStyle.Button("Controller triggers", delegate { using (var dialog = new ControllerTriggersForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("Controller trigger mappings saved. Restart KiWeave to activate changes.", false); }));
             help.Controls.Add(UiStyle.Button("Support bundle", delegate { OpenSupportBundle(); })); right.Controls.Add(help);
             help.Controls.Add(UiStyle.Button("Migrate app paths", OpenPathMigration));
-            help.Controls.Add(UiStyle.Button("Suspend shortcuts by app", delegate { using (var dialog = new ShortcutSuspensionForm()) if (dialog.ShowDialog(this) == DialogResult.OK) SetFeedback("Shortcut suspension list saved.", false); }));
+            help.Controls.Add(UiStyle.Button("Suspend shortcuts by app", delegate { using (var dialog = new ShortcutSuspensionForm()) if (dialog.ShowDialog(this) == DialogResult.OK) { ShortcutSuspension.RefreshForegroundState(); ApplyHotkeys(saved); SetFeedback("Shortcut suspension list saved.", false); } }));
             help.Controls.Add(UiStyle.Button("Release readiness", delegate { using (var dialog = new ReleaseReadinessForm(saved, profiles)) dialog.ShowDialog(this); }));
             var scripts = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, 12) };
             scripts.Controls.Add(UiStyle.Button("Open script workspace", OpenScriptWorkspace)); right.Controls.Add(scripts);
@@ -451,7 +451,7 @@ namespace FunctionRowRemapper
             customTargetField = UiStyle.Field("Key, shortcut or file", PathRow(customTarget, customActionRecord, customBrowse)); customStack.Controls.Add(customTargetField);
             UiStyle.Combo(customMedia); customMedia.Items.AddRange(Shortcuts.MediaLabels.Values.ToArray());
             customArgsField = UiStyle.Field("Arguments (optional)", customArguments); customWorkField = UiStyle.Field("Working folder (optional)", customWorking);
-            customStack.Controls.Add(customArgsField); customStack.Controls.Add(customWorkField);
+            customStack.Controls.Add(customArgsField); customStack.Controls.Add(customWorkField); BuildCustomMonitorEditor(); customStack.Controls.Add(customMonitorPanel);
             sequenceField = UiStyle.Field("Sequence", sequenceSummary); customStack.Controls.Add(sequenceField);
             customHelp.Margin = new Padding(0, 12, 0, 0); customStack.Controls.Add(customHelp);
             customNote.TextChanged += SaveCustomNote; customStack.Controls.Add(UiStyle.Field("Private note (never exported)", customNote));

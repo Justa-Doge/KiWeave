@@ -8,9 +8,12 @@ namespace FunctionRowRemapper
     {
         readonly KeyboardEngine engine;
         readonly Func<string> profileName;
-        readonly Label key = Value(), source = Value(), modifiers = Value(), decision = Value(), context = Value(), action = Value();
+        readonly Action<Action<string>> subscribeConsumer, unsubscribeConsumer;
+        readonly Label key = Value(), source = Value(), modifiers = Value(), decision = Value(), context = Value(), action = Value(), keyboard = Value();
 
         public LiveKeyTesterForm(KeyboardEngine keyboardEngine, Func<string> activeProfile) : this(keyboardEngine, activeProfile, false) { }
+        internal LiveKeyTesterForm(KeyboardEngine keyboardEngine, Func<string> activeProfile, Action<Action<string>> subscribeConsumer, Action<Action<string>> unsubscribeConsumer) : this(keyboardEngine, activeProfile, false)
+        { this.subscribeConsumer = subscribeConsumer; this.unsubscribeConsumer = unsubscribeConsumer; }
         internal LiveKeyTesterForm(KeyboardEngine keyboardEngine, Func<string> activeProfile, bool preview)
         {
             if (!preview && keyboardEngine == null) throw new ArgumentNullException("keyboardEngine"); engine = keyboardEngine; profileName = activeProfile ?? (() => "Default");
@@ -21,17 +24,17 @@ namespace FunctionRowRemapper
             var intro = UiStyle.Stack(); intro.Controls.Add(UiStyle.Text("Live key tester", 22, true));
             intro.Controls.Add(UiStyle.Text("Press a key to see what KiWeave receives and how it resolves the input.", 10, false)); root.Controls.Add(intro, 0, 0);
             var card = new DesignCard { Dock = DockStyle.Fill, Margin = new Padding(0, 20, 0, 14) }; root.Controls.Add(card, 0, 1);
-            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 6, BackColor = Color.Transparent };
+            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 7, BackColor = Color.Transparent };
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 175)); grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             AddRow(grid, 0, "Latest key event", key); AddRow(grid, 1, "Input source", source); AddRow(grid, 2, "Modifiers", modifiers);
-            AddRow(grid, 3, "KiWeave decision", decision); AddRow(grid, 4, "Profile and layer", context); AddRow(grid, 5, "Resolved action", action); card.Controls.Add(grid);
-            key.Text = "Waiting for input…"; source.Text = modifiers.Text = decision.Text = context.Text = action.Text = "—";
+            AddRow(grid, 3, "KiWeave decision", decision); AddRow(grid, 4, "Profile and layer", context); AddRow(grid, 5, "Resolved action", action); AddRow(grid, 6, "Keyboard device", keyboard); card.Controls.Add(grid);
+            key.Text = "Waiting for input…"; source.Text = modifiers.Text = decision.Text = context.Text = action.Text = "—"; keyboard.Text = KeyboardDeviceInventory.Describe();
             var privacy = UiStyle.Text("Private by design: only the latest event exists in memory while this window is open. KiWeave does not save, log, or build a history of pressed keys. Assigned actions still run normally.", 9, false);
             privacy.ForeColor = UiStyle.Muted; privacy.MaximumSize = new Size(680, 0); root.Controls.Add(privacy, 0, 2);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 0) };
             buttons.Controls.Add(UiStyle.Button("Close tester", delegate { Close(); }, true)); root.Controls.Add(buttons, 0, 3);
-            Shown += delegate { if (engine != null) engine.KeyObserved += Observe; };
-            FormClosed += delegate { if (engine != null) engine.KeyObserved -= Observe; ClearValues(); };
+            Shown += delegate { if (engine != null) engine.KeyObserved += Observe; if (subscribeConsumer != null) subscribeConsumer(ObserveConsumer); };
+            FormClosed += delegate { if (engine != null) engine.KeyObserved -= Observe; if (unsubscribeConsumer != null) unsubscribeConsumer(ObserveConsumer); ClearValues(); };
         }
         static Label Value() { return new DesignLabel { AutoSize = false, Dock = DockStyle.Fill, ForeColor = UiStyle.Ink, Font = new Font("Segoe UI", 10, FontStyle.Bold), Padding = new Padding(0, 8, 0, 6) }; }
         static void AddRow(TableLayoutPanel grid, int row, string label, Label value)
@@ -49,6 +52,11 @@ namespace FunctionRowRemapper
                 context.Text = item.ProfileName + "  •  " + item.LayerName; action.Text = item.ResolvedAction;
             }); } catch (InvalidOperationException) { }
         }
-        void ClearValues() { key.Text = source.Text = modifiers.Text = decision.Text = context.Text = action.Text = ""; }
+        void ClearValues() { key.Text = source.Text = modifiers.Text = decision.Text = context.Text = action.Text = keyboard.Text = ""; }
+        void ObserveConsumer(string name)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try { BeginInvoke((Action)delegate { key.Text = name + "  (consumer-control)"; source.Text = "HID consumer control"; modifiers.Text = "None"; decision.Text = "Observed"; context.Text = profileName() + "  •  Base"; action.Text = "Available for custom rebinding"; }); } catch (InvalidOperationException) { }
+        }
     }
 }

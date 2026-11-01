@@ -12,12 +12,40 @@ namespace FunctionRowRemapper
             var checks = new List<ReleaseCheck>();
             checks.Add(Check("Configuration schema", delegate { ConfigStore.Validate(configuration ?? new Configuration(), false); }, "Saved mappings validate without executing targets."));
             checks.Add(Check("Profile schema", delegate { ProfileStore.Validate(profiles ?? new ProfileCollection(), false); }, "Profiles, inheritance, and app ownership validate locally."));
-            checks.Add(Check("Local storage", delegate { string folder = AppStorage.DataFolder; Directory.CreateDirectory(folder); string path = Path.Combine(folder, ".readiness-check"); File.WriteAllText(path, "ok"); File.Delete(path); }, "KiWeave can create and replace its local data files."));
+            checks.Add(Check("Local storage", delegate { CheckLocalStorage(AppStorage.DataFolder); }, "KiWeave can safely create and remove a unique temporary file in its data folder."));
             checks.Add(new ReleaseCheck { Name = "Network default", Passed = !NetworkPolicy.Enabled, Status = NetworkPolicy.Enabled ? "Review" : "Ready", Detail = "Network access should remain blocked until explicitly approved." });
-            checks.Add(new ReleaseCheck { Name = "Experimental kill switch", Passed = File.Exists(FeatureFlags.Path) ? FeatureFlags.Load().ExperimentalEnabled || !FeatureFlags.Load().ExperimentalEnabled : true, Status = "Ready", Detail = "Experimental actions have an explicit persisted kill switch." });
-            checks.Add(new ReleaseCheck { Name = "Safe startup", Passed = true, Status = "Ready", Detail = "Safe Mode and repeated-crash recovery are available." });
+            checks.Add(Check("Experimental kill switch", delegate {
+                var stable = new Mapping { Kind = ActionKind.SendKey, Target = "A" };
+                var experimental = new Mapping { Kind = ActionKind.Command, Target = Path.Combine(Environment.SystemDirectory, "cmd.exe") };
+                if (!FeatureFlags.Allows(stable, false) || FeatureFlags.Allows(experimental, false) || !FeatureFlags.Allows(experimental, true))
+                    throw new InvalidOperationException("The dispatcher kill-switch contract did not hold.");
+            }, "The runtime gate allows stable actions and blocks experimental actions when disabled."));
+            checks.Add(Check("Safe startup", delegate {
+                if (!SafeStartupPolicy.SafeModeRequested(new[] { "--safe-mode" }, false)) throw new InvalidOperationException("The explicit Safe Mode launch switch is not recognized.");
+                if (SafeStartupPolicy.SafeModeRequested(new[] { "--normal-mode" }, true)) throw new InvalidOperationException("The normal restart can be captured by the held Shift key.");
+                if (StartupRecoveryPolicy.ShouldOfferRecovery(StartupRecoveryPolicy.RecoveryThreshold - 1) || !StartupRecoveryPolicy.ShouldOfferRecovery(StartupRecoveryPolicy.RecoveryThreshold))
+                    throw new InvalidOperationException("Repeated-crash recovery threshold is inconsistent.");
+            }, "Safe Mode launch, deliberate normal restart, and repeated-crash recovery thresholds are wired."));
             return checks;
         }
-        static ReleaseCheck Check(string name, Action action, string detail) { try { action(); return new ReleaseCheck { Name = name, Passed = true, Status = "Ready", Detail = detail }; } catch (Exception ex) { return new ReleaseCheck { Name = name, Passed = false, Status = "Review", Detail = ex.Message }; } }
+        internal static void CheckLocalStorage(string folder)
+        {
+            if (String.IsNullOrWhiteSpace(folder)) throw new ArgumentException("The data folder is unavailable.");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, ".readiness-check-" + Guid.NewGuid().ToString("N"));
+            bool created = false;
+            try {
+                using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+                    created = true;
+                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes("KiWeave readiness probe");
+                    stream.Write(bytes, 0, bytes.Length); stream.Flush(true);
+                }
+            } finally { if (created && File.Exists(path)) File.Delete(path); }
+        }
+        internal static ReleaseCheck Check(string name, Action action, string detail)
+        {
+            try { action(); return new ReleaseCheck { Name = name, Passed = true, Status = "Ready", Detail = detail }; }
+            catch { return new ReleaseCheck { Name = name, Passed = false, Status = "Review", Detail = "This check could not finish; review local settings and permissions, then retry." }; }
+        }
     }
 }

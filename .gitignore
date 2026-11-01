@@ -4,6 +4,7 @@ bin-*/
 backups/
 obj/
 .vs/
+release/
 *.exe
 *.pdb
 *.zip
@@ -18,3 +19,9 @@ profiles.json
 
 # Generated release metadata
 SHA256SUMS.txt
+
+# Keep the private WPF rewrite and build identity out of accidental Git staging.
+/wpf-rewrite/
+/src/KiWeaveBuildIdentity.cs
+/KIWEAVE-PROJECT-CONTEXT.md
+/KiWeave.LocalOnly

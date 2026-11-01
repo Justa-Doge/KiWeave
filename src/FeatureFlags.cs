@@ -9,15 +9,31 @@ namespace FunctionRowRemapper
     {
         public bool ExperimentalEnabled = true;
         public bool DeveloperMode;
+        internal bool LoadWarning;
+        const int MaxFileBytes = 4096;
+        static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         internal static string Path { get { return System.IO.Path.Combine(AppStorage.DataFolder, "feature-flags.json"); } }
-        internal static FeatureFlags Load()
+        internal static FeatureFlags Load() { return Load(Path); }
+        internal static FeatureFlags Load(string path)
         {
-            try { if (!File.Exists(Path)) return new FeatureFlags(); string json = File.ReadAllText(Path, Encoding.UTF8); JsonSyntax.Check(json); var d = new JavaScriptSerializer().DeserializeObject(json) as System.Collections.Generic.Dictionary<string, object>; if (d == null || d.Count != 3 || !(d["version"] is int) || (int)d["version"] != 1 || !(d["experimentalEnabled"] is bool) || !(d["developerMode"] is bool)) throw new ArgumentException(); return new FeatureFlags { ExperimentalEnabled = (bool)d["experimentalEnabled"], DeveloperMode = (bool)d["developerMode"] }; }
-            catch { return new FeatureFlags(); }
+            if (String.IsNullOrWhiteSpace(path)) throw new ArgumentException("A feature-settings path is required.", "path");
+            try {
+                string json = AtomicFile.ReadAllTextBounded(path, MaxFileBytes, StrictUtf8);
+                JsonSyntax.Check(json);
+                var d = new JavaScriptSerializer { MaxJsonLength = MaxFileBytes }.DeserializeObject(json) as System.Collections.Generic.Dictionary<string, object>;
+                if (d == null || d.Count != 3 || !d.ContainsKey("version") || !(d["version"] is int) || (int)d["version"] != 1 || !(d["experimentalEnabled"] is bool) || !(d["developerMode"] is bool)) throw new ArgumentException();
+                return new FeatureFlags { ExperimentalEnabled = (bool)d["experimentalEnabled"], DeveloperMode = (bool)d["developerMode"] };
+            }
+            catch (FileNotFoundException) { return new FeatureFlags(); }
+            catch (DirectoryNotFoundException) { return new FeatureFlags(); }
+            catch { return new FeatureFlags { ExperimentalEnabled = false, DeveloperMode = false, LoadWarning = true }; }
         }
-        internal void Save()
+        internal void Save() { Save(Path); }
+        internal void Save(string path)
         {
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)); string temp = Path + ".tmp"; File.WriteAllText(temp, "{\r\n  \"version\": 1,\r\n  \"experimentalEnabled\": " + (ExperimentalEnabled ? "true" : "false") + ",\r\n  \"developerMode\": " + (DeveloperMode ? "true" : "false") + "\r\n}\r\n", Encoding.UTF8); if (File.Exists(Path)) File.Replace(temp, Path, Path + ".bak", true); else File.Move(temp, Path);
+            if (String.IsNullOrWhiteSpace(path)) throw new ArgumentException("A feature-settings path is required.", "path");
+            string json = "{\r\n  \"version\": 1,\r\n  \"experimentalEnabled\": " + (ExperimentalEnabled ? "true" : "false") + ",\r\n  \"developerMode\": " + (DeveloperMode ? "true" : "false") + "\r\n}\r\n";
+            AtomicFile.WriteAllText(path, json, new UTF8Encoding(false), ".bak");
         }
         internal static bool IsExperimental(Mapping mapping)
         {
@@ -26,6 +42,15 @@ namespace FunctionRowRemapper
             if (mapping.Kind == ActionKind.Sequence) { try { foreach (var step in SequenceCodec.Parse(mapping.Target)) if (!step.IsWait && IsExperimental(step.Action)) return true; } catch { } }
             if (mapping.Kind == ActionKind.Conditional) { try { var rule = ConditionalCodec.Parse(mapping.Target); return IsExperimental(rule.WhenMatched) || IsExperimental(rule.Otherwise); } catch { } }
             return false;
+        }
+        internal static bool Allows(Mapping mapping, bool experimentalEnabled)
+        {
+            return experimentalEnabled || !IsExperimental(mapping);
+        }
+        internal static bool Allows(Mapping mapping, Func<bool> experimentalEnabled)
+        {
+            if (!IsExperimental(mapping)) return true;
+            return experimentalEnabled != null && experimentalEnabled();
         }
     }
 }

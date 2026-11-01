@@ -8,10 +8,10 @@ namespace FunctionRowRemapper
     // Adding catalog entries never runs them. These mappings use the existing validated dispatcher.
     internal static class ExpandedActions
     {
-        internal static readonly MainForm.SpecificChoice[] All = Build();
-        static MainForm.SpecificChoice[] Build()
+        internal static readonly ActionPickerChoice[] All = Build();
+        static ActionPickerChoice[] Build()
         {
-            var items = new List<MainForm.SpecificChoice>();
+            var items = new List<ActionPickerChoice>();
             AddKeys(items, "Windows and windows", "Windows shortcut; behavior can vary by Windows version.", @"
 Open start menu|Ctrl+Escape
 Open Windows search|Win+S
@@ -342,7 +342,7 @@ Delivery optimization|delivery-optimization
 Developer settings|developers")) {
                 bool proper = row[0].StartsWith("Windows") || row[0].StartsWith("Wi-Fi") || row[0] == "USB" || row[0] == "VPN";
                 string label = "Settings: " + (proper ? row[0] : Char.ToLowerInvariant(row[0][0]) + row[0].Substring(1));
-                items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.Application, Target = explorer, Arguments = "ms-settings:" + row[1] }, "Windows settings", "Opens the page only; availability depends on Windows version and hardware."));
+                items.Add(new ActionPickerChoice(label, new Mapping { Kind = ActionKind.Application, Target = explorer, Arguments = "ms-settings:" + row[1] }, "Windows settings", "Opens the page only; availability depends on Windows version and hardware."));
             }
             Folder(items, "Open desktop folder", Environment.SpecialFolder.DesktopDirectory);
             Folder(items, "Open documents folder", Environment.SpecialFolder.MyDocuments);
@@ -366,7 +366,7 @@ Open character map|charmap.exe
 Open Windows version|winver.exe
 Open command prompt|cmd.exe")) {
                 string path = Path.Combine(sys, row[1]);
-                if (File.Exists(path)) items.Add(new MainForm.SpecificChoice(row[0], new Mapping { Kind = ActionKind.Application, Target = path }, "Windows tools", "Opens the tool with your normal account; no command is pre-run."));
+                if (File.Exists(path)) items.Add(new ActionPickerChoice(row[0], new Mapping { Kind = ActionKind.Application, Target = path }, "Windows tools", "Opens the tool with your normal account; no command is pre-run."));
             }
             AddSystem(items, "Center active window", "CenterWindow", "Window management", "Centers the foreground window inside its current monitor work area.");
             AddSystem(items, "Toggle always on top", "ToggleAlwaysOnTop", "Window management", "Changes the always-on-top state of the foreground window.");
@@ -387,10 +387,11 @@ Open command prompt|cmd.exe")) {
             return items.ToArray();
         }
         static IEnumerable<string[]> Rows(string text) { return text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().Split('|')); }
-        static void AddKeys(List<MainForm.SpecificChoice> items, string category, string context, string data) { foreach (var row in Rows(data)) Key(items, row[0], row[1], category, context); }
-        static void Key(List<MainForm.SpecificChoice> items, string label, string chord, string category, string context) { items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.SendShortcut, Target = chord }, category, context)); }
-        static void AddSystem(List<MainForm.SpecificChoice> items, string label, string action, string category, string context) { items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.SystemAction, Target = action }, category, context)); }
-        static void Folder(List<MainForm.SpecificChoice> items, string label, Environment.SpecialFolder folder) { Folder(items, label, Environment.GetFolderPath(folder)); }
-        static void Folder(List<MainForm.SpecificChoice> items, string label, string path) { if (!String.IsNullOrEmpty(path) && Directory.Exists(path)) items.Add(new MainForm.SpecificChoice(label, new Mapping { Kind = ActionKind.FileOrFolder, Target = path }, "Folders", "Opens this local folder without changing its contents.")); }
+        static void AddKeys(List<ActionPickerChoice> items, string category, string context, string data) { foreach (var row in Rows(data)) Key(items, row[0], row[1], category, context); }
+        static void Key(List<ActionPickerChoice> items, string label, string chord, string category, string context) { items.Add(new ActionPickerChoice(label, new Mapping { Kind = ActionKind.SendShortcut, Target = chord }, category, context)); }
+        static void AddSystem(List<ActionPickerChoice> items, string label, string action, string category, string context) { items.Add(new ActionPickerChoice(label, new Mapping { Kind = ActionKind.SystemAction, Target = action }, category, context)); }
+        static void Folder(List<ActionPickerChoice> items, string label, Environment.SpecialFolder folder) { Folder(items, label, Environment.GetFolderPath(folder)); }
+        static void Folder(List<ActionPickerChoice> items, string label, string path) { if (!String.IsNullOrEmpty(path) && Directory.Exists(path)) items.Add(new ActionPickerChoice(label, new Mapping { Kind = ActionKind.FileOrFolder, Target = path }, "Folders", "Opens this local folder without changing its contents.")); }
     }
+
 }

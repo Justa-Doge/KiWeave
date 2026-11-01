@@ -19,10 +19,11 @@ namespace FunctionRowRemapper
         }
         internal static string Observe(string snapshot)
         {
-            string current = Fingerprint(snapshot), previous = "";
-            try { if (File.Exists(StatePath)) previous = File.ReadAllText(StatePath, Encoding.ASCII).Trim(); } catch { }
-            try { Directory.CreateDirectory(Path.GetDirectoryName(StatePath)); string temp = StatePath + ".tmp"; File.WriteAllText(temp, current, Encoding.ASCII); File.Copy(temp, StatePath, true); File.Delete(temp); } catch { }
-            return Compare(previous, current);
+            return Observe(StatePath, snapshot);
+        }
+        internal static string Observe(string path, string snapshot)
+        {
+            return LocalObservationStore.CompareAndSave(path, Fingerprint(snapshot), Compare);
         }
     }
 }

@@ -26,8 +26,7 @@ namespace FunctionRowRemapper
         internal static ActionPackRepositoryIndex Load(string path)
         {
             if (!File.Exists(path)) throw new FileNotFoundException("Action-pack repository index not found.");
-            if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Action-pack repository index is too large.");
-            string json = File.ReadAllText(path, Encoding.UTF8);
+            string json = AtomicFile.ReadAllTextBounded(path, MaxBytes, Encoding.UTF8);
             string signature = ActionPackSignatures.Status(path, json);
             var result = Parse(json);
             result.SignatureStatus = signature;

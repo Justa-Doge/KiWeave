@@ -14,6 +14,9 @@ namespace FunctionRowRemapper
     internal sealed class ConfigurationHealthReport
     {
         internal static readonly ConfigurationHealthReport Empty = new ConfigurationHealthReport(new HealthFinding[0]);
+        internal static readonly ConfigurationHealthReport Unavailable = new ConfigurationHealthReport(new[] {
+            new HealthFinding("Health scan unavailable", "A read-only configuration check could not finish. Retry it after reviewing the saved setup.")
+        });
         internal readonly HealthFinding[] Findings;
         internal bool HasWarnings { get { return Findings.Length > 0; } }
         internal string Summary { get { return HasWarnings ? Findings.Length + (Findings.Length == 1 ? " configuration issue needs attention." : " configuration issues need attention.") : "No configuration problems found."; } }
@@ -23,6 +26,19 @@ namespace FunctionRowRemapper
     // Read-only local validation. It never launches targets, contacts endpoints, or changes settings.
     internal static class ConfigurationHealth
     {
+        internal static bool TryScan(Func<ConfigurationHealthReport> scan, out ConfigurationHealthReport report)
+        {
+            if (scan == null) { report = ConfigurationHealthReport.Unavailable; return false; }
+            try
+            {
+                report = scan();
+                if (report != null) return true;
+            }
+            catch { }
+            report = ConfigurationHealthReport.Unavailable;
+            return false;
+        }
+
         internal static ConfigurationHealthReport Scan(Configuration configuration, ProfileCollection profiles, DdcMonitor[] detected)
         {
             var findings = new List<HealthFinding>();

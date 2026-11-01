@@ -15,13 +15,13 @@ namespace FunctionRowRemapper
         {
             if (profile == null) throw new ArgumentNullException("profile");
             UserPreferences preferences = File.Exists(UserPreferences.DefaultPath) ? UserPreferences.Load(UserPreferences.DefaultPath) : new UserPreferences();
-            string folder = Folder(profile.Name); Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff") + ".keyweave");
+            string folder = Folder(profile.Name); AppStorage.EnsureNoReparsePointInPath(folder); Directory.CreateDirectory(folder); AppStorage.EnsureNoReparsePointInPath(folder);
+            string path = Path.Combine(folder, DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff") + ".kiweave");
             BackupBundle.Save(path, profile.Configuration, profiles, preferences, Startup.Enabled, false); Trim(folder, Math.Max(5, preferences.HistoryRetention)); return path;
         }
         static void Trim(string folder, int limit)
         {
-            foreach (string path in Directory.GetFiles(folder, "*.keyweave").OrderByDescending(Path.GetFileName).Skip(limit)) try { File.Delete(path); } catch { }
+            foreach (string path in AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.kiweave").Concat(AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.keyweave")).OrderByDescending(File.GetLastWriteTimeUtc).Skip(limit)) try { File.Delete(path); } catch { }
         }
     }
 }

@@ -26,11 +26,25 @@ namespace FunctionRowRemapper
         public ProfileCollection Copy() { return new ProfileCollection { Profiles = Profiles.Select(p => p.Copy()).ToArray() }; }
         public static ProfileCollection Merge(ProfileCollection current, ProfileCollection imported)
         {
+            Dictionary<string, string> ignored;
+            return Merge(current, imported, out ignored);
+        }
+        internal static ProfileCollection Merge(ProfileCollection current, ProfileCollection imported, out Dictionary<string, string> renamedProfiles)
+        {
             var result = (current ?? new ProfileCollection()).Copy();
-            foreach (var incoming in (imported ?? new ProfileCollection()).Profiles) {
-                var copy = incoming.Copy(); string baseName = copy.Name; int suffix = 2;
-                while (result.Find(copy.Name) != null) { string tail = " (" + suffix++ + ")"; copy.Name = (baseName.Length + tail.Length > 40 ? baseName.Substring(0, 40 - tail.Length) : baseName) + tail; }
+            renamedProfiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var added = new List<KeyWeaveProfile>();
+            foreach (var incoming in (imported ?? new ProfileCollection()).Profiles ?? Array.Empty<KeyWeaveProfile>()) {
+                var copy = incoming.Copy(); string baseName = copy.Name.Trim(); copy.Name = baseName; int suffix = 2;
+                while (String.Equals(copy.Name.Trim(), "Default", StringComparison.OrdinalIgnoreCase) || result.Find(copy.Name) != null) { string tail = " (" + suffix++ + ")"; copy.Name = (baseName.Length + tail.Length > 40 ? baseName.Substring(0, 40 - tail.Length) : baseName) + tail; }
+                renamedProfiles[baseName] = copy.Name;
                 result.Profiles = result.Profiles.Concat(new[] { copy }).ToArray();
+                added.Add(copy);
+            }
+            foreach (var profile in added) {
+                string mappedBase;
+                if (!String.IsNullOrWhiteSpace(profile.InheritFrom) && renamedProfiles.TryGetValue(profile.InheritFrom, out mappedBase)) profile.InheritFrom = mappedBase;
+                ProfileActionReferences.Rewrite(profile.Configuration, renamedProfiles);
             }
             ProfileStore.Validate(result, false); return result;
         }
@@ -66,6 +80,138 @@ namespace FunctionRowRemapper
         }
     }
 
+    internal static class ProfileActionReferences
+    {
+        internal static int Rewrite(ProfileCollection profiles, Configuration defaultConfiguration, string oldName, string newName, out int defaultReferences)
+        {
+            if (String.IsNullOrWhiteSpace(oldName) || String.IsNullOrWhiteSpace(newName)) throw new ArgumentException("Profile reference names are required.");
+            if (String.Equals(oldName, "Default", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("The Default profile name cannot be renamed.");
+            defaultReferences = Rewrite(defaultConfiguration, oldName, newName);
+            int profileReferences = 0;
+            foreach (var profile in (profiles ?? new ProfileCollection()).Profiles ?? Array.Empty<KeyWeaveProfile>())
+                if (profile != null && profile.Configuration != null) profileReferences += Rewrite(profile.Configuration, oldName, newName);
+            return defaultReferences + profileReferences;
+        }
+
+        internal static int Rewrite(Configuration configuration, string oldName, string newName)
+        {
+            return Rewrite(configuration, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { oldName, newName } });
+        }
+
+        internal static int Rewrite(ProfileCollection profiles, IDictionary<string, string> renamedProfiles)
+        {
+            int count = 0;
+            foreach (var profile in (profiles ?? new ProfileCollection()).Profiles ?? Array.Empty<KeyWeaveProfile>()) {
+                if (profile == null) continue;
+                string mappedBase;
+                if (!String.IsNullOrWhiteSpace(profile.InheritFrom) && !String.Equals(profile.InheritFrom, "Default", StringComparison.OrdinalIgnoreCase) && renamedProfiles != null && renamedProfiles.TryGetValue(profile.InheritFrom, out mappedBase)) profile.InheritFrom = mappedBase;
+                count += Rewrite(profile.Configuration, renamedProfiles);
+            }
+            return count;
+        }
+
+        internal static int Rewrite(Configuration configuration, IDictionary<string, string> renamedProfiles)
+        {
+            if (configuration == null) return 0;
+            int count = 0;
+            foreach (var mapping in configuration.Mappings ?? Array.Empty<Mapping>()) count += Rewrite(mapping, renamedProfiles);
+            foreach (var hotkey in configuration.CustomHotkeys ?? Array.Empty<CustomHotkey>()) if (hotkey != null) count += Rewrite(hotkey.Action, renamedProfiles);
+            foreach (var layer in configuration.Layers ?? Array.Empty<ModifierLayer>())
+                if (layer != null) foreach (var mapping in layer.Mappings ?? Array.Empty<Mapping>()) count += Rewrite(mapping, renamedProfiles);
+            return count;
+        }
+
+        internal static string[] FindMissingTargets(IEnumerable<Configuration> configurations, ProfileCollection profiles)
+        {
+            var missing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var configuration in configurations ?? Enumerable.Empty<Configuration>()) {
+                if (configuration == null) continue;
+                foreach (var mapping in configuration.Mappings ?? Array.Empty<Mapping>()) FindMissingTargets(mapping, profiles, missing);
+                foreach (var hotkey in configuration.CustomHotkeys ?? Array.Empty<CustomHotkey>()) if (hotkey != null) FindMissingTargets(hotkey.Action, profiles, missing);
+                foreach (var layer in configuration.Layers ?? Array.Empty<ModifierLayer>()) if (layer != null) foreach (var mapping in layer.Mappings ?? Array.Empty<Mapping>()) FindMissingTargets(mapping, profiles, missing);
+            }
+            return missing.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        static void FindMissingTargets(Mapping mapping, ProfileCollection profiles, HashSet<string> missing)
+        {
+            if (mapping == null) return;
+            if (mapping.Kind == ActionKind.SystemAction) {
+                string profile;
+                if (SystemActions.TryProfile(mapping.Target, out profile) && !String.Equals(profile, "Default", StringComparison.OrdinalIgnoreCase) && (profiles == null || profiles.Find(profile) == null)) missing.Add(profile);
+            } else if (mapping.Kind == ActionKind.Sequence) {
+                try { foreach (var step in SequenceCodec.Parse(mapping.Target)) if (step != null && !step.IsWait) FindMissingTargets(step.Action, profiles, missing); } catch { }
+            } else if (mapping.Kind == ActionKind.Conditional) {
+                try { var rule = ConditionalCodec.Parse(mapping.Target); FindMissingTargets(rule.WhenMatched, profiles, missing); FindMissingTargets(rule.Otherwise, profiles, missing); } catch { }
+            }
+        }
+
+        internal static void SaveChanges(ProfileCollection profiles, Configuration defaultConfiguration, bool saveDefaultConfiguration)
+        {
+            SaveChanges(ProfileStore.DefaultPath, ConfigStore.DefaultPath, profiles, defaultConfiguration, saveDefaultConfiguration);
+        }
+
+        internal static void SaveChanges(string profilePath, string configurationPath, ProfileCollection profiles, Configuration defaultConfiguration, bool saveDefaultConfiguration)
+        {
+            bool profileExisted = File.Exists(profilePath);
+            byte[] oldProfiles = null;
+            if (profileExisted) {
+                try { oldProfiles = AtomicFile.ReadAllBytesBounded(profilePath, ProfileStore.MaxBytes); }
+                catch (InvalidDataException error) { throw new IOException("The saved profiles file exceeds the recovery limit; profile changes were not saved.", error); }
+            }
+            ProfileStore.Save(profilePath, profiles);
+            if (!saveDefaultConfiguration) return;
+            try { ConfigStore.Save(configurationPath, defaultConfiguration); }
+            catch (Exception saveError) {
+                try {
+                    if (profileExisted) RestoreFile(profilePath, oldProfiles);
+                    else if (File.Exists(profilePath)) File.Delete(profilePath);
+                } catch (Exception rollbackError) {
+                    throw new IOException("The configuration save failed and the profile-file rollback was incomplete: " + rollbackError.Message, saveError);
+                }
+                throw;
+            }
+        }
+
+        static void RestoreFile(string path, byte[] contents)
+        {
+            string full = Path.GetFullPath(path), directory = Path.GetDirectoryName(full), temporary = Path.Combine(directory, ".profile-rollback-" + Guid.NewGuid().ToString("N") + ".tmp");
+            try {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(contents, 0, contents.Length); stream.Flush(true); }
+                if (File.Exists(full)) File.Replace(temporary, full, null, true); else File.Move(temporary, full);
+            } finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+
+        static int Rewrite(Mapping mapping, IDictionary<string, string> renamedProfiles)
+        {
+            if (mapping == null) return 0;
+            if (mapping.Kind == ActionKind.SystemAction) {
+                string profile, mapped;
+                if (renamedProfiles != null && SystemActions.TryProfile(mapping.Target, out profile) && !String.Equals(profile, "Default", StringComparison.OrdinalIgnoreCase) && renamedProfiles.TryGetValue(profile, out mapped) && !String.Equals(profile, mapped, StringComparison.OrdinalIgnoreCase)) {
+                    mapping.Target = SystemActions.ActivateProfilePrefix + mapped; return 1;
+                }
+                return 0;
+            }
+            if (mapping.Kind == ActionKind.Sequence) {
+                try {
+                    var steps = SequenceCodec.Parse(mapping.Target); int count = 0;
+                    foreach (var step in steps) if (step != null && !step.IsWait) count += Rewrite(step.Action, renamedProfiles);
+                    if (count > 0) mapping.Target = SequenceCodec.Serialize(steps);
+                    return count;
+                } catch { return 0; }
+            }
+            if (mapping.Kind == ActionKind.Conditional) {
+                try {
+                    var rule = ConditionalCodec.Parse(mapping.Target);
+                    int count = Rewrite(rule.WhenMatched, renamedProfiles) + Rewrite(rule.Otherwise, renamedProfiles);
+                    if (count > 0) mapping.Target = ConditionalCodec.Serialize(rule);
+                    return count;
+                } catch { return 0; }
+            }
+            return 0;
+        }
+    }
+
     public static class ProfileStore
     {
         public const int MaxBytes = 1024 * 1024;
@@ -83,6 +229,7 @@ namespace FunctionRowRemapper
             var applications = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var profile in collection.Profiles) {
                 if (profile == null || String.IsNullOrWhiteSpace(profile.Name) || profile.Name.Length > 40 || profile.Name.Any(Char.IsControl)) throw new ArgumentException("Profile names must be 1 to 40 characters.");
+                if (String.Equals(profile.Name.Trim(), "Default", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Default is reserved for the base configuration. Choose another profile name.");
                 if (profile.Accent == null || profile.Accent.Length > 7 || profile.Accent.Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch(profile.Accent, "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException(profile.Name + " has an invalid accent color.");
                 if (profile.Icon == null || profile.Icon.Length > 4 || profile.Icon.Any(Char.IsControl)) throw new ArgumentException(profile.Name + " has an invalid icon label.");
                 if (!names.Add(profile.Name.Trim())) throw new ArgumentException("Profile names must be unique.");
@@ -136,8 +283,7 @@ namespace FunctionRowRemapper
         public static ProfileCollection Load(string path)
         {
             if (!File.Exists(path)) return new ProfileCollection();
-            if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Profiles file is too large.");
-            return Parse(File.ReadAllText(path, Encoding.UTF8));
+            return Parse(AtomicFile.ReadAllTextBounded(path, MaxBytes, Encoding.UTF8));
         }
         public static ProfileCollection Parse(string json)
         {

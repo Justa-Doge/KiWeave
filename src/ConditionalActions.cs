@@ -7,21 +7,21 @@ using System.Web.Script.Serialization;
 
 namespace FunctionRowRemapper
 {
-    internal enum ConditionKind { ForegroundApplication, ApplicationRunning }
+    public enum ConditionKind { ForegroundApplication, ApplicationRunning }
 
-    internal sealed class ConditionalRule
+    public sealed class ConditionalRule
     {
-        internal ConditionKind Condition;
-        internal string Application = "";
-        internal Mapping WhenMatched = new Mapping { Kind = ActionKind.Unbound };
-        internal Mapping Otherwise = new Mapping { Kind = ActionKind.Unbound };
-        internal string Summary { get { return (Condition == ConditionKind.ForegroundApplication ? "When foreground app is " : "When app is running: ") + Application; } }
+        public ConditionKind Condition;
+        public string Application = "";
+        public Mapping WhenMatched = new Mapping { Kind = ActionKind.Unbound };
+        public Mapping Otherwise = new Mapping { Kind = ActionKind.Unbound };
+        public string Summary { get { return (Condition == ConditionKind.ForegroundApplication ? "When foreground app is " : "When app is running: ") + Application; } }
     }
 
-    internal static class ConditionalCodec
+    public static class ConditionalCodec
     {
         static readonly string[] MappingFields = { "action", "target", "arguments", "workingDirectory", "monitorId", "monitorControl", "monitorStep" };
-        internal static string Serialize(ConditionalRule rule)
+        public static string Serialize(ConditionalRule rule)
         {
             ValidateShape(rule);
             var serializer = new JavaScriptSerializer();
@@ -37,7 +37,7 @@ namespace FunctionRowRemapper
         {
             return new { action = m.Kind.ToString(), target = m.Target, arguments = m.Arguments, workingDirectory = m.WorkingDirectory, monitorId = m.MonitorId, monitorControl = m.MonitorControl, monitorStep = m.MonitorStep };
         }
-        internal static ConditionalRule Parse(string json)
+        public static ConditionalRule Parse(string json)
         {
             try {
                 if (String.IsNullOrWhiteSpace(json) || json.Length > 4096) throw new ArgumentException();

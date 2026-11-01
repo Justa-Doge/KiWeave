@@ -35,21 +35,30 @@ namespace FunctionRowRemapper
             { "Suspend shortcuts by app", "Suspender atajos por aplicación" }, { "KiWeave Safe Mode", "Modo seguro de KiWeave" }, { "KiWeave release readiness", "Preparación de lanzamiento de KiWeave" },
             { "KiWeave import review", "Revisión de importación de KiWeave" }, { "KiWeave profile import", "Importación de perfil de KiWeave" }, { "Backup privacy preset", "Preajuste de privacidad de copia" },
             { "Encrypted full backup", "Copia de seguridad completa cifrada" }, { "English", "Inglés" }, { "Español", "Español" }, { "All", "Todo" },
-            { "Warnings and above", "Advertencias y superiores" }, { "Critical only", "Solo críticos" }, { "Enabled", "Activado" }, { "Disabled", "Desactivado" }
+            { "Warnings and above", "Advertencias y superiores" }, { "Critical only", "Solo críticos" }, { "Enabled", "Activado" }, { "Disabled", "Desactivado" },
+            { "Language", "Idioma" }, { "Restart KiWeave to apply translated labels.", "Reinicie KiWeave para aplicar las etiquetas traducidas." },
+            { "Language saved. Restart KiWeave to apply translated labels.", "Idioma guardado. Reinicie KiWeave para aplicar las etiquetas traducidas." }
         };
-        internal static readonly string[] Languages = { "English", "Español" };
+        // KiWeave currently ships with English only. Keep the persisted value
+        // normalized so older installs that selected Spanish cannot leave the
+        // settings UI in an unsupported state.
+        internal static readonly string[] Languages = { "English" };
         internal static string Path { get { return System.IO.Path.Combine(AppStorage.DataFolder, "language.json"); } }
         static string current = "English";
         internal static string Current { get { return current; } }
-        internal static void Load() { try { if (File.Exists(Path)) { var d = new JavaScriptSerializer().DeserializeObject(File.ReadAllText(Path, Encoding.UTF8)) as Dictionary<string, object>; string value = d == null || !d.ContainsKey("language") ? "" : d["language"] as string; current = value == "Español" ? value : "English"; } } catch { current = "English"; } }
-        internal static void Save(string language) { if (Array.IndexOf(Languages, language) < 0) throw new ArgumentException("Unsupported language."); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)); File.WriteAllText(Path, "{\r\n  \"version\": 1,\r\n  \"language\": \"" + language + "\"\r\n}\r\n", new UTF8Encoding(false)); current = language; }
-        internal static string Translate(string text) { if (Current != "Español" || String.IsNullOrEmpty(text)) return text; string translated; return BuiltIn.TryGetValue(text, out translated) ? translated : text; }
+        internal static void Load() { Load(Path); }
+        internal static void Load(string path) { try { if (!File.Exists(path)) { current = "English"; return; } string json = AtomicFile.ReadAllTextBounded(path, 1024, Encoding.UTF8); JsonSyntax.Check(json); var parser = new JavaScriptSerializer { MaxJsonLength = 1024 }; parser.DeserializeObject(json); current = "English"; } catch { current = "English"; } }
+        internal static void Save(string language) { Save(Path, language); }
+        internal static void Save(string path, string language) { if (Array.IndexOf(Languages, language) < 0) throw new ArgumentException("Unsupported language."); AtomicFile.WriteAllText(path, "{\r\n  \"version\": 1,\r\n  \"language\": \"" + language + "\"\r\n}\r\n", new UTF8Encoding(false), ".bak"); current = language; }
+        internal static string Translate(string text) { return Translate(text, Current); }
+        internal static string Translate(string text, string language) { return text; }
         internal static void Apply(Control root)
         {
-            if (root == null || Current != "Español") return;
+            if (root == null || Current != "English") return;
             root.Text = Translate(root.Text);
-            var combo = root as ComboBox;
-            if (combo != null) for (int i = 0; i < combo.Items.Count; i++) combo.Items[i] = Translate(Convert.ToString(combo.Items[i]));
+            // Combo-box items are values, not labels. Translating them would make
+            // handlers receive display text such as "Inglés" instead of the
+            // persisted value "English", and typed entries must remain objects.
             foreach (Control child in root.Controls) Apply(child);
         }
     }

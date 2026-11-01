@@ -13,7 +13,7 @@ namespace FunctionRowRemapper
         readonly TextBox search = new DesignTextBox();
         readonly Label summary = UiStyle.Text("", 10, false);
         readonly NumericUpDown wait = new DesignNumericUpDown { Minimum = 0.001M, Maximum = 60, Value = 1, Increment = 0.25M, DecimalPlaces = 3, Width = 90 };
-        readonly MainForm.SpecificChoice[] catalog = ActionPickerForm.Catalog(false);
+        readonly ActionPickerChoice[] catalog = ActionPickerForm.Catalog(false);
         public List<SequenceStep> Result { get { return steps.Select(s => s.Copy()).ToList(); } }
         public SequenceBuilderForm(IEnumerable<SequenceStep> initial)
         {
@@ -70,7 +70,7 @@ namespace FunctionRowRemapper
         }
         void AddAction()
         {
-            var c = actions.SelectedItem as MainForm.SpecificChoice; if (c == null) return;
+            var c = actions.SelectedItem as ActionPickerChoice; if (c == null) return;
             Mapping m = c.Mapping.Copy();
             if (String.IsNullOrEmpty(m.Target) && m.Kind != ActionKind.LockThenSleep) {
                 using (var d = new StepDetailsForm(m)) { if (d.ShowDialog(this) != DialogResult.OK) return; m = d.Result; }

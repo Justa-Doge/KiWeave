@@ -13,7 +13,7 @@ namespace FunctionRowRemapper
         internal static long FileBytes(string path) { try { return File.Exists(path) ? new FileInfo(path).Length : 0; } catch { return 0; } }
         internal static long FolderBytes(string path)
         {
-            try { if (!Directory.Exists(path)) return 0; long total = 0; foreach (string file in Directory.GetFiles(path, "*", SearchOption.AllDirectories)) try { total += new FileInfo(file).Length; } catch { } return total; } catch { return 0; }
+            try { long total = 0; foreach (string file in AppStorage.EnumerateFilesWithoutFollowingReparsePoints(path, "*")) try { total += new FileInfo(file).Length; } catch { } return total; } catch { return 0; }
         }
         internal static string Size(long bytes)
         {
@@ -25,7 +25,7 @@ namespace FunctionRowRemapper
             long backups = FolderBytes(Path.Combine(DataFolder, "Backups"));
             long history = FolderBytes(ConfigurationHistory.DefaultFolder);
             long powerToys = FolderBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KiWeave", "PowerToysBackups"));
-            string reminder = BackupReminder();
+            string reminder = BackupAge();
             return "Active configuration and preferences: " + Size(active) + "\r\n" +
                 "KiWeave backups: " + Size(backups) + "\r\n" +
                 "Undo history: " + Size(history) + "\r\n" +
@@ -35,14 +35,13 @@ namespace FunctionRowRemapper
                 reminder + "\r\n" +
                 "Cache: none";
         }
-        static string BackupReminder()
+        static string BackupAge()
         {
             try {
                 string folder = Path.Combine(DataFolder, "Backups");
-                var files = Directory.Exists(folder) ? Directory.GetFiles(folder, "*.keyweave", SearchOption.AllDirectories).Select(x => new FileInfo(x)).OrderBy(x => x.LastWriteTimeUtc).ToArray() : new FileInfo[0];
-                if (files.Length == 0) return "Backup age: none yet";
-                TimeSpan age = DateTime.UtcNow - files[0].LastWriteTimeUtc.ToUniversalTime();
-                return age.TotalDays >= 30 ? "Backup age: oldest rollback is " + (int)age.TotalDays + " days old; review or remove stale rollback folders" : "Backup age: oldest rollback is " + (int)Math.Max(0, age.TotalDays) + " days old";
+                var status = BackupReminder.Inspect(folder, DateTime.UtcNow, null, delegate(string path) { BackupBundle.LoadAny(path); return true; });
+                if (!status.HasBackup) return "Backup age: none yet";
+                return status.OldestAgeDays >= 30 ? "Backup age: oldest rollback is " + status.OldestAgeDays + " days old; review or remove stale rollback folders" : "Backup age: oldest rollback is " + status.OldestAgeDays + " days old";
             } catch { return "Backup age: unavailable"; }
         }
     }
@@ -123,7 +122,7 @@ namespace FunctionRowRemapper
         void ClearHistory()
         {
             if (MessageBox.Show(this, "Delete KiWeave's local undo/history snapshots? Active mappings, profiles, backups, and preferences will not be changed.", "Clear undo history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            try { if (Directory.Exists(ConfigurationHistory.DefaultFolder)) foreach (string file in Directory.GetFiles(ConfigurationHistory.DefaultFolder, "*.keyweave")) File.Delete(file); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "Undo history was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+            try { foreach (string file in AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(ConfigurationHistory.DefaultFolder, "*.kiweave").Concat(AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(ConfigurationHistory.DefaultFolder, "*.keyweave"))) File.Delete(file); storage.Text = PrivacyData.Summary(); MessageBox.Show(this, "Undo history was removed.", "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Information); }
             catch (Exception ex) { MessageBox.Show(this, "Undo history could not be cleared: " + ex.Message, "Privacy center", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         void ClearActivity()

@@ -24,7 +24,7 @@ namespace FunctionRowRemapper
             cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33)); cards.RowStyles.Add(new RowStyle(SizeType.Percent, 34)); cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33));
             cards.Controls.Add(Item("1", "Choose an action", "Pick a function key or create a global hotkey. Browse the library, build a sequence, or connect an integration."), 0, 0);
             cards.Controls.Add(Item("2", "Test, then save", "Test action always asks first. Save only when the mapping looks right; KiWeave starts with shortcuts paused."), 0, 1);
-            cards.Controls.Add(Item("3", "Grow into profiles", "Create layouts for games or apps, switch them from the tray, and make a private .keyweave backup whenever you want."), 0, 2); root.Controls.Add(cards, 0, 1);
+            cards.Controls.Add(Item("3", "Grow into profiles", "Create layouts for games or apps, switch them from the tray, and make a private .kiweave backup whenever you want."), 0, 2); root.Controls.Add(cards, 0, 1);
             var safety = UiStyle.Text("Emergency pause: hold Ctrl + Alt + Shift for 1.5 seconds.", 9, true); safety.ForeColor = UiStyle.Blue; root.Controls.Add(safety, 0, 2);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 0) };
             buttons.Controls.Add(UiStyle.Button("Start weaving", delegate { DialogResult = DialogResult.OK; Close(); }, true)); root.Controls.Add(buttons, 0, 3);

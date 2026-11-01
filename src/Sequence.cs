@@ -100,17 +100,23 @@ namespace FunctionRowRemapper
     public static class SequenceCodec
     {
         public const int MaxSteps = 20;
+        public const int MaxEncodedLength = 4096;
         static string EncodeText(string text) { return Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? "")).TrimEnd('=').Replace('+', '-').Replace('/', '_'); }
         static string DecodeText(string text) { string padded = text.Replace('-', '+').Replace('_', '/'); while (padded.Length % 4 != 0) padded += "="; return Encoding.UTF8.GetString(Convert.FromBase64String(padded)); }
         public static string Serialize(IEnumerable<SequenceStep> source)
         {
-            var steps = source == null ? new List<SequenceStep>() : source.Select(s => s.Copy()).ToList(); Validate(steps);
-            return String.Join(";", steps.Select(s => s.IsWait ? "W," + s.WaitMilliseconds : "A," + s.Action.Kind + "," + EncodeText(s.Action.Target) + "," + EncodeText(s.Action.Arguments) + "," + EncodeText(s.Action.WorkingDirectory)));
+            var steps = source == null ? new List<SequenceStep>() : source.ToList();
+            Validate(steps);
+            steps = steps.Select(s => s.Copy()).ToList();
+            string encoded = String.Join(";", steps.Select(s => s.IsWait ? "W," + s.WaitMilliseconds : "A," + s.Action.Kind + "," + EncodeText(s.Action.Target) + "," + EncodeText(s.Action.Arguments) + "," + EncodeText(s.Action.WorkingDirectory)));
+            if (encoded.Length > MaxEncodedLength) throw new ArgumentException("The encoded action sequence is too large.");
+            return encoded;
         }
         public static List<SequenceStep> Parse(string value)
         {
             try {
                 if (String.IsNullOrWhiteSpace(value)) throw new ArgumentException("Add at least one sequence step.");
+                if (value.Length > MaxEncodedLength) throw new ArgumentException();
                 var result = new List<SequenceStep>();
                 foreach (string record in value.Split(';')) {
                     string[] parts = record.Split(',');

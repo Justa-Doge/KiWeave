@@ -32,44 +32,23 @@ namespace FunctionRowRemapper
         internal static string Capture(string folder, string reason, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup, int limit)
         {
             if (limit < 1 || limit > 100) throw new ArgumentOutOfRangeException("limit");
+            AppStorage.EnsureNoReparsePointInPath(folder);
             Directory.CreateDirectory(folder);
-            string slug = Slug(reason), path = Path.Combine(folder, DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff") + "--" + slug + "--" + Guid.NewGuid().ToString("N").Substring(0, 6) + ".keyweave");
+            AppStorage.EnsureNoReparsePointInPath(folder);
+            string slug = Slug(reason), path = Path.Combine(folder, DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff") + "--" + slug + "--" + Guid.NewGuid().ToString("N").Substring(0, 6) + ".kiweave");
             BackupBundle.Save(path, configuration, profiles, preferences, startup, false);
             Trim(folder, limit); return path;
         }
         internal static List<ConfigurationHistoryEntry> List(string folder)
         {
             var entries = new List<ConfigurationHistoryEntry>(); if (!Directory.Exists(folder)) return entries;
-            foreach (string path in Directory.GetFiles(folder, "*.keyweave", SearchOption.TopDirectoryOnly)) try {
+            foreach (string path in AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.kiweave").Concat(AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.keyweave"))) try {
                 var backup = BackupBundle.Load(path); entries.Add(new ConfigurationHistoryEntry { Path = path, Backup = backup, CreatedUtc = backup.CreatedUtc, Bytes = new FileInfo(path).Length, Reason = ReasonFromFile(path), Note = LoadNote(path) });
             } catch { }
             return entries.OrderByDescending(x => x.CreatedUtc).ToList();
         }
         internal static string Compare(KeyWeaveBackup older, Configuration current, ProfileCollection profiles, UserPreferences preferences, bool startup)
-        {
-            if (older == null) return "Select a history entry.";
-            var lines = new List<string>(); int changed = 0;
-            for (int i = 0; i < 12; i++) if (!Same(older.Configuration.Mappings[i], current.Mappings[i])) { changed++; lines.Add("F" + (i + 1) + ": " + Safe(older.Configuration.Mappings[i]) + " → " + Safe(current.Mappings[i])); }
-            if (older.Configuration.CustomHotkeys.Length != current.CustomHotkeys.Length) lines.Add("Custom hotkeys: " + older.Configuration.CustomHotkeys.Length + " → " + current.CustomHotkeys.Length);
-            if (older.Configuration.Layers.Length != current.Layers.Length) lines.Add("Modifier layers: " + older.Configuration.Layers.Length + " → " + current.Layers.Length);
-            if (older.Profiles.Profiles.Length != profiles.Profiles.Length) lines.Add("Profiles: " + older.Profiles.Profiles.Length + " → " + profiles.Profiles.Length);
-            if (older.Configuration.Enabled != current.Enabled) lines.Add("Shortcuts enabled: " + Yes(older.Configuration.Enabled) + " → " + Yes(current.Enabled));
-            if (older.Preferences.UseTray != preferences.UseTray) lines.Add("Tray mode: " + Yes(older.Preferences.UseTray) + " → " + Yes(preferences.UseTray));
-            if (older.Preferences.AutomaticProfiles != preferences.AutomaticProfiles) lines.Add("Automatic profiles: " + Yes(older.Preferences.AutomaticProfiles) + " → " + Yes(preferences.AutomaticProfiles));
-            if (older.Preferences.NetworkAccess != preferences.NetworkAccess) lines.Add("Network access: " + Yes(older.Preferences.NetworkAccess) + " → " + Yes(preferences.NetworkAccess));
-            if (older.StartWithWindows != startup) lines.Add("Start with Windows: " + Yes(older.StartWithWindows) + " → " + Yes(startup));
-            if (lines.Count == 0) return "No visible differences from the current saved setup.";
-            if (changed > 8) { lines = lines.Take(8).ToList(); lines.Add("…and " + (changed - 8) + " more function-key changes."); }
-            return String.Join("\r\n", lines);
-        }
-        static bool Same(Mapping a, Mapping b) { return a.Kind == b.Kind && a.Target == b.Target && a.Arguments == b.Arguments && a.WorkingDirectory == b.WorkingDirectory && a.MonitorId == b.MonitorId && a.MonitorControl == b.MonitorControl && a.MonitorStep == b.MonitorStep; }
-        static string Safe(Mapping m)
-        {
-            if (m.Kind == ActionKind.Media && Shortcuts.MediaLabels.ContainsKey(m.Target)) return Shortcuts.MediaLabels[m.Target];
-            if (m.Kind == ActionKind.SystemAction && Mapping.SystemActionLabels.ContainsKey(m.Target)) return Mapping.SystemActionLabels[m.Target];
-            return Mapping.Labels[(int)m.Kind];
-        }
-        static string Yes(bool value) { return value ? "on" : "off"; }
+        { return ConfigurationHistoryComparison.Compare(older, current, profiles, preferences, startup); }
         static string Slug(string reason)
         {
             string value = new string((reason ?? "change").ToLowerInvariant().Select(c => Char.IsLetterOrDigit(c) ? c : '-').ToArray());
@@ -81,11 +60,11 @@ namespace FunctionRowRemapper
             return String.Join(" ", slug.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries).Select(x => Char.ToUpperInvariant(x[0]) + x.Substring(1)));
         }
         internal static string NotePath(string path) { return path + ".note"; }
-        internal static string LoadNote(string path) { try { return File.Exists(NotePath(path)) ? File.ReadAllText(NotePath(path), Encoding.UTF8) : ""; } catch { return ""; } }
+        internal static string LoadNote(string path) { try { return File.Exists(NotePath(path)) ? AtomicFile.ReadAllTextBounded(NotePath(path), 2048, Encoding.UTF8) : ""; } catch { return ""; } }
         internal static void SaveNote(string path, string note) { if (String.IsNullOrWhiteSpace(note)) { try { if (File.Exists(NotePath(path))) File.Delete(NotePath(path)); } catch { } return; } if (note.Length > 500) throw new ArgumentException("Private notes are limited to 500 characters."); File.WriteAllText(NotePath(path), note.Trim(), Encoding.UTF8); }
         static void Trim(string folder, int limit)
         {
-            foreach (string path in Directory.GetFiles(folder, "*.keyweave").OrderByDescending(Path.GetFileName).Skip(limit)) try { File.Delete(path); } catch { }
+            foreach (string path in AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.kiweave").Concat(AppStorage.EnumerateDirectFilesWithoutFollowingReparsePoints(folder, "*.keyweave")).OrderByDescending(File.GetLastWriteTimeUtc).Skip(limit)) try { File.Delete(path); } catch { }
         }
     }
 

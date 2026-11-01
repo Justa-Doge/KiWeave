@@ -22,10 +22,11 @@ namespace FunctionRowRemapper
         }
         internal static string Observe(IEnumerable<PowerToysShortcut> shortcuts)
         {
-            string current = Fingerprint(shortcuts), previous = "";
-            try { if (File.Exists(StatePath)) previous = File.ReadAllText(StatePath, Encoding.ASCII).Trim(); } catch { }
-            try { Directory.CreateDirectory(Path.GetDirectoryName(StatePath)); string temp = StatePath + ".tmp"; File.WriteAllText(temp, current, Encoding.ASCII); File.Copy(temp, StatePath, true); File.Delete(temp); } catch { }
-            return Compare(previous, current);
+            return Observe(StatePath, shortcuts);
+        }
+        internal static string Observe(string path, IEnumerable<PowerToysShortcut> shortcuts)
+        {
+            return LocalObservationStore.CompareAndSave(path, Fingerprint(shortcuts), Compare);
         }
     }
 }

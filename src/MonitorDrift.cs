@@ -22,10 +22,11 @@ namespace FunctionRowRemapper
         }
         internal static string Observe(IEnumerable<DdcMonitor> monitors)
         {
-            string current = Fingerprint(monitors), previous = "";
-            try { if (File.Exists(StatePath)) previous = File.ReadAllText(StatePath, Encoding.ASCII).Trim(); } catch { }
-            try { Directory.CreateDirectory(Path.GetDirectoryName(StatePath)); string temp = StatePath + ".tmp"; File.WriteAllText(temp, current, Encoding.ASCII); File.Copy(temp, StatePath, true); File.Delete(temp); } catch { }
-            return Compare(previous, current);
+            return Observe(StatePath, monitors);
+        }
+        internal static string Observe(string path, IEnumerable<DdcMonitor> monitors)
+        {
+            return LocalObservationStore.CompareAndSave(path, Fingerprint(monitors), Compare);
         }
     }
 }

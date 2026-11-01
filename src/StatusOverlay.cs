@@ -134,7 +134,7 @@ namespace FunctionRowRemapper
             this.title = title ?? "KiWeave"; this.message = message ?? ""; this.icon = icon ?? ""; this.active = active; this.windowsStyle = windowsStyle;
             customIcon = windowsStyle ? null : OverlayAssetLoader.Load(icon, active);
             FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
-            StartPosition = FormStartPosition.Manual; Size = windowsStyle ? new Size(160, 48) : new Size(StatusOverlaySettings.Width, StatusOverlaySettings.Height); BackColor = windowsStyle ? Color.FromArgb(32, 32, 32) : UiStyle.Surface;
+            StartPosition = FormStartPosition.Manual; Size = windowsStyle ? new Size(WindowsStyleWidth(message, icon), 48) : new Size(StatusOverlaySettings.Width, StatusOverlaySettings.Height); BackColor = windowsStyle ? Color.FromArgb(32, 32, 32) : UiStyle.Surface;
             DoubleBuffered = true; animation.Interval = 16;
             animation.Tick += delegate {
                 double elapsed = (DateTime.UtcNow - animationStart).TotalMilliseconds;
@@ -158,7 +158,7 @@ namespace FunctionRowRemapper
             title = nextTitle ?? "KiWeave"; message = nextMessage ?? ""; icon = nextIcon ?? ""; active = nextActive; windowsStyle = nextWindowsStyle;
             if (customIcon != null) { customIcon.Dispose(); customIcon = null; }
             if (!windowsStyle) customIcon = OverlayAssetLoader.Load(icon, active);
-            Size = windowsStyle ? new Size(160, 48) : new Size(StatusOverlaySettings.Width, StatusOverlaySettings.Height);
+            Size = windowsStyle ? new Size(WindowsStyleWidth(message, icon), 48) : new Size(StatusOverlaySettings.Width, StatusOverlaySettings.Height);
             BackColor = windowsStyle ? Color.FromArgb(32, 32, 32) : UiStyle.Surface;
             ApplyRoundedRegion(); RestartAnimation(); Invalidate();
         }
@@ -207,7 +207,13 @@ namespace FunctionRowRemapper
             if (icon == "mute") DrawMic(graphics, active); else if (icon == "deaf") DrawHeadphones(graphics, active);
             graphics.Restore(state);
             string label = message == "Mute shortcut sent" ? "Muted" : message == "Deafen shortcut sent" ? "Deafened" : message;
-            using (var font = new Font("Segoe UI", 8.5f)) TextRenderer.DrawText(graphics, label, font, new Rectangle(42, 10, 112, 25), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.SingleLine);
+            int left = (icon == "mute" || icon == "deaf") ? 42 : 8;
+            using (var font = new Font("Segoe UI", 8.5f)) TextRenderer.DrawText(graphics, label, font, new Rectangle(left, 10, Width - left - 8, 25), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.SingleLine);
+        }
+        static int WindowsStyleWidth(string text, string icon)
+        {
+            if (icon == "mute" || icon == "deaf") return 160;
+            using (var font = new Font("Segoe UI", 8.5f)) return Math.Max(132, Math.Min(220, TextRenderer.MeasureText(text ?? "", font).Width + 36));
         }
         static GraphicsPath Rounded(Rectangle r, int radius)
         {

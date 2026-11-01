@@ -18,8 +18,7 @@ namespace FunctionRowRemapper
         internal static Dictionary<string, string> Load(string path)
         {
             if (!File.Exists(path)) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Private mapping notes are too large.");
-            string json = File.ReadAllText(path, Encoding.UTF8); JsonSyntax.Check(json);
+            string json = AtomicFile.ReadAllTextBounded(path, MaxBytes, Encoding.UTF8); JsonSyntax.Check(json);
             var root = new JavaScriptSerializer { MaxJsonLength = MaxBytes }.DeserializeObject(json) as Dictionary<string, object>;
             if (root == null || root.Count != 2 || !(root.ContainsKey("version")) || !(root["version"] is int) || (int)root["version"] != 1 || !(root["notes"] is Dictionary<string, object>)) throw new ArgumentException("Invalid private mapping notes.");
             var raw = (Dictionary<string, object>)root["notes"]; if (raw.Count > MaxNotes) throw new ArgumentException("Private mapping notes contain too many entries.");

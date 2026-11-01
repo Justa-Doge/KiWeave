@@ -12,14 +12,12 @@ namespace FunctionRowRemapper
         readonly ComboBox category = new DesignComboBox();
         readonly ListBox results = new DesignListBox();
         readonly Label count = UiStyle.Text("", 9, false);
-        readonly MainForm.SpecificChoice[] catalog;
+        readonly ActionPickerChoice[] catalog;
         readonly Button choose;
         internal Mapping SelectedAction { get; private set; }
-        internal static MainForm.SpecificChoice[] Catalog(bool allowSequence, bool allowConditional = true)
+        internal static ActionPickerChoice[] Catalog(bool allowSequence, bool allowConditional = true)
         {
-            return new[] { 0, 1, 2, 3 }.SelectMany(g => MainForm.ChoicesFor(g, true))
-                .Where(c => c.Label != "Choose an action" && (allowSequence || c.Mapping.Kind != ActionKind.Sequence) && (allowConditional || c.Mapping.Kind != ActionKind.Conditional))
-                .GroupBy(c => c.Label).Select(g => g.First()).OrderBy(c => c.Label).ToArray();
+            return ActionPickerCatalog.LibraryChoices(allowSequence, allowConditional);
         }
         public ActionPickerForm(bool allowSequence, bool allowConditional = true)
         {
@@ -71,13 +69,13 @@ namespace FunctionRowRemapper
         }
         void DescribeSelection()
         {
-            var selected = results.SelectedItem as MainForm.SpecificChoice;
+            var selected = results.SelectedItem as ActionPickerChoice;
             count.Text = results.Items.Count == 0 ? "No matches. Try another word or category." : results.Items.Count + " / " + catalog.Length + " actions";
             if (selected != null) count.Text += "\n" + (String.IsNullOrEmpty(selected.Context) ? "Runs only when you press the saved hotkey. Keyboard actions use the focused app." : selected.Context);
         }
         void SelectAction()
         {
-            var c = results.SelectedItem as MainForm.SpecificChoice;
+            var c = results.SelectedItem as ActionPickerChoice;
             if (c == null) return; SelectedAction = c.Mapping.Copy(); DialogResult = DialogResult.OK; Close();
         }
         void DrawAction(object sender, DrawItemEventArgs e)
@@ -85,7 +83,7 @@ namespace FunctionRowRemapper
             if (e.Index < 0) return; bool selected = (e.State & DrawItemState.Selected) != 0;
             using (var brush = new SolidBrush(UiStyle.Surface)) e.Graphics.FillRectangle(brush, e.Bounds);
             if (selected) Design.Box(e.Graphics, new Rectangle(e.Bounds.X + 2, e.Bounds.Y + 3, e.Bounds.Width - 5, e.Bounds.Height - 6), UiStyle.Soft, UiStyle.Soft, 10);
-            var c = (MainForm.SpecificChoice)results.Items[e.Index];
+            var c = (ActionPickerChoice)results.Items[e.Index];
             var icon = new Rectangle(e.Bounds.X + 12, e.Bounds.Y + 13, 36, 36);
             Design.Box(e.Graphics, icon, selected ? UiStyle.Input : UiStyle.Canvas, UiStyle.Border, 9);
             Design.Glyph(e.Graphics, ActionGlyph(c.Mapping.Kind), icon, UiStyle.Blue);
@@ -94,6 +92,6 @@ namespace FunctionRowRemapper
             using (var small = new Font("Segoe UI", 8.5f)) TextRenderer.DrawText(e.Graphics, c.Category + " · " + ActionType(c.Mapping.Kind), small, new Rectangle(area.X, e.Bounds.Y + 34, area.Width, 18), UiStyle.Muted, TextFormatFlags.EndEllipsis);
         }
         internal static string ActionGlyph(ActionKind kind) { return kind == ActionKind.Media ? "\uE8D6" : kind == ActionKind.LockThenSleep ? "\uE72E" : kind == ActionKind.Sequence ? "\uE8FD" : kind == ActionKind.Conditional ? "\uE8EF" : kind == ActionKind.Python || kind == ActionKind.Command ? "\uE943" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "\uE765" : "\uE8A7"; }
-        internal static string ActionType(ActionKind kind) { return kind == ActionKind.Media ? "Media and sound" : kind == ActionKind.LockThenSleep ? "Power action" : kind == ActionKind.Sequence ? "Multiple steps" : kind == ActionKind.Conditional ? "Conditional action" : kind == ActionKind.Python ? "Python script" : kind == ActionKind.Command ? "Command or script" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "Keyboard action" : "Open or launch"; }
+        internal static string ActionType(ActionKind kind) { return kind == ActionKind.Media ? "Media and sound" : kind == ActionKind.Monitor ? "Monitor control" : kind == ActionKind.LockThenSleep ? "Power action" : kind == ActionKind.Sequence ? "Multiple steps" : kind == ActionKind.Conditional ? "Conditional action" : kind == ActionKind.Python ? "Python script" : kind == ActionKind.Command ? "Command or script" : kind == ActionKind.SendKey || kind == ActionKind.SendShortcut ? "Keyboard action" : "Open or launch"; }
     }
 }

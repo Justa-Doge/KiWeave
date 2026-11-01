@@ -1,4 +1,7 @@
-param([string]$OutputFolder = 'bin')
+param(
+    [string]$OutputFolder = 'bin',
+    [string]$DotnetPath = 'dotnet'
+)
 $ErrorActionPreference = 'Stop'
 $projectDir = $PSScriptRoot
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -32,5 +35,27 @@ if (Test-Path -LiteralPath $tests) {
     & "$binDir\KiWeave.Tests.exe"
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 }
+$installerCopyTests = Join-Path $projectDir 'tests\InstallCopy.Tests.ps1'
+if (Test-Path -LiteralPath $installerCopyTests) { & $installerCopyTests }
+$portableArchiveTests = Join-Path $projectDir 'tests\PortableArchivePolicy.Tests.ps1'
+if (Test-Path -LiteralPath $portableArchiveTests) { & $portableArchiveTests }
+$releaseArtifactTests = Join-Path $projectDir 'tests\ReleaseArtifactPolicy.Tests.ps1'
+if (Test-Path -LiteralPath $releaseArtifactTests) { & $releaseArtifactTests }
+$wpfStartupTests = Join-Path $projectDir 'tests\WpfStartup.Tests.ps1'
+if (Test-Path -LiteralPath $wpfStartupTests) { & $wpfStartupTests }
+$dotnet = Get-Command $DotnetPath -ErrorAction SilentlyContinue
+if (-not $dotnet) { throw "The .NET 10 SDK executable was not found: $DotnetPath" }
+$sdkList = @(& $dotnet.Source --list-sdks)
+if ($LASTEXITCODE -ne 0 -or -not ($sdkList | Where-Object { $_ -match '^10\.' })) {
+    throw "The selected .NET SDK does not include .NET 10: $($dotnet.Source)"
+}
+$wpfProject = Join-Path $projectDir 'wpf-rewrite\KiWeave.Wpf.csproj'
+$versionSource = Get-Content -LiteralPath (Join-Path $projectDir 'src\KiWeaveBuildIdentity.cs') -Raw
+if ($versionSource -notmatch 'CurrentVersion\s*=\s*"(?<version>[^"]+)"') { throw 'Could not read the KiWeave product version.' }
+$version = $Matches.version
+& $dotnet.Source publish $wpfProject -c Release -r win-x64 --self-contained true `
+    "-p:WpfAssemblyName=KiWeave" "-p:Version=$version" "-p:InformationalVersion=$version" `
+    '-p:DebugSymbols=false' '-p:DebugType=None' -o $binDir
+if ($LASTEXITCODE -ne 0) { throw 'WPF application publish failed.' }
 Write-Output "Built: $binDir\KiWeave.exe"
 Write-Output "Built: $binDir\UninstallKiWeave.exe"

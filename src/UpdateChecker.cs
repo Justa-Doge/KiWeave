@@ -12,8 +12,8 @@ namespace FunctionRowRemapper
 {
     internal static class UpdateChecker
     {
-        // Bump this when publishing a matching vX.Y.Z tag for an installed build.
-        internal const string CurrentVersion = "1.0.0-beta.4";
+        // The shared build identity also feeds UI labels and assembly metadata.
+        internal const string CurrentVersion = KiWeaveBuildIdentity.CurrentVersion;
         internal const int CheckIntervalMilliseconds = 12 * 60 * 60 * 1000;
         internal const string ReleasesApi = "https://api.github.com/repos/Justa-Doge/KiWeave/releases";
         static readonly Regex TagPattern = new Regex(@"^v?(\d{1,5})\.(\d{1,5})\.(\d{1,5})(?:-(alpha|beta)\.(\d{1,5}))?$", RegexOptions.CultureInvariant);
@@ -77,15 +77,19 @@ namespace FunctionRowRemapper
             if (!NetworkPolicy.Enabled) { completed(null, new InvalidOperationException("Network access is turned off in KiWeave Settings.")); return; }
             Task.Run(delegate {
                 try { completed(NewestUpdate(ReadReleaseTags(channel), CurrentVersion, channel), null); }
-                catch (Exception ex) { completed(null, ex); }
+                catch (Exception ex) { completed(null, NetworkPolicy.Enabled ? ex : null); }
             });
         }
         static string ReadReleaseTags(string channel)
         {
+            var token = NetworkPolicy.BeginRequest();
             var request = (HttpWebRequest)WebRequest.Create(ReleasesApi + "?per_page=30"); request.Method = "GET"; request.UserAgent = "KiWeave/" + CurrentVersion;
             request.Accept = "application/vnd.github+json"; request.Timeout = 8000; request.ReadWriteTimeout = 8000;
-            using (var response = (HttpWebResponse)request.GetResponse()) using (var stream = response.GetResponseStream()) using (var reader = new StreamReader(stream, Encoding.UTF8)) {
-                string json = reader.ReadToEnd(); return TagsFromReleaseJson(json, channel);
+            using (token.Register(delegate { request.Abort(); })) {
+                token.ThrowIfCancellationRequested();
+                using (var response = (HttpWebResponse)request.GetResponse()) using (var stream = response.GetResponseStream()) {
+                    string json = AtomicFile.ReadStreamTextBounded(stream, 262144, Encoding.UTF8); return TagsFromReleaseJson(json, channel);
+                }
             }
         }
         static string ReadReleaseTags() { return ReadReleaseTags("Stable"); }

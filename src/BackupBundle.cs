@@ -76,8 +76,10 @@ namespace FunctionRowRemapper
 
         internal static KeyWeaveBackup Load(string path)
         {
-            if (!File.Exists(path) || new FileInfo(path).Length > MaxBytes) throw new ArgumentException("Invalid or oversized KeyWeave backup.");
-            return Parse(File.ReadAllText(path, Encoding.UTF8));
+            try { return Parse(AtomicFile.ReadAllTextBounded(path, MaxBytes, new UTF8Encoding(true, true))); }
+            catch (FileNotFoundException) { throw new ArgumentException("Invalid or oversized KeyWeave backup."); }
+            catch (DirectoryNotFoundException) { throw new ArgumentException("Invalid or oversized KeyWeave backup."); }
+            catch (InvalidDataException) { throw new ArgumentException("Invalid or oversized KeyWeave backup."); }
         }
 
         internal static void Save(string path, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup)
@@ -86,31 +88,67 @@ namespace FunctionRowRemapper
         }
         internal static void Save(string path, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup, bool includePowerToys)
         {
-            string json = Serialize(configuration, profiles, preferences, startup, includePowerToys); string full = Path.GetFullPath(path), dir = Path.GetDirectoryName(full);
-            Directory.CreateDirectory(dir); string temp = Path.Combine(dir, ".keyweave-" + Guid.NewGuid().ToString("N") + ".tmp");
-            try { File.WriteAllText(temp, json, new UTF8Encoding(false)); if (File.Exists(full)) File.Replace(temp, full, full + ".bak", true); else File.Move(temp, full); }
-            finally { if (File.Exists(temp)) File.Delete(temp); }
+            string json = Serialize(configuration, profiles, preferences, startup, includePowerToys);
+            AtomicFile.WriteAllText(path, json, new UTF8Encoding(false), ".bak");
         }
         internal static void SaveEncrypted(string path, Configuration configuration, ProfileCollection profiles, UserPreferences preferences, bool startup)
         {
-            byte[] plain = Encoding.UTF8.GetBytes(Serialize(configuration, profiles, preferences, startup, true)); byte[] cipher = ProtectedData.Protect(plain, BackupEntropy, DataProtectionScope.CurrentUser); string full = Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(full)); File.WriteAllBytes(full, cipher);
+            byte[] plain = Encoding.UTF8.GetBytes(Serialize(configuration, profiles, preferences, startup, true)); byte[] cipher = ProtectedData.Protect(plain, BackupEntropy, DataProtectionScope.CurrentUser); AtomicFile.WriteAllBytes(path, cipher, ".bak");
         }
         internal static KeyWeaveBackup LoadEncrypted(string path)
         {
-            if (!File.Exists(path) || new FileInfo(path).Length > MaxBytes * 2) throw new ArgumentException("Invalid or oversized encrypted backup.");
-            try { return Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(path), BackupEntropy, DataProtectionScope.CurrentUser))); } catch (CryptographicException) { throw new ArgumentException("This encrypted backup belongs to a different Windows account or is damaged."); }
+            byte[] encrypted;
+            try { encrypted = AtomicFile.ReadAllBytesBounded(path, MaxBytes * 2); }
+            catch (FileNotFoundException) { throw new ArgumentException("Invalid or oversized encrypted backup."); }
+            catch (DirectoryNotFoundException) { throw new ArgumentException("Invalid or oversized encrypted backup."); }
+            catch (InvalidDataException) { throw new ArgumentException("Invalid or oversized encrypted backup."); }
+            try { return Parse(new UTF8Encoding(false, true).GetString(ProtectedData.Unprotect(encrypted, BackupEntropy, DataProtectionScope.CurrentUser))); }
+            catch (CryptographicException) { throw new ArgumentException("This encrypted backup belongs to a different Windows account or is damaged."); }
+            catch (DecoderFallbackException) { throw new ArgumentException("This encrypted backup belongs to a different Windows account or is damaged."); }
+        }
+
+        internal static KeyWeaveBackup LoadAny(string path)
+        {
+            return path != null && path.EndsWith(".enc", StringComparison.OrdinalIgnoreCase) ? LoadEncrypted(path) : Load(path);
         }
 
         internal static string Restore(KeyWeaveBackup backup)
         {
             if (backup == null) throw new ArgumentNullException("backup");
             string folder = Path.Combine(Path.GetDirectoryName(ConfigStore.DefaultPath), "Backups", DateTime.Now.ToString("yyyyMMdd-HHmmssfff")); Directory.CreateDirectory(folder);
-            Snapshot(ConfigStore.DefaultPath, Path.Combine(folder, "config.json")); Snapshot(ProfileStore.DefaultPath, Path.Combine(folder, "profiles.json")); Snapshot(UserPreferences.DefaultPath, Path.Combine(folder, "preferences.json"));
+            Snapshot(ConfigStore.DefaultPath, Path.Combine(folder, "config.kiweave")); Snapshot(ProfileStore.DefaultPath, Path.Combine(folder, "profiles.json")); Snapshot(UserPreferences.DefaultPath, Path.Combine(folder, "preferences.json"));
+            #if WPF_REWRITE
+            bool originalStartup = KiWeave.Wpf.WpfStartup.Enabled;
+            try { ConfigStore.Save(ConfigStore.DefaultPath, backup.Configuration); ProfileStore.Save(ProfileStore.DefaultPath, backup.Profiles); UserPreferences.Save(UserPreferences.DefaultPath, backup.Preferences); KiWeave.Wpf.WpfStartup.Set(backup.StartWithWindows); }
+            catch (Exception restoreError)
+            {
+                List<Exception> rollbackErrors = RestoreSnapshots(folder, ConfigStore.DefaultPath, ProfileStore.DefaultPath, UserPreferences.DefaultPath);
+                try { KiWeave.Wpf.WpfStartup.Set(originalStartup); } catch (Exception error) { rollbackErrors.Add(error); }
+                if (rollbackErrors.Count > 0) { rollbackErrors.Insert(0, restoreError); throw new AggregateException("Backup restore failed and rollback was incomplete.", rollbackErrors); }
+                throw;
+            }
+            #else
             bool originalStartup = Startup.Enabled;
             try { ConfigStore.Save(ConfigStore.DefaultPath, backup.Configuration); ProfileStore.Save(ProfileStore.DefaultPath, backup.Profiles); UserPreferences.Save(UserPreferences.DefaultPath, backup.Preferences); Startup.Set(backup.StartWithWindows); }
-            catch { RestoreSnapshot(Path.Combine(folder, "config.json"), ConfigStore.DefaultPath); RestoreSnapshot(Path.Combine(folder, "profiles.json"), ProfileStore.DefaultPath); RestoreSnapshot(Path.Combine(folder, "preferences.json"), UserPreferences.DefaultPath); try { Startup.Set(originalStartup); } catch { } throw; }
+            catch (Exception restoreError)
+            {
+                List<Exception> rollbackErrors = RestoreSnapshots(folder, ConfigStore.DefaultPath, ProfileStore.DefaultPath, UserPreferences.DefaultPath);
+                try { Startup.Set(originalStartup); } catch (Exception error) { rollbackErrors.Add(error); }
+                if (rollbackErrors.Count > 0) { rollbackErrors.Insert(0, restoreError); throw new AggregateException("Backup restore failed and rollback was incomplete.", rollbackErrors); }
+                throw;
+            }
+            #endif
             return folder;
         }
+        internal static List<Exception> RestoreSnapshots(string folder, string configPath, string profilesPath, string preferencesPath)
+        {
+            var errors = new List<Exception>();
+            TryRestoreSnapshot(Path.Combine(folder, "config.kiweave"), configPath, errors);
+            TryRestoreSnapshot(Path.Combine(folder, "profiles.json"), profilesPath, errors);
+            TryRestoreSnapshot(Path.Combine(folder, "preferences.json"), preferencesPath, errors);
+            return errors;
+        }
+        static void TryRestoreSnapshot(string snapshot, string target, List<Exception> errors) { try { RestoreSnapshot(snapshot, target); } catch (Exception error) { errors.Add(error); } }
         static void Snapshot(string source, string target) { if (File.Exists(source)) File.Copy(source, target, false); else File.WriteAllBytes(target + ".missing", new byte[0]); }
         static void RestoreSnapshot(string snapshot, string target) { if (File.Exists(snapshot)) File.Copy(snapshot, target, true); else if (File.Exists(snapshot + ".missing") && File.Exists(target)) File.Delete(target); }
     }

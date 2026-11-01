@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -30,9 +31,10 @@ namespace FunctionRowRemapper
         sealed class Press { public bool Suppress; public Mapping Mapping; public bool Cancelled; }
         readonly Press[] pressed = new Press[12];
         readonly Dictionary<int, Press> mediaPressed = new Dictionary<int, Press>();
+        readonly Dictionary<int, Press> standalonePressed = new Dictionary<int, Press>();
         int activeLayerKey;
         bool suppressLayerRelease;
-        public KeyDecision Process(int vk, bool down, bool injected, Configuration config)
+        public KeyDecision Process(int vk, bool down, bool injected, Configuration config, bool customChordWins = false, bool allowNewActions = true, bool ejectHandledByRawInput = false)
         {
             var d = new KeyDecision();
             if (injected) return d;
@@ -40,7 +42,8 @@ namespace FunctionRowRemapper
             if (layerForKey != null || (activeLayerKey == vk && suppressLayerRelease)) {
                 if (down) {
                     if (layerForKey != null) { d.LayerName = layerForKey.Name; d.ResolvedAction = config.Enabled ? "Activate layer " + layerForKey.Name : "Shortcuts are paused"; }
-                    if (layerForKey != null && config.Enabled && (activeLayerKey == 0 || activeLayerKey == vk)) { activeLayerKey = vk; suppressLayerRelease = true; d.Suppress = true; }
+                    if (layerForKey != null && config.Enabled && allowNewActions && (activeLayerKey == 0 || activeLayerKey == vk)) { activeLayerKey = vk; suppressLayerRelease = true; d.Suppress = true; }
+                    else if (activeLayerKey == vk && suppressLayerRelease) d.Suppress = true;
                 } else if (activeLayerKey == vk) {
                     d.Suppress = suppressLayerRelease; activeLayerKey = 0; suppressLayerRelease = false;
                 }
@@ -53,19 +56,46 @@ namespace FunctionRowRemapper
                     return d;
                 }
                 if (!mediaPressed.TryGetValue(vk, out mediaPress)) {
+                    if (!allowNewActions) return d;
                     CustomHotkey hotkey = (config.CustomHotkeys ?? new CustomHotkey[0]).FirstOrDefault(h => {
                         HotkeyChord chord;
                         try { chord = HotkeyChord.Parse(h.Shortcut); } catch { return false; }
                         return chord.Modifiers == 0 && chord.Key == vk;
                     });
-                    if (hotkey == null || !config.Enabled) return d;
+                    if (hotkey == null || hotkey.Action == null || hotkey.Action.Kind == ActionKind.PassThrough || !config.Enabled) return d;
                     mediaPress = new Press { Suppress = true, Mapping = hotkey.Action.Copy() };
-                    mediaPressed[vk] = mediaPress; d.Suppress = true; d.Action = mediaPress.Mapping;
+                    mediaPressed[vk] = mediaPress; d.Suppress = true;
+                    // Raw HID dispatches the Consumer-page Eject action. The
+                    // keyboard hook still swallows both edges but must not queue it again.
+                    if (mediaPress.Mapping.Kind != ActionKind.Unbound && !(vk == 0xB8 && ejectHandledByRawInput)) d.Action = mediaPress.Mapping;
                     d.ResolvedAction = mediaPress.Mapping.Summary; return d;
                 }
                 d.Suppress = mediaPress.Suppress;
-                if (config.Enabled && !mediaPress.Cancelled && mediaPress.Mapping.Repeats) d.Action = mediaPress.Mapping;
+                if (allowNewActions && config.Enabled && !mediaPress.Cancelled && mediaPress.Mapping.Kind != ActionKind.Unbound && mediaPress.Mapping.Repeats) d.Action = mediaPress.Mapping;
                 d.ResolvedAction = mediaPress.Mapping.Summary; return d;
+            }
+            if (HotkeyChord.IsStandaloneKeyboardKey(vk)) {
+                Press standalonePress;
+                if (!down) {
+                    if (standalonePressed.TryGetValue(vk, out standalonePress)) { d.Suppress = standalonePress.Suppress; standalonePressed.Remove(vk); }
+                    return d;
+                }
+                if (!standalonePressed.TryGetValue(vk, out standalonePress)) {
+                    if (!allowNewActions) return d;
+                    CustomHotkey hotkey = (config.CustomHotkeys ?? new CustomHotkey[0]).FirstOrDefault(h => {
+                        HotkeyChord chord;
+                        try { chord = HotkeyChord.Parse(h.Shortcut); } catch { return false; }
+                        return chord.Modifiers == 0 && chord.Key == vk;
+                    });
+                    if (hotkey == null || hotkey.Action == null || hotkey.Action.Kind == ActionKind.PassThrough || !config.Enabled) return d;
+                    standalonePress = new Press { Suppress = true, Mapping = hotkey.Action.Copy() };
+                    standalonePressed[vk] = standalonePress; d.Suppress = true;
+                    if (standalonePress.Mapping.Kind != ActionKind.Unbound) d.Action = standalonePress.Mapping;
+                    d.ResolvedAction = standalonePress.Mapping.Summary; return d;
+                }
+                d.Suppress = standalonePress.Suppress;
+                if (allowNewActions && config.Enabled && !standalonePress.Cancelled && standalonePress.Mapping.Kind != ActionKind.Unbound && standalonePress.Mapping.Repeats) d.Action = standalonePress.Mapping;
+                d.ResolvedAction = standalonePress.Mapping.Summary; return d;
             }
             if (vk < 0x70 || vk > 0x7B) return d;
             int i = vk - 0x70; Press p = pressed[i];
@@ -74,6 +104,11 @@ namespace FunctionRowRemapper
                 return d;
             }
             if (p == null) {
+                if (!allowNewActions) return d;
+                if (customChordWins) {
+                    pressed[i] = new Press { Suppress = false, Mapping = new Mapping { Kind = ActionKind.PassThrough } };
+                    d.ResolvedAction = "Custom hotkey chord"; return d;
+                }
                 ModifierLayer activeLayer = activeLayerKey == 0 || config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == activeLayerKey);
                 Mapping m = activeLayer == null ? config.Mappings[i] : activeLayer.Mappings[i];
                 d.LayerName = activeLayer == null ? "Base" : activeLayer.Name; d.ResolvedAction = config.Enabled ? m.Summary : "Shortcuts are paused";
@@ -81,7 +116,7 @@ namespace FunctionRowRemapper
                 pressed[i] = p;
                 if (p.Suppress && m.Kind != ActionKind.Unbound) d.Action = p.Mapping;
             }
-            else if (p.Suppress && config.Enabled && !p.Cancelled && p.Mapping.Repeats) d.Action = p.Mapping;
+            else if (allowNewActions && p.Suppress && config.Enabled && !p.Cancelled && p.Mapping.Repeats) d.Action = p.Mapping;
             d.Suppress = p.Suppress; return d;
         }
         public string ActiveLayerName(Configuration config)
@@ -89,7 +124,24 @@ namespace FunctionRowRemapper
             ModifierLayer active = activeLayerKey == 0 || config.Layers == null ? null : config.Layers.FirstOrDefault(l => LayerKeys.VirtualKey(l.ActivationKey) == activeLayerKey);
             return active == null ? "Base" : active.Name;
         }
-        public void CancelHeldActions() { foreach (Press p in pressed) if (p != null) p.Cancelled = true; foreach (Press p in mediaPressed.Values) p.Cancelled = true; }
+        public void CancelHeldActions() { foreach (Press p in pressed) if (p != null) p.Cancelled = true; foreach (Press p in mediaPressed.Values) p.Cancelled = true; foreach (Press p in standalonePressed.Values) p.Cancelled = true; }
+    }
+
+    internal sealed class EjectDispatchGate
+    {
+        readonly object gate = new object();
+        long lastDispatch;
+        internal bool TryEnter(long timestamp, long frequency)
+        {
+            if (timestamp <= 0 || frequency <= 0) throw new ArgumentOutOfRangeException();
+            lock (gate) {
+                long window = Math.Max(1, frequency / 10); // Coalesce the raw-HID, VK and app-command reports of one press.
+                if (lastDispatch != 0 && (timestamp <= lastDispatch || timestamp - lastDispatch < window)) return false;
+                lastDispatch = timestamp;
+                return true;
+            }
+        }
+        internal void Reset(long timestamp) { lock (gate) if (lastDispatch == timestamp) lastDispatch = 0; }
     }
 
     public sealed class EmergencyHold
@@ -123,27 +175,85 @@ namespace FunctionRowRemapper
     {
         readonly IActionSink sink;
         readonly IDdcController monitors;
-        public ActionDispatcher(IActionSink sink) : this(sink, DdcService.Shared) { }
-        public ActionDispatcher(IActionSink sink, IDdcController monitors) { this.sink = sink; this.monitors = monitors; }
+        readonly Func<bool> lockWorkstation;
+        readonly Action suspendWorkstation;
+        readonly Action<bool> mediaToggleForSelfTest;
+        public ActionDispatcher(IActionSink sink) : this(sink, DdcService.Shared, null) { }
+        public ActionDispatcher(IActionSink sink, IDdcController monitors) : this(sink, monitors, null) { }
+        internal ActionDispatcher(IActionSink sink, IDdcController monitors, Action<bool> mediaToggleForSelfTest)
+            : this(sink, monitors, Native.LockWorkStation, delegate { Native.SetSuspendState(false, false, false); }, mediaToggleForSelfTest) { }
+        internal ActionDispatcher(IActionSink sink, IDdcController monitors, Func<bool> lockWorkstation, Action suspendWorkstation)
+            : this(sink, monitors, lockWorkstation, suspendWorkstation, null) { }
+        internal ActionDispatcher(IActionSink sink, IDdcController monitors, Func<bool> lockWorkstation, Action suspendWorkstation, Action<bool> mediaToggleForSelfTest)
+        {
+            if (sink == null) throw new ArgumentNullException("sink");
+            if (monitors == null) throw new ArgumentNullException("monitors");
+            if (lockWorkstation == null) throw new ArgumentNullException("lockWorkstation");
+            if (suspendWorkstation == null) throw new ArgumentNullException("suspendWorkstation");
+            this.sink = sink; this.monitors = monitors; this.lockWorkstation = lockWorkstation; this.suspendWorkstation = suspendWorkstation;
+            this.mediaToggleForSelfTest = mediaToggleForSelfTest;
+        }
+        internal static bool RequiresMonitorQueue(Mapping mapping)
+        {
+            if (mapping == null) return false;
+            if (mapping.Kind == ActionKind.Monitor) return true;
+            if (mapping.Kind == ActionKind.Sequence) {
+                try { return SequenceCodec.Parse(mapping.Target).Any(step => !step.IsWait && RequiresMonitorQueue(step.Action)); }
+                catch { return false; }
+            }
+            if (mapping.Kind == ActionKind.Conditional) {
+                try { var rule = ConditionalCodec.Parse(mapping.Target); return RequiresMonitorQueue(rule.WhenMatched) || RequiresMonitorQueue(rule.Otherwise); }
+                catch { return false; }
+            }
+            return false;
+        }
         public void Execute(Mapping m) { Execute(m, () => true); }
         public void Execute(Mapping m, Func<bool> stillActive)
         {
+            if (stillActive == null) stillActive = delegate { return true; };
+            if (!stillActive() && (m == null || m.Kind != ActionKind.Monitor)) return;
             ActionExplanation.Record(m, "action dispatcher");
-            if (!FeatureFlags.Load().ExperimentalEnabled && FeatureFlags.IsExperimental(m)) throw new InvalidOperationException("Experimental actions are disabled in Settings.");
+            if (!FeatureFlags.Allows(m, delegate { return FeatureFlags.Load().ExperimentalEnabled; })) throw new InvalidOperationException("Experimental actions are disabled in Settings.");
             ConfigStore.Validate(m, true);
             if (m.Kind == ActionKind.Monitor) { monitors.Apply(m, stillActive); return; }
+            if (!stillActive()) return;
             if (m.Kind == ActionKind.Conditional) {
                 var rule = ConditionalCodec.Parse(m.Target); Execute(ConditionalActions.Matches(rule) ? rule.WhenMatched : rule.Otherwise, stillActive); return;
             }
-            if (m.Kind == ActionKind.SystemAction) { SystemActions.Execute(m.Target, sink); return; }
-            if (m.Kind == ActionKind.HttpRequest) { SystemActions.HttpRequest(m); return; }
+            if (m.Kind == ActionKind.SystemAction) { SystemActions.Execute(m.Target, sink, mediaToggleForSelfTest); return; }
+            if (m.Kind == ActionKind.HttpRequest) { SystemActions.HttpRequest(m, stillActive); return; }
             if (m.Kind == ActionKind.PassThrough || m.Kind == ActionKind.Unbound) return;
-            if (m.Kind == ActionKind.LockThenSleep) { if (Native.LockWorkStation()) { Thread.Sleep(750); Native.SetSuspendState(false, false, false); } return; }
-            if (m.Kind == ActionKind.Sequence) { foreach (var step in SequenceCodec.Parse(m.Target)) { if (!stillActive()) return; if (step.IsWait) Thread.Sleep(step.WaitMilliseconds); else Execute(step.Action, stillActive); } return; }
+            if (m.Kind == ActionKind.LockThenSleep) { RunLockThenSleep(lockWorkstation, suspendWorkstation, stillActive); return; }
+            if (m.Kind == ActionKind.Sequence) { foreach (var step in SequenceCodec.Parse(m.Target)) { if (!stillActive()) return; if (step.IsWait) { if (!WaitWhileActive(step.WaitMilliseconds, stillActive)) return; } else Execute(step.Action, stillActive); } return; }
             if (m.Kind == ActionKind.SendKey || m.Kind == ActionKind.SendShortcut || m.Kind == ActionKind.Media) {
-                sink.Send(m.Kind == ActionKind.SendKey ? Shortcuts.ParseSendKey(m.Target) : Shortcuts.Parse(m.Target, m.Kind != ActionKind.SendShortcut)); return;
+                if (m.Kind == ActionKind.Media) { SystemActions.ExecuteMedia(m.Target, sink, mediaToggleForSelfTest); return; }
+                sink.Send(m.Kind == ActionKind.SendKey ? Shortcuts.ParseSendKey(m.Target) : Shortcuts.Parse(m.Target, false)); return;
             }
             sink.Launch(BuildLaunch(m));
+        }
+        internal static bool RunLockThenSleep(Func<bool> lockWorkstation, Action suspend, Func<bool> stillActive)
+        {
+            return RunLockThenSleep(750, lockWorkstation, suspend, stillActive);
+        }
+        internal static bool RunLockThenSleep(int delayMilliseconds, Func<bool> lockWorkstation, Action suspend, Func<bool> stillActive)
+        {
+            if (lockWorkstation == null) throw new ArgumentNullException("lockWorkstation");
+            if (suspend == null) throw new ArgumentNullException("suspend");
+            if (delayMilliseconds < 0) throw new ArgumentOutOfRangeException("delayMilliseconds");
+            if (stillActive == null) stillActive = delegate { return true; };
+            if (!lockWorkstation() || !WaitWhileActive(delayMilliseconds, stillActive)) return false;
+            suspend();
+            return true;
+        }
+        internal static bool WaitWhileActive(int milliseconds, Func<bool> stillActive)
+        {
+            Stopwatch elapsed = Stopwatch.StartNew();
+            while (elapsed.ElapsedMilliseconds < milliseconds) {
+                if (!stillActive()) return false;
+                int remaining = milliseconds - (int)elapsed.ElapsedMilliseconds;
+                Thread.Sleep(Math.Min(25, Math.Max(1, remaining)));
+            }
+            return stillActive();
         }
         public static ProcessStartInfo BuildLaunch(Mapping m)
         {
@@ -176,28 +286,45 @@ namespace FunctionRowRemapper
         readonly ManualResetEvent ready = new ManualResetEvent(false);
         readonly KeyStateMachine machine = new KeyStateMachine();
         readonly ActionDispatcher dispatcher;
+        readonly EjectDispatchGate ejectDispatchGate = new EjectDispatchGate();
         readonly bool testInjected;
+        readonly Action beforeHookStartupForTest, hookThreadExitedForTest;
+        readonly int hookStartupTimeoutMilliseconds;
         readonly Native.HookProc callback;
         Configuration config = new Configuration();
+        int[] customChordPrecedence = new int[0];
         Control control; IntPtr hook; Exception startupError;
-        volatile bool stopping, installed; int generation;
+        volatile bool stopping, installed, ejectHandledByRawInput; int generation, queueSaturationReported, monitorQueueSaturationReported, stopSignaled, readyDisposed;
         public event Action EmergencyDisabled;
         public event Action<string> Error;
         public event Action<KeyDiagnostic> KeyObserved;
         public bool Installed { get { return installed; } }
         public bool Enabled { get { return Volatile.Read(ref config).Enabled; } }
+        public void SetEjectHandledByRawInput(bool value) { ejectHandledByRawInput = value; }
+        internal void SetCustomChordPrecedence(int[] chordKeys) { Volatile.Write(ref customChordPrecedence, chordKeys == null ? new int[0] : (int[])chordKeys.Clone()); }
         public string ActiveLayerName { get { return machine.ActiveLayerName(Volatile.Read(ref config)); } }
         public KeyboardEngine() : this(new WindowsActionSink(), false) { }
-        internal KeyboardEngine(Action<string> profileActivation) : this(new WindowsActionSink(profileActivation), false) { }
+        public KeyboardEngine(Action<string> profileActivation) : this(new WindowsActionSink(profileActivation), false) { }
         // Test-only injection seam. The shipping application never enables it.
-        internal KeyboardEngine(IActionSink sink, bool testInjected)
+        internal KeyboardEngine(IActionSink sink, bool testInjected, IDdcController monitors = null)
+            : this(sink, testInjected, monitors, Native.LockWorkStation, delegate { Native.SetSuspendState(false, false, false); }) { }
+        // Test-only injection seam for exercising sensitive power actions without locking or suspending the test machine.
+        internal KeyboardEngine(IActionSink sink, bool testInjected, IDdcController monitors, Func<bool> lockWorkstation, Action suspendWorkstation)
+            : this(sink, testInjected, monitors, lockWorkstation, suspendWorkstation, null, 5000, null) { }
+        // Test seam for deterministically exercising the bounded startup-timeout cleanup path.
+        internal KeyboardEngine(IActionSink sink, bool testInjected, IDdcController monitors, Func<bool> lockWorkstation, Action suspendWorkstation, Action beforeHookStartupForTest, int hookStartupTimeoutMilliseconds, Action hookThreadExitedForTest)
         {
-            this.testInjected = testInjected; dispatcher = new ActionDispatcher(sink); callback = OnKey;
+            if (hookStartupTimeoutMilliseconds <= 0) throw new ArgumentOutOfRangeException("hookStartupTimeoutMilliseconds");
+            // Prime filesystem and foreground policy before installing the time-sensitive input hook.
+            GameMode.RefreshEnabledState();
+            ShortcutSuspension.RefreshForegroundState();
+            this.testInjected = testInjected; this.beforeHookStartupForTest = beforeHookStartupForTest; this.hookThreadExitedForTest = hookThreadExitedForTest; this.hookStartupTimeoutMilliseconds = hookStartupTimeoutMilliseconds;
+            dispatcher = new ActionDispatcher(sink, monitors ?? DdcService.Shared, lockWorkstation, suspendWorkstation); callback = OnKey;
             workerThread = new Thread(Work) { IsBackground = true, Name = "Action dispatcher" }; workerThread.SetApartmentState(ApartmentState.STA);
             monitorThread = new Thread(delegate() { WorkQueue(monitorQueue); }) { IsBackground = true, Name = "DDC monitor dispatcher" };
             hookThread = new Thread(RunHook) { IsBackground = true, Name = "Function row hook" }; hookThread.SetApartmentState(ApartmentState.STA);
             workerThread.Start(); monitorThread.Start(); hookThread.Start();
-            if (!ready.WaitOne(5000)) { stopping = true; queue.CompleteAdding(); monitorQueue.CompleteAdding(); throw new InvalidOperationException("The keyboard hook did not start within five seconds."); }
+            if (!ready.WaitOne(hookStartupTimeoutMilliseconds)) { Dispose(); throw new InvalidOperationException("The keyboard hook did not start within five seconds."); }
             if (startupError != null) { Dispose(); throw new InvalidOperationException("Could not install the keyboard hook.", startupError); }
         }
         public void Apply(Configuration c)
@@ -207,7 +334,50 @@ namespace FunctionRowRemapper
             control.Invoke((Action)delegate { machine.CancelHeldActions(); Interlocked.Increment(ref generation); Volatile.Write(ref config, snapshot); });
         }
         public void SetEnabled(bool value) { Configuration c = Volatile.Read(ref config).Copy(); c.Enabled = value; Apply(c); }
-        void Report(string text) { var e = Error; if (e != null) e(text); }
+        public bool TriggerFunctionKey(int functionKey)
+        {
+            if (functionKey < 1 || functionKey > 12 || stopping || !Enabled || ShortcutSuspension.IsSuspended()) return false;
+            var snapshot = Volatile.Read(ref config); var mappings = snapshot.Mappings ?? new Mapping[0]; if (mappings.Length < functionKey || mappings[functionKey - 1] == null) return false;
+            Mapping mapping = mappings[functionKey - 1];
+            return TryQueue(mapping, true);
+        }
+        public bool TriggerCustomHotkey(string shortcut)
+        {
+            if (String.IsNullOrWhiteSpace(shortcut) || stopping || !Enabled || ShortcutSuspension.IsSuspended()) return false;
+            var snapshot = Volatile.Read(ref config);
+            var hotkey = HotkeyChord.FindCustomHotkey(snapshot, shortcut);
+            if (hotkey == null || hotkey.Action == null) return false;
+            if (hotkey.Action.Kind == ActionKind.PassThrough) return false;
+            if (hotkey.Action.Kind == ActionKind.Unbound) return true;
+            var mapping = hotkey.Action.Copy();
+            return String.Equals(HotkeyChord.Normalize(hotkey.Shortcut), "MediaEject", StringComparison.OrdinalIgnoreCase) ? TryQueueEject(mapping) : TryQueue(mapping, true);
+        }
+        bool TryQueueEject(Mapping mapping)
+        {
+            long timestamp = Stopwatch.GetTimestamp();
+            if (!ejectDispatchGate.TryEnter(timestamp, Stopwatch.Frequency)) return true;
+            bool queued = TryQueue(mapping, true);
+            if (!queued) ejectDispatchGate.Reset(timestamp);
+            return queued;
+        }
+        bool TryQueue(Mapping mapping, bool reportSaturation)
+        {
+            bool monitorAction = ActionDispatcher.RequiresMonitorQueue(mapping);
+            BlockingCollection<Job> destination = monitorAction ? monitorQueue : queue;
+            bool queued;
+            try { queued = destination.TryAdd(new Job { Mapping = mapping.Copy(), Generation = Volatile.Read(ref generation) }); }
+            catch (InvalidOperationException) { return false; } // A producer can race Dispose/CompleteAdding.
+            if (queued) {
+                if (monitorAction) Interlocked.Exchange(ref monitorQueueSaturationReported, 0);
+                else Interlocked.Exchange(ref queueSaturationReported, 0);
+            } else if (reportSaturation && (monitorAction
+                ? Interlocked.CompareExchange(ref monitorQueueSaturationReported, 1, 0)
+                : Interlocked.CompareExchange(ref queueSaturationReported, 1, 0)) == 0) {
+                ThreadPool.QueueUserWorkItem(delegate { Report("KiWeave is busy; a triggered action was skipped. Try again when the current action finishes."); });
+            }
+            return queued;
+        }
+        void Report(string text) { var e = Error; if (e != null) try { e(text); } catch { } }
         void Work() { WorkQueue(queue); }
         void WorkQueue(BlockingCollection<Job> jobs)
         {
@@ -219,7 +389,9 @@ namespace FunctionRowRemapper
         void RunHook()
         {
             System.Windows.Forms.Timer timer = null;
+            EventHandler messageLoopReady = null;
             try {
+                if (beforeHookStartupForTest != null) beforeHookStartupForTest();
                 control = new Control(); var handle = control.Handle;
                 hook = Native.SetWindowsHookEx(13, callback, Native.GetModuleHandle(null), 0);
                 if (hook == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
@@ -230,19 +402,24 @@ namespace FunctionRowRemapper
                     if (emergency.Tick(Native.IsDown(0x11) && Native.IsDown(0x12) && Native.IsDown(0x10), clock.ElapsedMilliseconds)) {
                         var c = Volatile.Read(ref config).Copy(); c.Enabled = false;
                         machine.CancelHeldActions(); Interlocked.Increment(ref generation); Volatile.Write(ref config, c);
-                        var e = EmergencyDisabled;
-                        if (e != null) ThreadPool.QueueUserWorkItem(delegate { e(); });
+                        NotifyEmergencyDisabled();
                     }
                 };
-                timer.Start(); ready.Set();
-                if (!stopping) Application.Run();
+                timer.Start();
+                if (!stopping) {
+                    messageLoopReady = delegate { Application.Idle -= messageLoopReady; ready.Set(); };
+                    Application.Idle += messageLoopReady;
+                    Application.Run();
+                } else ready.Set();
             }
             catch (Exception ex) { startupError = ex; ready.Set(); if (!stopping) Report(ex.Message); }
             finally {
+                if (messageLoopReady != null) Application.Idle -= messageLoopReady;
                 installed = false;
                 if (timer != null) timer.Dispose();
                 if (hook != IntPtr.Zero) { Native.UnhookWindowsHookEx(hook); hook = IntPtr.Zero; }
                 if (control != null) control.Dispose();
+                if (hookThreadExitedForTest != null) try { hookThreadExitedForTest(); } catch { }
             }
         }
         IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
@@ -257,21 +434,33 @@ namespace FunctionRowRemapper
                 bool down = msg == 0x100 || msg == 0x104;
 
                 Configuration snapshot = Volatile.Read(ref config);
-                if (!ignore && (ShortcutSuspension.IsSuspended() || (GameMode.Enabled && GameMode.IsFullscreenForeground() && !GameMode.AllowsControl(snapshot, (int)k.Vk)))) return Native.CallNextHookEx(hook, code, wParam, lParam);
-                KeyDecision d = machine.Process((int)k.Vk, down, ignore, snapshot);
+                bool allowNewActions = ignore || (!ShortcutSuspension.IsSuspendedCached() && !(GameMode.EnabledCached && GameMode.IsFullscreenForegroundCached && !GameMode.AllowsControl(snapshot, (int)k.Vk)));
+                int virtualKey = (int)k.Vk;
+                bool customChordWins = virtualKey >= 0x70 && virtualKey <= 0x7B && allowNewActions && !ignore && HotkeyChord.HasMatchingModifierChord(Volatile.Read(ref customChordPrecedence), virtualKey, Native.IsDown);
+                KeyDecision d = machine.Process(virtualKey, down, ignore, snapshot, customChordWins, allowNewActions, ejectHandledByRawInput);
                 var observed = KeyObserved;
                 if (observed != null && down) {
                     string modifiers = String.Join("+", new[] { Native.IsDown(0x11) ? "Ctrl" : "", Native.IsDown(0x12) ? "Alt" : "", Native.IsDown(0x10) ? "Shift" : "", (Native.IsDown(0x5B) || Native.IsDown(0x5C)) ? "Win" : "" }.Where(x => x.Length > 0));
                     var diagnostic = new KeyDiagnostic { VirtualKey = (int)k.Vk, KeyName = KeyLabel((int)k.Vk), Modifiers = modifiers.Length == 0 ? "None" : modifiers, Source = ignore ? "Injected (ignored)" : injected ? "Injected test input" : "Physical", Suppressed = d.Suppress, LayerName = d.LayerName == "Base" ? machine.ActiveLayerName(snapshot) : d.LayerName, ResolvedAction = ignore ? "Ignored injected input" : d.ResolvedAction };
                     ThreadPool.QueueUserWorkItem(delegate { try { observed(diagnostic); } catch { } });
                 }
-                if (d.Action != null) (d.Action.Kind == ActionKind.Monitor ? monitorQueue : queue).TryAdd(new Job { Mapping = d.Action, Generation = Volatile.Read(ref generation) });
+                if (d.Action != null) { if (virtualKey == 0xB8) TryQueueEject(d.Action); else TryQueue(d.Action, true); }
                 if (d.Suppress) return new IntPtr(1);
             }
             catch { // Fail open, disable further actions; do not perform I/O or call UI from the hook.
-                Interlocked.Increment(ref generation); var c = Volatile.Read(ref config).Copy(); c.Enabled = false; Volatile.Write(ref config, c);
+                var c = Volatile.Read(ref config);
+                if (c.Enabled) {
+                    c = c.Copy(); c.Enabled = false;
+                    machine.CancelHeldActions(); Interlocked.Increment(ref generation); Volatile.Write(ref config, c);
+                    NotifyEmergencyDisabled();
+                }
             }
             return Native.CallNextHookEx(hook, code, wParam, lParam);
+        }
+        void NotifyEmergencyDisabled()
+        {
+            var disabled = EmergencyDisabled;
+            if (disabled != null) ThreadPool.QueueUserWorkItem(delegate { try { disabled(); } catch { } });
         }
         static string KeyLabel(int vk)
         {
@@ -280,10 +469,14 @@ namespace FunctionRowRemapper
         }
         public void Dispose()
         {
-            if (stopping) return; stopping = true; Interlocked.Increment(ref generation); queue.CompleteAdding(); monitorQueue.CompleteAdding();
+            stopping = true;
+            if (Interlocked.Exchange(ref stopSignaled, 1) == 0) { Interlocked.Increment(ref generation); queue.CompleteAdding(); monitorQueue.CompleteAdding(); }
             if (control != null && !control.IsDisposed) try { control.BeginInvoke((Action)delegate { Application.ExitThread(); }); } catch (InvalidOperationException) { }
             if (Thread.CurrentThread != hookThread) hookThread.Join(2000);
-            workerThread.Join(1000); monitorThread.Join(500); ready.Dispose();
+            workerThread.Join(1000); monitorThread.Join(500);
+            // A hook startup can still be unwinding after the bounded join. Keep
+            // its readiness event alive until RunHook has stopped touching it.
+            if (!hookThread.IsAlive && Interlocked.Exchange(ref readyDisposed, 1) == 0) ready.Dispose();
         }
     }
 
@@ -307,6 +500,7 @@ namespace FunctionRowRemapper
         [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterHotKey(IntPtr handle, int id);
         [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int length);
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] internal struct MonitorInfo { public int Size; public Rect Monitor, Work; public uint Flags; }
         [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
@@ -323,6 +517,26 @@ namespace FunctionRowRemapper
                 uint id; GetWindowThreadProcessId(GetForegroundWindow(), out id); if (id == 0) return "";
                 using (var process = Process.GetProcessById((int)id)) return process.ProcessName;
             } catch { return ""; }
+        }
+        internal static bool TryForegroundProcessName(out string processName)
+        {
+            processName = "";
+            try {
+                IntPtr window = GetForegroundWindow();
+                if (window == IntPtr.Zero) return true;
+                uint id;
+                if (GetWindowThreadProcessId(window, out id) == 0 || id == 0) return false;
+                using (var process = Process.GetProcessById((int)id)) processName = process.ProcessName;
+                return !String.IsNullOrWhiteSpace(processName);
+            } catch { processName = ""; return false; }
+        }
+        internal static string ForegroundProcessPath()
+        {
+            try { uint id; GetWindowThreadProcessId(GetForegroundWindow(), out id); if (id == 0) return ""; using (var process = Process.GetProcessById((int)id)) { var module = process.MainModule; return module == null ? "" : module.FileName; } } catch { return ""; }
+        }
+        internal static string WindowTitle(IntPtr window)
+        {
+            try { if (window == IntPtr.Zero) return ""; var text = new StringBuilder(512); return GetWindowText(window, text, text.Capacity) > 0 ? text.ToString() : ""; } catch { return ""; }
         }
         internal static Input Key(int vk, bool up, UIntPtr tag)
         {

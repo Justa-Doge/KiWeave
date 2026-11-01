@@ -9,9 +9,11 @@ namespace FunctionRowRemapper
     internal static class RecoveryStore
     {
         internal static string BackupsFolder { get { return Path.Combine(Path.GetDirectoryName(ConfigStore.DefaultPath), "Backups"); } }
-        internal static string KnownGoodPath { get { return Path.Combine(BackupsFolder, "known-good.keyweave"); } }
+        internal static string KnownGoodPath { get { return Path.Combine(BackupsFolder, "known-good.kiweave"); } }
+        internal static string LegacyKnownGoodPath { get { return Path.Combine(BackupsFolder, "known-good.keyweave"); } }
         internal static string DraftFolder { get { return Path.Combine(Path.GetDirectoryName(ConfigStore.DefaultPath), "Drafts"); } }
-        internal static string DraftPath { get { return Path.Combine(DraftFolder, "recovery-draft.keyweave"); } }
+        internal static string DraftPath { get { return Path.Combine(DraftFolder, "recovery-draft.kiweave"); } }
+        internal static string LegacyDraftPath { get { return Path.Combine(DraftFolder, "recovery-draft.keyweave"); } }
         internal static string DraftProfilePath { get { return Path.Combine(DraftFolder, "recovery-profile.txt"); } }
 
         internal static void SaveDraft(Configuration defaults, ProfileCollection profiles, UserPreferences preferences, bool startup, string currentProfile, Configuration draft)
@@ -26,14 +28,29 @@ namespace FunctionRowRemapper
         }
 
         internal static bool TryLoadDraft(out KeyWeaveBackup backup, out string profile)
-        { return TryLoadDraft(DraftPath, DraftProfilePath, out backup, out profile); }
+        {
+            string path = File.Exists(DraftPath) ? DraftPath : LegacyDraftPath;
+            return TryLoadDraft(path, DraftProfilePath, out backup, out profile);
+        }
         internal static bool TryLoadDraft(string draftPath, string profilePath, out KeyWeaveBackup backup, out string profile)
         {
             backup = null; profile = "Default"; if (!File.Exists(draftPath)) return false; backup = BackupBundle.Load(draftPath);
-            if (File.Exists(profilePath)) { string value = File.ReadAllText(profilePath, Encoding.UTF8).Trim(); if (value.Length > 0 && value.Length <= 40 && value.IndexOfAny(new[] { '\r', '\n' }) < 0) profile = value; }
+            if (File.Exists(profilePath)) { string value = AtomicFile.ReadAllTextBounded(profilePath, 256, Encoding.UTF8).Trim(); if (value.Length > 0 && value.Length <= 40 && value.IndexOfAny(new[] { '\r', '\n' }) < 0) profile = value; }
             if (!String.Equals(profile, "Default", StringComparison.OrdinalIgnoreCase) && backup.Profiles.Find(profile) == null) profile = "Default"; return true;
         }
-        internal static void DeleteDraft() { try { if (File.Exists(DraftPath)) File.Delete(DraftPath); } catch { } try { if (File.Exists(DraftProfilePath)) File.Delete(DraftProfilePath); } catch { } }
+        internal static bool MatchesCurrent(KeyWeaveBackup recovery, Configuration current, ProfileCollection profiles, UserPreferences preferences, bool startup)
+        {
+            if (recovery == null || recovery.Configuration == null || recovery.Profiles == null || recovery.Preferences == null || current == null || profiles == null || preferences == null) return false;
+            try {
+                // Recovery bundles are canonicalized through the same serializers used for saved files.
+                // This catches stale drafts even when the human-readable comparison has nothing to show.
+                return recovery.StartWithWindows == startup &&
+                    String.Equals(ConfigStore.Serialize(recovery.Configuration), ConfigStore.Serialize(current), StringComparison.Ordinal) &&
+                    String.Equals(ProfileStore.Serialize(recovery.Profiles), ProfileStore.Serialize(profiles), StringComparison.Ordinal) &&
+                    String.Equals(UserPreferences.Serialize(recovery.Preferences), UserPreferences.Serialize(preferences), StringComparison.Ordinal);
+            } catch { return false; }
+        }
+        internal static void DeleteDraft() { foreach (string path in new[] { DraftPath, LegacyDraftPath }) try { if (File.Exists(path)) File.Delete(path); } catch { } try { if (File.Exists(DraftProfilePath)) File.Delete(DraftProfilePath); } catch { } }
         internal static void SaveKnownGoodCurrent()
         {
             Configuration configuration = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration();
@@ -62,7 +79,7 @@ namespace FunctionRowRemapper
         }
         void Export(object sender, EventArgs e)
         {
-            using (var dialog = new SaveFileDialog { Filter = "KiWeave backup|*.keyweave", FileName = "KiWeave-recovered-draft.keyweave", DefaultExt = "keyweave", AddExtension = true }) if (dialog.ShowDialog(this) == DialogResult.OK)
+            using (var dialog = new SaveFileDialog { Filter = "KiWeave backup (*.kiweave)|*.kiweave", FileName = "KiWeave-recovered-draft.kiweave", DefaultExt = "kiweave", AddExtension = true }) if (dialog.ShowDialog(this) == DialogResult.OK)
                 try { BackupBundle.Save(dialog.FileName, backup.Configuration, backup.Profiles, backup.Preferences, backup.StartWithWindows, false); MessageBox.Show(this, "Private draft copy exported.", "Draft recovery", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch (Exception ex) { MessageBox.Show(this, "The draft could not be exported. " + ex.Message, "Draft recovery", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
     }

@@ -6,13 +6,14 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace FunctionRowRemapper
 {
-    internal sealed class PowerToysShortcut
+    public sealed class PowerToysShortcut
     {
         public string Module, Action, Chord, FilePath, FileHash, DscModule;
         public string[] PropertyPath;
@@ -20,8 +21,9 @@ namespace FunctionRowRemapper
         public bool CanEdit { get { return !IsProfileRemap && DscModule != null; } }
     }
 
-    internal static class PowerToysIntegration
+    public static class PowerToysIntegration
     {
+        const int MaxSettingsBytes = 1024 * 1024;
         static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 1024 * 1024, RecursionLimit = 64 };
         static readonly Dictionary<string, string> DscNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
             { "AdvancedPaste", "AdvancedPaste" }, { "AlwaysOnTop", "AlwaysOnTop" }, { "Awake", "Awake" },
@@ -39,8 +41,7 @@ namespace FunctionRowRemapper
 
         static Dictionary<string, object> ReadObject(string file)
         {
-            if (new FileInfo(file).Length > 1024 * 1024) throw new InvalidDataException("PowerToys settings file is unexpectedly large.");
-            var data = Json.DeserializeObject(File.ReadAllText(file, Encoding.UTF8)) as Dictionary<string, object>;
+            var data = Json.DeserializeObject(AtomicFile.ReadAllTextBounded(file, MaxSettingsBytes, Encoding.UTF8)) as Dictionary<string, object>;
             if (data == null) throw new InvalidDataException("PowerToys settings must be a JSON object.");
             return data;
         }
@@ -76,9 +77,20 @@ namespace FunctionRowRemapper
             if (names.Count == 0) return "Toggle";
             return String.Join(" • ", names);
         }
-        static string Hash(string file)
+        internal static string Hash(string file)
         {
-            using (var sha = SHA256.Create()) using (var stream = File.OpenRead(file)) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "");
+            using (var stream = File.OpenRead(file))
+            using (var sha = SHA256.Create()) {
+                if (stream.Length > MaxSettingsBytes) throw new InvalidDataException("PowerToys settings exceed the allowed size.");
+                byte[] buffer = new byte[32768]; long total = 0; int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) {
+                    total += read;
+                    if (total > MaxSettingsBytes) throw new InvalidDataException("PowerToys settings exceed the allowed size.");
+                    sha.TransformBlock(buffer, 0, read, buffer, 0);
+                }
+                sha.TransformFinalBlock(new byte[0], 0, 0);
+                return BitConverter.ToString(sha.Hash).Replace("-", "");
+            }
         }
         internal static string FormatHotkey(Dictionary<string, object> data)
         {
@@ -109,12 +121,13 @@ namespace FunctionRowRemapper
         public static List<PowerToysShortcut> Load(string root)
         {
             var found = new List<PowerToysShortcut>();
+            if (String.IsNullOrWhiteSpace(root) || AppStorage.HasReparsePointInPath(root) || !Directory.Exists(root)) return found;
             string general = Path.Combine(root, "settings.json");
-            if (!File.Exists(general)) return found;
+            if (!File.Exists(general) || AppStorage.HasReparsePointInPath(general)) return found;
             var generalData = ReadObject(general); var enabledMap = Child(generalData, "enabled");
             Scan(generalData, new string[0], "PowerToys", true, general, Hash(general), File.Exists(DscPath) ? "App" : null, found);
-            foreach (string dir in Directory.GetDirectories(root)) {
-                string file = Path.Combine(dir, "settings.json"); if (!File.Exists(file)) continue;
+            foreach (string dir in Directory.GetDirectories(root).Where(path => !AppStorage.HasReparsePointInPath(path))) {
+                string file = Path.Combine(dir, "settings.json"); if (!File.Exists(file) || AppStorage.HasReparsePointInPath(file)) continue;
                 string module = Path.GetFileName(dir); string dsc;
                 if (!DscNames.TryGetValue(module, out dsc) || !File.Exists(DscPath)) dsc = null;
                 try { Scan(ReadObject(file), new string[0], module, Bool(enabledMap, module), file, Hash(file), dsc, found); }
@@ -122,13 +135,13 @@ namespace FunctionRowRemapper
             }
             // Keyboard Manager remaps have a separate profile file and schema. Show them, but edit in PowerToys' own editor.
             string kbm = Path.Combine(root, "Keyboard Manager"); string kbmSettings = Path.Combine(kbm, "settings.json");
-            if (File.Exists(kbmSettings)) try {
+            if (!AppStorage.HasReparsePointInPath(kbm) && File.Exists(kbmSettings) && !AppStorage.HasReparsePointInPath(kbmSettings)) try {
                 var properties = Child(ReadObject(kbmSettings), "properties"); var active = Child(properties, "activeConfiguration");
                 object profileName; if (active != null && active.TryGetValue("value", out profileName) && profileName is string) {
                     string name = (string)profileName;
                     if (Regex.IsMatch(name, "^[A-Za-z0-9_-]{1,80}$")) {
                         string profile = Path.Combine(kbm, name + ".json");
-                        if (File.Exists(profile)) {
+                        if (File.Exists(profile) && !AppStorage.HasReparsePointInPath(profile)) {
                             var remaps = Child(ReadObject(profile), "remapShortcuts");
                             if (remaps != null) foreach (string scope in new[] { "global", "appSpecific" }) {
                                 object rows; if (!remaps.TryGetValue(scope, out rows)) continue;
@@ -177,25 +190,71 @@ namespace FunctionRowRemapper
             var start = new ProcessStartInfo(DscPath, verb + " --resource settings --module " + Quote(module) + " --input " + Quote(Json.Serialize(input))) {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             using (var process = Process.Start(start)) {
-                Task<string> outputTask = process.StandardOutput.ReadToEndAsync(), errorTask = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit(10000)) { try { process.Kill(); } catch { } throw new TimeoutException("PowerToys did not finish applying the setting."); }
-                string error = errorTask.Result, output = outputTask.Result;
+                Task<string> outputTask = ReadProcessOutputBoundedAsync(process.StandardOutput, 65536), errorTask = ReadProcessOutputBoundedAsync(process.StandardError, 65536);
+                if (!process.WaitForExit(10000)) {
+                    try { process.Kill(); } catch { }
+                    try { process.WaitForExit(2000); } catch { }
+                    CloseProcessOutputReaders(process, outputTask, errorTask);
+                    throw new TimeoutException("PowerToys did not finish applying the setting.");
+                }
+                var captured = WaitForProcessOutput(outputTask, errorTask, 2000, delegate { CloseProcessOutputReaders(process, outputTask, errorTask); });
+                string error = captured.Value, output = captured.Key;
                 if (process.ExitCode != 0) throw new InvalidOperationException("PowerToys rejected the change: " + (error.Length > 0 ? error : output));
                 return output;
             }
         }
+        internal static KeyValuePair<string, string> WaitForProcessOutput(Task<string> outputTask, Task<string> errorTask, int timeoutMilliseconds, Action closeReaders)
+        {
+            if (outputTask == null) throw new ArgumentNullException("outputTask"); if (errorTask == null) throw new ArgumentNullException("errorTask");
+            if (timeoutMilliseconds < 0) throw new ArgumentOutOfRangeException("timeoutMilliseconds");
+            Task<string[]> combined = Task.WhenAll(outputTask, errorTask);
+            if (!combined.Wait(timeoutMilliseconds)) {
+                try { if (closeReaders != null) closeReaders(); } catch { }
+                ObserveLateFailure(outputTask); ObserveLateFailure(errorTask);
+                throw new TimeoutException("PowerToys exited but did not close its redirected output streams.");
+            }
+            string[] values = combined.GetAwaiter().GetResult();
+            return new KeyValuePair<string, string>(values[0], values[1]);
+        }
+        static void CloseProcessOutputReaders(Process process, Task<string> outputTask, Task<string> errorTask)
+        {
+            try { process.StandardOutput.Dispose(); } catch { }
+            try { process.StandardError.Dispose(); } catch { }
+            ObserveLateFailure(outputTask); ObserveLateFailure(errorTask);
+        }
+        static void ObserveLateFailure(Task<string> task)
+        {
+            if (task == null) return;
+            task.ContinueWith(completed => { var ignored = completed.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+        internal static async Task<string> ReadProcessOutputBoundedAsync(TextReader reader, int maximumCharacters)
+        {
+            if (reader == null) throw new ArgumentNullException("reader"); if (maximumCharacters < 0) throw new ArgumentOutOfRangeException("maximumCharacters");
+            var output = new StringBuilder(Math.Min(maximumCharacters, 4096)); char[] buffer = new char[4096]; bool truncated = false; int read;
+            while ((read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0) {
+                int remaining = maximumCharacters - output.Length, keep = Math.Min(remaining, read);
+                if (keep > 0) output.Append(buffer, 0, keep);
+                if (keep < read) truncated = true;
+            }
+            if (truncated) output.Append("\r\n[PowerToys output truncated]");
+            return output.ToString();
+        }
         static void DscSet(string module, Dictionary<string, object> settings) { DscCall("set", module, settings); }
         internal static string TestCurrentDscInput(string module, string settingsFile) { return DscCall("test", module, ReadObject(settingsFile)); }
-        static string Backup(string path)
+        internal static string Backup(string path)
         {
+            AppStorage.EnsureNoReparsePointInPath(path);
             string folder = Path.Combine(AppStorage.DataFolder, "PowerToysBackups");
             Directory.CreateDirectory(folder);
+            AppStorage.EnsureNoReparsePointInPath(folder);
             string target = Path.Combine(folder, Path.GetFileName(Path.GetDirectoryName(path)) + "-" + Path.GetFileName(path) + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmssfff") + ".bak");
             File.Copy(path, target, false); return target;
         }
         public static string Save(PowerToysShortcut selected, string chord, bool enableModule)
         {
             if (selected == null || !selected.CanEdit) throw new InvalidOperationException("This PowerToys shortcut must be edited in PowerToys Settings.");
+            AppStorage.EnsureNoReparsePointInPath(selected.FilePath);
             if (!File.Exists(selected.FilePath) || Hash(selected.FilePath) != selected.FileHash) throw new InvalidOperationException("PowerToys settings changed since this list loaded. Refresh and try again.");
             HotkeyChord parsed = HotkeyChord.Parse(chord); if (parsed.Key == (int)Keys.L) {
                 if ((parsed.Modifiers & HotkeyChord.Win) != 0 && (parsed.Modifiers & (HotkeyChord.Ctrl | HotkeyChord.Alt | HotkeyChord.Shift)) == 0)
@@ -214,6 +273,7 @@ namespace FunctionRowRemapper
             current["alt"] = (parsed.Modifiers & HotkeyChord.Alt) != 0; current["shift"] = (parsed.Modifiers & HotkeyChord.Shift) != 0;
             current["code"] = parsed.Key; current["key"] = "";
             string backup = Backup(selected.FilePath);
+            AppStorage.EnsureNoReparsePointInPath(selected.FilePath);
             DscSet(selected.DscModule, settings);
             var persisted = ReadObject(selected.FilePath);
             foreach (string key in selected.PropertyPath) {
@@ -221,7 +281,7 @@ namespace FunctionRowRemapper
             }
             if (FormatHotkey(persisted) != normalized) throw new IOException("PowerToys did not retain the shortcut change. Backup: " + backup);
             if (enableModule && !selected.ModuleEnabled) {
-                string generalFile = Path.Combine(Root, "settings.json"); var general = ReadObject(generalFile); var enabled = Child(general, "enabled");
+                string generalFile = Path.Combine(Root, "settings.json"); AppStorage.EnsureNoReparsePointInPath(generalFile); var general = ReadObject(generalFile); var enabled = Child(general, "enabled");
                 if (enabled == null || !enabled.ContainsKey(selected.Module)) throw new InvalidDataException("PowerToys no longer lists this module. Its shortcut was saved, but the module was not enabled.");
                 Backup(generalFile); enabled[selected.Module] = true;
                 try { DscSet("App", general); }

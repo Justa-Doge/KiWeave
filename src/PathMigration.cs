@@ -5,10 +5,10 @@ using System.Linq;
 
 namespace FunctionRowRemapper
 {
-    internal sealed class PathMigrationCandidate { internal string Location, Value; }
-    internal static class PathMigration
+    public sealed class PathMigrationCandidate { public string Location, Value; }
+    public static class PathMigration
     {
-        internal static List<PathMigrationCandidate> Find(Configuration configuration)
+        public static List<PathMigrationCandidate> Find(Configuration configuration)
         {
             var result = new List<PathMigrationCandidate>(); if (configuration == null) return result;
             Visit(configuration.Mappings, "Base F", result); foreach (var layer in configuration.Layers ?? new ModifierLayer[0]) Visit(layer.Mappings, layer.Name + " F", result); foreach (var hotkey in configuration.CustomHotkeys ?? new CustomHotkey[0]) Visit(new[] { hotkey.Action }, "Hotkey " + hotkey.Shortcut, result); return result;
@@ -24,7 +24,7 @@ namespace FunctionRowRemapper
             if (mapping.Kind == ActionKind.Sequence) { try { int i = 0; foreach (var step in SequenceCodec.Parse(mapping.Target)) if (!step.IsWait) Visit(step.Action, location + " step " + (++i), result); } catch { } }
             if (mapping.Kind == ActionKind.Conditional) { try { var rule = ConditionalCodec.Parse(mapping.Target); Visit(rule.WhenMatched, location + " matched", result); Visit(rule.Otherwise, location + " fallback", result); } catch { } }
         }
-        internal static int Replace(Configuration configuration, string oldRoot, string newRoot)
+        public static int Replace(Configuration configuration, string oldRoot, string newRoot)
         {
             if (configuration == null || String.IsNullOrWhiteSpace(oldRoot) || String.IsNullOrWhiteSpace(newRoot)) return 0; oldRoot = Normalize(oldRoot); newRoot = Normalize(newRoot); int count = 0;
             VisitReplace(configuration.Mappings, ref count, oldRoot, newRoot); foreach (var layer in configuration.Layers ?? new ModifierLayer[0]) VisitReplace(layer.Mappings, ref count, oldRoot, newRoot); foreach (var hotkey in configuration.CustomHotkeys ?? new CustomHotkey[0]) VisitReplace(new[] { hotkey.Action }, ref count, oldRoot, newRoot); return count;

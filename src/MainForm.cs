@@ -30,21 +30,12 @@ namespace FunctionRowRemapper
 
     public sealed partial class MainForm : Form
     {
-        internal sealed class SpecificChoice
-        {
-            public readonly string Label; public readonly Mapping Mapping;
-            public readonly string Category, Context;
-            public string SearchText { get { return Label + " " + Category + " " + Context + " " + Mapping.Target + " " + Mapping.Arguments; } }
-            public SpecificChoice(string label, Mapping mapping, string category = "General", string context = "") { Label = label; Mapping = mapping; Category = category; Context = context; }
-            public override string ToString() { return Label; }
-            public bool Matches(Mapping other) { return other != null && Mapping.Kind == other.Kind && Mapping.Target == other.Target && Mapping.Arguments == other.Arguments && Mapping.WorkingDirectory == other.WorkingDirectory; }
-        }
-        static SpecificChoice Choice(string label, ActionKind kind) { return new SpecificChoice(label, new Mapping { Kind = kind }); }
-        static readonly SpecificChoice ChooseAction = Choice("Choose an action", ActionKind.Unbound);
-        static SpecificChoice Preset(string label, ActionKind kind, string target, string arguments) { return new SpecificChoice(label, new Mapping { Kind = kind, Target = target, Arguments = arguments }); }
-        static SpecificChoice Shortcut(string label, string target) { return Preset(label, ActionKind.SendShortcut, target, ""); }
-        static readonly string[] FunctionGroups = { "Normal behavior", "Disable this key", "Keyboard input", "Media and sound", "Open or run something", "Monitor controls", "Custom action" };
-        static readonly string[] CustomGroups = { "Keyboard input", "Media and sound", "Open or run something", "Custom action" };
+        internal static bool IsPreRelease { get { return UpdateChecker.CurrentVersion.IndexOf("-", StringComparison.OrdinalIgnoreCase) >= 0; } }
+        internal static string PreReleaseToastLabel { get { return KiWeaveBuildIdentity.ToastStyleLabel; } }
+        static readonly ActionPickerChoice ChooseAction = ActionPickerCatalog.ChooseAction;
+        static ActionPickerChoice Preset(string label, ActionKind kind, string target, string arguments) { return new ActionPickerChoice(label, new Mapping { Kind = kind, Target = target, Arguments = arguments }); }
+        static readonly string[] FunctionGroups = ActionPickerCatalog.FunctionGroups;
+        static readonly string[] CustomGroups = ActionPickerCatalog.CustomGroups;
         readonly Color ink = UiStyle.Ink, accent = UiStyle.Blue, muted = UiStyle.Muted;
         readonly ListView list = new DesignListView();
         readonly ListView customList = new DesignListView();
@@ -55,6 +46,11 @@ namespace FunctionRowRemapper
         readonly Button detect = new DesignButton();
         readonly Label monitorStatus = new Label();
         readonly TableLayoutPanel monitorPanel = new TableLayoutPanel();
+        readonly ComboBox customMonitor = new DesignComboBox(), customMonitorControl = new DesignComboBox();
+        readonly NumericUpDown customMonitorStep = new DesignNumericUpDown { Minimum = 1, Maximum = 20, Value = 5 };
+        readonly Button customDetect = new DesignButton();
+        readonly Label customMonitorStatus = new Label();
+        readonly TableLayoutPanel customMonitorPanel = new TableLayoutPanel();
         DdcMonitor[] detected = new DdcMonitor[0];
         bool scanning;
         readonly TextBox target = new DesignTextBox(), arguments = new DesignTextBox(), working = new DesignTextBox();
@@ -88,16 +84,25 @@ namespace FunctionRowRemapper
         readonly ToolStripMenuItem trayPinProfile = new ToolStripMenuItem("Pin current profile");
         readonly ToolStripMenuItem trayLayer = new ToolStripMenuItem("Layer: Base");
         readonly System.Windows.Forms.Timer statusTimer = new System.Windows.Forms.Timer { Interval = 1000 };
-        readonly System.Windows.Forms.Timer scheduleTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+        readonly System.Windows.Forms.Timer scheduleTimer = new System.Windows.Forms.Timer { Interval = ProfileScheduleStore.PollIntervalMilliseconds };
+        readonly System.Windows.Forms.Timer customHotkeySuspensionTimer = new System.Windows.Forms.Timer { Interval = 1000 };
         readonly System.Windows.Forms.Timer draftTimer = new System.Windows.Forms.Timer { Interval = 750 };
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = UpdateChecker.CheckIntervalMilliseconds };
         readonly bool startInTray;
         readonly bool isPreview;
         readonly bool showWelcome;
         KeyboardEngine engine;
+        bool? customHotkeysSuspendedForForeground;
+        ForegroundChangeMonitor foregroundChangeMonitor;
+        bool customHotkeyRegistrationNeedsRetry;
+        long nextCustomHotkeyRegistrationRetryTick;
+        string customHotkeyRetryFeedback = "";
+        string customHotkeyRegistrationWarning = "";
         StreamDeckBridge streamDeckBridge;
         MidiTriggerService midiTriggerService;
         ControllerTriggerService controllerTriggerService;
+        RawConsumerInput rawConsumerInput;
+        internal event Action<string> ConsumerInputObserved;
         readonly ActionDispatcher customDispatcher;
         readonly System.Collections.Generic.Dictionary<int, CustomHotkey> registeredHotkeys = new System.Collections.Generic.Dictionary<int, CustomHotkey>();
         Configuration saved, draft;
@@ -132,7 +137,7 @@ namespace FunctionRowRemapper
             UiStyle.ApplyAccent(preferences.CustomAccent);
             Design.GlassBackdrop(this, String.Equals(preferences.Theme, "Glass", StringComparison.OrdinalIgnoreCase));
             NetworkPolicy.Enabled = preferences.NetworkAccess;
-            DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling; StatusOverlay.Style = preferences.ToastStyle;
+            DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling; StatusOverlay.Style = IsPreRelease ? preferences.ToastStyle : "Compact flyout";
             try { if (File.Exists(ConfigStore.DefaultPath)) saved = ConfigStore.Load(ConfigStore.DefaultPath); }
             catch (Exception ex) { initialError = "Saved configuration could not be loaded. Remapping is off; the original file is untouched. " + ex.Message; }
             try { profiles = ProfileStore.Load(ProfileStore.DefaultPath); }
@@ -151,11 +156,12 @@ namespace FunctionRowRemapper
             DiscordIntegration.Start(NetworkPolicy.Enabled);
             try {
                 engine = new KeyboardEngine(RequestProfileActivation);
-                engine.Error += message => Ui(delegate { AppLog.Record("Mapped action failed"); if (notificationPreferences.Safety && notificationPreferences.AllowsWarning) SetFeedback(message, true); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(4000, "Action could not run", message, ToolTipIcon.Warning); });
+                engine.Error += message => Ui(delegate { AppLog.Record("Mapped action failed"); StatusOverlay.ShowStyled("KiWeave", "Action failed", "", false); if (notificationPreferences.Safety && notificationPreferences.AllowsWarning) SetFeedback(message, true); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(4000, "Action could not run", message, ToolTipIcon.Warning); });
                 engine.EmergencyDisabled += () => Ui(EmergencyOff);
                 engine.Apply(saved);
             } catch (Exception ex) { saved.Enabled = draft.Enabled = false; initialError = ex.Message; }
-            if (engine != null) try { ApplyHotkeys(saved); } catch (Exception ex) { initialError = "Function-key remapping is still available, but a custom hotkey could not register. " + ex.Message; }
+            try { rawConsumerInput = new RawConsumerInput(Handle, HandleConsumerInput); if (engine != null) engine.SetEjectHandledByRawInput(rawConsumerInput.IsActive); if (!rawConsumerInput.IsActive) initialError = "Consumer-control input could not be registered; the app-command fallback remains available."; } catch (Exception ex) { if (engine != null) engine.SetEjectHandledByRawInput(false); initialError = "Consumer-control input is unavailable: " + ex.Message; }
+            if (engine != null) { string[] hotkeyErrors = ApplyHotkeys(saved); if (hotkeyErrors.Length > 0) initialError = "Function-key remapping is available, but some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); }
             loading = true; enabled.Checked = saved.Enabled;
             useTray.Checked = preferences.UseTray;
             checkUpdates.Checked = preferences.CheckUpdates;
@@ -166,23 +172,34 @@ namespace FunctionRowRemapper
             try { startup.Checked = Startup.Enabled; } catch (Exception ex) { initialError = "Cannot read startup setting: " + ex.Message; }
             loading = false;
             SetupTray(); UpdateStatus();
-            try { var midiTriggers = MidiTriggerStore.Load(); if (midiTriggers.Count > 0) midiTriggerService = new MidiTriggerService(midiTriggers, key => Ui(delegate { if (key >= 1 && key <= 12 && engine != null) { try { customDispatcher.Execute(saved.Mappings[key - 1]); } catch (Exception ex) { SetFeedback("MIDI trigger failed: " + ex.Message, true); } } })); } catch (Exception ex) { initialError = "MIDI triggers are unavailable: " + ex.Message; }
-            try { var controllerTriggers = ControllerTriggerStore.Load(); if (controllerTriggers.Count > 0) controllerTriggerService = new ControllerTriggerService(controllerTriggers, key => Ui(delegate { if (key >= 1 && key <= 12 && engine != null) { try { customDispatcher.Execute(saved.Mappings[key - 1]); } catch (Exception ex) { SetFeedback("Controller trigger failed: " + ex.Message, true); } } })); } catch (Exception ex) { initialError = "Controller triggers are unavailable: " + ex.Message; }
-            if (FirstPartyExtensionCatalog.IsEnabled("streamdeck")) streamDeckBridge = new StreamDeckBridge(command => Ui(delegate { if (command == "show-settings") ShowSettings(); else if (command.StartsWith("activate-profile:", StringComparison.Ordinal)) RequestProfileActivation(command.Substring("activate-profile:".Length)); }));
-            statusTimer.Tick += delegate { CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
+            string hardwareTriggerWarning = StartHardwareTriggers();
+            if (!String.IsNullOrWhiteSpace(hardwareTriggerWarning)) initialError = String.IsNullOrWhiteSpace(initialError) ? hardwareTriggerWarning : initialError + " " + hardwareTriggerWarning;
+            string streamDeckWarning = UpdateStreamDeckBridge(FirstPartyExtensionCatalog.IsEnabled("streamdeck"));
+            if (!String.IsNullOrWhiteSpace(streamDeckWarning)) initialError = String.IsNullOrWhiteSpace(initialError) ? streamDeckWarning : initialError + " " + streamDeckWarning;
+            FirstPartyExtensionCatalog.EnabledChanged += FirstPartyExtensionStateChanged;
+            foregroundChangeMonitor = new ForegroundChangeMonitor(delegate { RefreshHotkeysForForeground(); CheckAutomaticProfile(); });
+            customHotkeySuspensionTimer.Interval = foregroundChangeMonitor.IsInstalled ? 1000 : 100;
+            customHotkeySuspensionTimer.Tick += delegate { RefreshHotkeysForForeground(); }; customHotkeySuspensionTimer.Start();
+            statusTimer.Tick += delegate { if (AutomaticProfilePolicy.ShouldPollForegroundForAutomaticProfile(preferences.AutomaticProfiles, foregroundChangeMonitor != null && foregroundChangeMonitor.IsInstalled)) CheckAutomaticProfile(); UpdateStatus(); }; statusTimer.Start();
             scheduleTimer.Tick += delegate { CheckScheduledProfile(); }; scheduleTimer.Start();
             draftTimer.Tick += delegate { draftTimer.Stop(); SaveRecoveryDraft(); };
             updateTimer.Tick += delegate { RunAutomaticUpdateCheck(); };
             UpdateAutomaticCheckTimer();
+            string suspensionWarning = ShortcutSuspension.Warning;
+            if (!String.IsNullOrWhiteSpace(suspensionWarning)) initialError = String.IsNullOrWhiteSpace(initialError) ? suspensionWarning : initialError + " " + suspensionWarning;
             Shown += delegate {
                 OfferDraftRecovery();
                 DetectMonitors();
-                if (initialError != null) SetFeedback(initialError, true);
-                else CheckMissingTargets();
+                if (initialError != null || featureFlags.LoadWarning || notificationPreferences.LoadWarning) {
+                    string message = initialError ?? "";
+                    if (featureFlags.LoadWarning) message += (message.Length == 0 ? "" : " ") + "Feature safety settings could not be read; experimental actions and Developer mode are disabled for this session. The file was left unchanged.";
+                    if (notificationPreferences.LoadWarning) message += (message.Length == 0 ? "" : " ") + "Notification preferences could not be read; warnings are limited to critical only until you save corrected settings. The file was left unchanged.";
+                    SetFeedback(message, true);
+                } else CheckMissingTargets();
                 if (startInTray && preferences.UseTray && initialError == null) Hide();
                 if (showWelcome) try { using (var welcome = new WelcomeForm()) welcome.ShowDialog(this); FirstRun.MarkSeen(); } catch (Exception ex) { SetFeedback("Welcome setup could not be saved: " + ex.Message, true); }
                 try {
-                    DateTime lastNotice; var reminder = BackupReminder.Inspect(Path.Combine(AppStorage.DataFolder, "Backups"), DateTime.UtcNow, BackupReminder.TryReadLastNotified(out lastNotice) ? (DateTime?)lastNotice : null);
+                    DateTime lastNotice; var reminder = BackupReminder.Inspect(Path.Combine(AppStorage.DataFolder, "Backups"), DateTime.UtcNow, BackupReminder.TryReadLastNotified(out lastNotice) ? (DateTime?)lastNotice : null, delegate(string path) { BackupBundle.LoadAny(path); return true; });
                     if (reminder.ShouldNotify && notificationPreferences.Safety && notificationPreferences.AllowsWarning) { SetFeedback(reminder.Message, true); if (preferences.UseTray) tray.ShowBalloonTip(5000, "Backup reminder", reminder.Message, ToolTipIcon.Info); BackupReminder.MarkNotified(DateTime.UtcNow); }
                 } catch { }
                 if (preferences.NetworkAccess && preferences.CheckUpdates) UpdateChecker.CheckInBackground(tag => Ui(delegate { if (tag != null && notificationPreferences.Updates) updateNotice = new UpdateNotification(tag); }), UpdateChannels.Load());
@@ -190,11 +207,58 @@ namespace FunctionRowRemapper
             FormClosing += OnClosing;
         }
         void Ui(Action a) { if (!IsDisposed && IsHandleCreated) try { BeginInvoke(a); } catch (InvalidOperationException) { } }
+        string StartHardwareTriggers()
+        {
+            if (!FirstPartyExtensionCatalog.IsEnabled("controller-midi")) return "";
+            string warning = "";
+            try { var triggers = MidiTriggerStore.Load(); if (FirstPartyExtensionCatalog.ShouldRunHardwareTriggerService(true, triggers.Count)) midiTriggerService = new MidiTriggerService(triggers, key => { if (key >= 1 && key <= 12 && engine != null) engine.TriggerFunctionKey(key); }); }
+            catch (Exception error) { warning = "MIDI triggers are unavailable: " + error.Message; }
+            try { var triggers = ControllerTriggerStore.Load(); if (FirstPartyExtensionCatalog.ShouldRunHardwareTriggerService(true, triggers.Count)) controllerTriggerService = new ControllerTriggerService(triggers, key => { if (key >= 1 && key <= 12 && engine != null) engine.TriggerFunctionKey(key); }); }
+            catch (Exception error) { warning = String.IsNullOrEmpty(warning) ? "Controller triggers are unavailable: " + error.Message : warning + " Controller triggers are unavailable: " + error.Message; }
+            return warning;
+        }
+        void StopHardwareTriggers()
+        {
+            var midi = midiTriggerService; midiTriggerService = null; if (midi != null) try { midi.Dispose(); } catch (Exception error) { AppLog.Record("MIDI trigger shutdown", error); }
+            var controller = controllerTriggerService; controllerTriggerService = null; if (controller != null) try { controller.Dispose(); } catch (Exception error) { AppLog.Record("Controller trigger shutdown", error); }
+        }
+        string UpdateStreamDeckBridge(bool enabled)
+        {
+            if (!enabled) { var bridge = streamDeckBridge; streamDeckBridge = null; if (bridge != null) try { bridge.Dispose(); } catch (Exception error) { return "Stream Deck bridge could not stop cleanly: " + error.Message; } return ""; }
+            if (streamDeckBridge != null) return "";
+            try { streamDeckBridge = new StreamDeckBridge(command => Ui(delegate { if (command == "show-settings") ShowSettings(); else if (command.StartsWith("activate-profile:", StringComparison.Ordinal)) RequestProfileActivation(command.Substring("activate-profile:".Length)); })); return ""; }
+            catch (Exception error) { return "Stream Deck bridge is unavailable: " + error.Message; }
+        }
+        void FirstPartyExtensionStateChanged(string id, bool enabled)
+        {
+            if (IsDisposed) return;
+            if (InvokeRequired) { Ui(delegate { FirstPartyExtensionStateChanged(id, enabled); }); return; }
+            if (String.Equals(id, "controller-midi", StringComparison.OrdinalIgnoreCase))
+            {
+                StopHardwareTriggers();
+                string warning = enabled ? StartHardwareTriggers() : "";
+                SetFeedback(!String.IsNullOrWhiteSpace(warning) ? warning : enabled ? "Controller and MIDI triggers are active when mappings are configured." : "Controller and MIDI triggers are paused with the extension.", !String.IsNullOrWhiteSpace(warning));
+                return;
+            }
+            if (String.Equals(id, "streamdeck", StringComparison.OrdinalIgnoreCase))
+            {
+                string warning = UpdateStreamDeckBridge(enabled);
+                if (!String.IsNullOrWhiteSpace(warning)) SetFeedback(warning, true);
+            }
+        }
         void CheckScheduledProfile()
         {
-            if (isPreview || !preferences.AutomaticProfiles || pinnedProfile.Length > 0 || Visible || dirty || engine == null) return;
+            if (isPreview || !AutomaticProfilePolicy.CanSwitch(preferences.AutomaticProfiles, pinnedProfile.Length > 0, Visible, dirty, engine != null)) return;
             string scheduled = ProfileScheduleStore.ActiveProfile(DateTime.Now);
-            if (scheduled.Length > 0 && !String.Equals(scheduled, currentProfile, StringComparison.OrdinalIgnoreCase)) ActivateProfile(scheduled, false, true);
+            if (scheduled.Length > 0) {
+                automaticProfileProcess = "";
+                string reason = "Selected by an active local profile schedule. Session: " + SessionAwareness.CurrentDescription() + ".";
+                if (!String.Equals(scheduled, currentProfile, StringComparison.OrdinalIgnoreCase)) {
+                    if (ActivateProfile(scheduled, false, true)) { profileReason = reason; UpdateStatus(); }
+                } else if (!automaticProfileActive) {
+                    automaticProfileActive = true; profileReason = reason; UpdateStatus();
+                }
+            }
         }
         Label LabelText(string text, float size, Color color) { return new Label { Text = text, AutoSize = true, Font = new Font("Segoe UI", size), ForeColor = color, Margin = new Padding(0, 0, 0, 6) }; }
         Button ButtonText(string text, EventHandler click)
@@ -203,41 +267,27 @@ namespace FunctionRowRemapper
             b.FlatAppearance.BorderColor = UiStyle.Border; b.Click += click; return b;
         }
         static int FunctionGroup(ActionKind kind) { if (kind == ActionKind.PassThrough) return 0; if (kind == ActionKind.Unbound) return 1; if (kind == ActionKind.SendKey || kind == ActionKind.SendShortcut) return 2; if (kind == ActionKind.Media) return 3; if (kind == ActionKind.Monitor) return 5; if (kind == ActionKind.LockThenSleep || kind == ActionKind.SystemAction || kind == ActionKind.Conditional) return 6; return 4; }
-        static int CustomGroup(ActionKind kind) { if (kind == ActionKind.SendKey || kind == ActionKind.SendShortcut) return 0; if (kind == ActionKind.Media) return 1; if (kind == ActionKind.LockThenSleep || kind == ActionKind.Sequence || kind == ActionKind.SystemAction || kind == ActionKind.Conditional) return 3; return 2; }
+        static int CustomGroup(ActionKind kind) { if (kind == ActionKind.SendKey || kind == ActionKind.SendShortcut) return 0; if (kind == ActionKind.Media) return 1; if (kind == ActionKind.Monitor) return 4; if (kind == ActionKind.LockThenSleep || kind == ActionKind.Sequence || kind == ActionKind.SystemAction || kind == ActionKind.Conditional) return 3; return 2; }
         static int GroupFor(Mapping mapping, bool custom)
         {
             if (ChoicesFor(3, true).Any(c => c.Matches(mapping))) return custom ? 3 : 6;
             return custom ? CustomGroup(mapping.Kind) : FunctionGroup(mapping.Kind);
         }
-        internal static SpecificChoice[] ChoicesFor(int group, bool custom)
+        internal static ActionPickerChoice[] ChoicesFor(int group, bool custom)
         {
-            string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
-            if (!custom) {
-                if (group == 0) return new[] { Choice("Pass through normally", ActionKind.PassThrough) };
-                if (group == 1) return new[] { Choice("Do nothing", ActionKind.Unbound) };
-                if (group == 5) return new[] { Choice("Monitor brightness, contrast, or volume", ActionKind.Monitor) };
-            }
-            int normalized = custom ? group : group - 2;
-            if (normalized == 0) return new[] { Choice("Send one key", ActionKind.SendKey), Choice("Send a keyboard shortcut", ActionKind.SendShortcut) };
-            if (normalized == 1) return new[] { Preset("Volume up", ActionKind.Media, "VolumeUp", ""), Preset("Volume down", ActionKind.Media, "VolumeDown", ""), Preset("Mute or unmute", ActionKind.Media, "VolumeMute", ""), Preset("Play or pause", ActionKind.Media, "MediaPlayPause", ""), Preset("Next track", ActionKind.Media, "MediaNextTrack", ""), Preset("Previous track", ActionKind.Media, "MediaPreviousTrack", "") };
-            if (normalized == 2) return new[] { Choice("Open an application", ActionKind.Application), Choice("Open a file or folder", ActionKind.FileOrFolder), Choice("Run a Windows shortcut", ActionKind.WindowsShortcut), Choice("Run a command or script", ActionKind.Command), Choice("Run a Python script", ActionKind.Python), Choice("Call an HTTP endpoint", ActionKind.HttpRequest) };
-            var presets = new List<SpecificChoice> { Choice("Lock Windows, then sleep", ActionKind.LockThenSleep), Shortcut("Lock Windows", "Win+L"), Shortcut("Open file explorer", "Win+E"), Shortcut("Open Windows settings", "Win+I"), Shortcut("Open task manager", "Ctrl+Shift+Escape"), Shortcut("Open clipboard history", "Win+V"), Shortcut("Open notification center", "Win+N"), Shortcut("Open quick settings", "Win+A"), Shortcut("Open emoji picker", "Win+OemPeriod"), Shortcut("Open task view", "Win+Tab"), Shortcut("Open run dialog", "Win+R"), Shortcut("Open power-user menu", "Win+X"), Shortcut("Take a screen snip", "Win+Shift+S"), Shortcut("Show desktop", "Win+D"), Shortcut("Switch apps", "Alt+Tab"), Shortcut("Snap window left", "Win+Left"), Shortcut("Snap window right", "Win+Right"), Shortcut("Maximize window", "Win+Up"), Shortcut("Minimize window", "Win+Down"), Shortcut("New virtual desktop", "Win+Ctrl+D"), Shortcut("Close virtual desktop", "Win+Ctrl+F4"), Shortcut("Next virtual desktop", "Win+Ctrl+Right"), Shortcut("Previous virtual desktop", "Win+Ctrl+Left"), Shortcut("Copy", "Ctrl+C"), Shortcut("Paste", "Ctrl+V"), Shortcut("Cut", "Ctrl+X"), Shortcut("Undo", "Ctrl+Z"), Shortcut("Redo", "Ctrl+Y"), Shortcut("Select all", "Ctrl+A"), Shortcut("Save", "Ctrl+S"), Shortcut("Open", "Ctrl+O"), Shortcut("New", "Ctrl+N"), Shortcut("Find", "Ctrl+F"), Shortcut("Print", "Ctrl+P"), Shortcut("Refresh", "F5"), Shortcut("Close current window", "Alt+F4"), Shortcut("Toggle full screen", "F11"), Preset("Open calculator", ActionKind.Application, Path.Combine(sys, "calc.exe"), ""), Preset("Open notepad", ActionKind.Application, Path.Combine(sys, "notepad.exe"), ""), Preset("Open paint", ActionKind.Application, Path.Combine(sys, "mspaint.exe"), ""), Preset("Open control panel", ActionKind.Application, Path.Combine(sys, "control.exe"), ""), Preset("Open device manager", ActionKind.Application, Path.Combine(sys, "mmc.exe"), "devmgmt.msc"), Preset("Sleep", ActionKind.Application, Path.Combine(sys, "rundll32.exe"), "powrprof.dll,SetSuspendState 0,1,0"), Preset("Sign out", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/l"), Preset("Restart", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/r /t 0"), Preset("Shut down", ActionKind.Application, Path.Combine(sys, "shutdown.exe"), "/s /t 0") };
-            presets.AddRange(ExpandedActions.All);
-            presets.Insert(0, ChooseAction);
-            presets.Insert(1, Choice("Build a conditional action...", ActionKind.Conditional));
-            if (custom) presets.Insert(2, Choice("Build a step-by-step sequence...", ActionKind.Sequence)); return presets.ToArray();
+            return ActionPickerCatalog.ChoicesFor(group, custom);
         }
         void PopulateChoices(ComboBox box, int group, bool custom, Mapping selectedMapping)
         {
             box.Items.Clear(); foreach (var choice in ChoicesFor(group, custom)) box.Items.Add(choice);
-            if (box.Items.Cast<SpecificChoice>().Any(c => ReferenceEquals(c, ChooseAction))) {
+            if (box.Items.Cast<ActionPickerChoice>().Any(c => ReferenceEquals(c, ChooseAction))) {
                 box.Items.Add(Preset("Activate and pin profile: Default", ActionKind.SystemAction, SystemActions.ActivateProfilePrefix + "Default", ""));
                 foreach (var profile in profiles.Profiles)
                     box.Items.Add(Preset("Activate and pin profile: " + profile.Name, ActionKind.SystemAction, SystemActions.ActivateProfilePrefix + profile.Name, ""));
             }
             int selectedChoice = 0;
             if (selectedMapping != null) {
-                var choices = box.Items.Cast<SpecificChoice>().ToArray();
+                var choices = box.Items.Cast<ActionPickerChoice>().ToArray();
                 int exact = Array.FindIndex(choices, c => c.Matches(selectedMapping));
                 int sameKind = Array.FindIndex(choices, c => c.Mapping.Kind == selectedMapping.Kind);
                 selectedChoice = exact >= 0 ? exact : Math.Max(0, sameKind);
@@ -246,17 +296,21 @@ namespace FunctionRowRemapper
         }
         void ApplyFunctionChoice()
         {
-            if (loading || specificKind.SelectedItem == null) return; var choice = (SpecificChoice)specificKind.SelectedItem;
+            if (loading || specificKind.SelectedItem == null) return; var choice = (ActionPickerChoice)specificKind.SelectedItem;
             if (ReferenceEquals(choice, ChooseAction)) { SetFeedback("Choose an action before saving this function key.", false); return; }
             if (choice.Mapping.Kind == ActionKind.Conditional) { OpenConditionalBuilder(false); return; }
-            loading = true; kind.SelectedIndex = (int)choice.Mapping.Kind; target.Text = choice.Mapping.Target; arguments.Text = choice.Mapping.Arguments; working.Text = choice.Mapping.WorkingDirectory; media.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target); ConfigureFields(false); loading = false; Edited();
+            loading = true; kind.SelectedIndex = (int)choice.Mapping.Kind; target.Text = choice.Mapping.Target; arguments.Text = choice.Mapping.Arguments; working.Text = choice.Mapping.WorkingDirectory; media.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target);
+            if (choice.Mapping.Kind == ActionKind.Monitor) { var selectedMonitor = monitor.SelectedItem as DdcMonitor; string id = selectedMonitor == null ? "" : selectedMonitor.Id; LoadMonitorChoices(monitor, monitorControl, monitorStatus, id, choice.Mapping.MonitorControl); }
+            ConfigureFields(false); loading = false; Edited();
         }
         void ApplyCustomChoice()
         {
-            if (loading || customSpecificKind.SelectedItem == null) return; var choice = (SpecificChoice)customSpecificKind.SelectedItem;
+            if (loading || customSpecificKind.SelectedItem == null) return; var choice = (ActionPickerChoice)customSpecificKind.SelectedItem;
             if (ReferenceEquals(choice, ChooseAction)) { SetFeedback("Choose an action before saving this custom hotkey.", false); return; }
             if (choice.Mapping.Kind == ActionKind.Conditional) { OpenConditionalBuilder(true); return; }
-            loading = true; customKind.SelectedIndex = (int)choice.Mapping.Kind; customTarget.Text = choice.Mapping.Target; customArguments.Text = choice.Mapping.Arguments; customWorking.Text = choice.Mapping.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target); ConfigureCustomFields(false); loading = false; if (choice.Mapping.Kind == ActionKind.Sequence) OpenSequenceBuilder(); else CustomEdited();
+            loading = true; customKind.SelectedIndex = (int)choice.Mapping.Kind; customTarget.Text = choice.Mapping.Target; customArguments.Text = choice.Mapping.Arguments; customWorking.Text = choice.Mapping.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), choice.Mapping.Target);
+            if (choice.Mapping.Kind == ActionKind.Monitor) { var selectedMonitor = customMonitor.SelectedItem as DdcMonitor; string id = selectedMonitor == null ? "" : selectedMonitor.Id; LoadMonitorChoices(customMonitor, customMonitorControl, customMonitorStatus, id, choice.Mapping.MonitorControl); customMonitorStep.Value = Math.Max(1, Math.Min(20, choice.Mapping.MonitorStep)); }
+            ConfigureCustomFields(false); loading = false; if (choice.Mapping.Kind == ActionKind.Sequence) OpenSequenceBuilder(); else CustomEdited();
         }
         void PopulateCustomList()
         {
@@ -299,7 +353,7 @@ namespace FunctionRowRemapper
             foreach (ListViewItem item in customList.Items) item.Selected = item.Index == index;
             SetCustomEditorState(true); customTitle.Text = String.IsNullOrWhiteSpace(h.Shortcut) ? "New shortcut" : h.Shortcut;
             sequenceSteps.Clear(); if (h.Action.Kind == ActionKind.Sequence) try { sequenceSteps.AddRange(SequenceCodec.Parse(h.Action.Target)); } catch { }
-            customShortcut.Text = h.Shortcut; customKind.SelectedIndex = (int)h.Action.Kind; customTarget.Text = h.Action.Target; customArguments.Text = h.Action.Arguments; customWorking.Text = h.Action.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), h.Action.Target); customSimpleKind.SelectedIndex = GroupFor(h.Action, true); PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, h.Action); ConfigureCustomFields(false); customNote.Text = NoteForCustom(index); loading = false;
+            customShortcut.Text = h.Shortcut; customKind.SelectedIndex = (int)h.Action.Kind; customTarget.Text = h.Action.Target; customArguments.Text = h.Action.Arguments; customWorking.Text = h.Action.WorkingDirectory; customMedia.SelectedIndex = Array.IndexOf(Shortcuts.MediaLabels.Keys.ToArray(), h.Action.Target); customSimpleKind.SelectedIndex = GroupFor(h.Action, true); PopulateChoices(customSpecificKind, customSimpleKind.SelectedIndex, true, h.Action); LoadMonitorChoices(customMonitor, customMonitorControl, customMonitorStatus, h.Action.MonitorId, h.Action.MonitorControl); customMonitorStep.Value = Math.Max(1, Math.Min(20, h.Action.MonitorStep)); ConfigureCustomFields(false); customNote.Text = NoteForCustom(index); loading = false;
         }
         void ConfigureCustomFields(bool reset)
         {
@@ -307,6 +361,7 @@ namespace FunctionRowRemapper
             bool launch = (k >= ActionKind.Application && k <= ActionKind.Command) || k == ActionKind.Python;
             bool args = k == ActionKind.Application || k == ActionKind.Command || k == ActionKind.Python || k == ActionKind.HttpRequest;
             customTargetField.Visible = launch || k == ActionKind.SendKey || k == ActionKind.SendShortcut || k == ActionKind.HttpRequest;
+            customMonitorPanel.Visible = k == ActionKind.Monitor;
             customArgsField.Visible = customWorkField.Visible = args;
             customArguments.Enabled = customWorking.Enabled = args;
             customBrowse.Visible = launch;
@@ -332,7 +387,9 @@ namespace FunctionRowRemapper
             if (loading || customSelected < 0 || customSelected >= draft.CustomHotkeys.Length || customKind.SelectedIndex < 0) return;
             ActionKind k = (ActionKind)customKind.SelectedIndex;
             string targetValue = k == ActionKind.Media ? Shortcuts.MediaLabels.Keys.ElementAt(Math.Max(0, customMedia.SelectedIndex)) : (k == ActionKind.Sequence ? (sequenceSteps.Count == 0 ? "" : SequenceCodec.Serialize(sequenceSteps)) : (k == ActionKind.PassThrough || k == ActionKind.Unbound || k == ActionKind.LockThenSleep ? "" : customTarget.Text.Trim()));
-            draft.CustomHotkeys[customSelected] = new CustomHotkey { Shortcut = customShortcut.Text.Trim(), Action = new Mapping { Kind = k, Target = targetValue, Arguments = customArguments.Enabled ? customArguments.Text : "", WorkingDirectory = customWorking.Enabled ? customWorking.Text.Trim() : "" } };
+            Mapping action = new Mapping { Kind = k, Target = targetValue, Arguments = customArguments.Enabled ? customArguments.Text : "", WorkingDirectory = customWorking.Enabled ? customWorking.Text.Trim() : "" };
+            if (k == ActionKind.Monitor) { var device = customMonitor.SelectedItem as DdcMonitor; var operation = customMonitorControl.SelectedItem as DdcOperation; action.MonitorId = device == null ? "" : device.Id; action.MonitorControl = operation == null ? "" : operation.Id; action.MonitorStep = (int)customMonitorStep.Value; }
+            draft.CustomHotkeys[customSelected] = new CustomHotkey { Shortcut = customShortcut.Text.Trim(), Action = action };
             if (customSelected < customList.Items.Count) { customList.Items[customSelected].Text = customShortcut.Text.Trim(); customList.Items[customSelected].SubItems[1].Text = Summary(draft.CustomHotkeys[customSelected].Action); }
             MarkDirty();
         }
@@ -382,25 +439,8 @@ namespace FunctionRowRemapper
         string Summary(Mapping m) { try { return m.Summary; } catch { return "Choose action details"; } }
         internal static string ExplainShortcut(string shortcut, Mapping mapping, string context)
         {
-            if (mapping == null) return shortcut + "\r\nNo action is configured.";
-            var text = new System.Text.StringBuilder();
-            text.AppendLine("Explain " + shortcut);
-            if (!String.IsNullOrWhiteSpace(context)) text.AppendLine(context);
-            text.AppendLine();
-            text.AppendLine("Action: " + SummaryForExplanation(mapping));
-            string maturity = ActionInsights.Maturity(mapping);
-            text.AppendLine("Maturity: " + maturity);
-            text.AppendLine(ActionInsights.MaturityExplanation(maturity));
-            text.AppendLine("Dependencies: " + ActionInsights.Dependencies(mapping));
-            text.AppendLine("Permission: " + ActionPrivacy.Risk(mapping));
-            if (mapping.Kind == ActionKind.HttpRequest) text.AppendLine("Network policy: checked when the action is triggered.");
-            if (mapping.Kind == ActionKind.Sequence) {
-                try { text.AppendLine("Safety: " + ActionInsights.Sequence(SequenceCodec.Parse(mapping.Target)).Compact); }
-                catch { text.AppendLine("Safety: sequence details could not be decoded safely."); }
-            }
-            return text.ToString().TrimEnd();
+            return ShortcutExplanation.Build(shortcut, mapping, context);
         }
-        static string SummaryForExplanation(Mapping mapping) { try { return mapping.Summary; } catch { return "Choose action details"; } }
         void LoadEditor(int index)
         {
             loading = true; selected = index; Mapping m = CurrentMappings()[index]; editorTitle.Text = "F" + (index + 1); kind.SelectedIndex = (int)m.Kind;
@@ -481,29 +521,50 @@ namespace FunctionRowRemapper
             steps.Controls.Add(LabelText("Step (%)", 10, muted)); monitorStep.Width = 58; monitorStep.AccessibleName = "Monitor adjustment percent"; steps.Controls.Add(monitorStep);
             detect.Text = "Detect monitors"; detect.AutoSize = true; detect.Margin = new Padding(12, 0, 0, 0); detect.Click += delegate { DetectMonitors(); }; steps.Controls.Add(detect); monitorPanel.Controls.Add(steps);
             monitorStatus.AutoSize = true; monitorStatus.Dock = DockStyle.Top; monitorStatus.ForeColor = muted; monitorStatus.Margin = new Padding(0, 8, 0, 4); monitorPanel.Controls.Add(monitorStatus);
-            monitor.SelectedIndexChanged += delegate { if (!loading) { bool old = loading; loading = true; LoadMonitorControls(""); loading = old; Edited(); } };
+            monitor.SelectedIndexChanged += delegate { if (!loading) { bool old = loading; loading = true; LoadMonitorControls(monitor, monitorControl, monitorStatus, ""); loading = old; Edited(); } };
             monitorControl.SelectedIndexChanged += delegate { Edited(); }; monitorStep.ValueChanged += delegate { Edited(); };
+        }
+        void BuildCustomMonitorEditor()
+        {
+            customMonitorPanel.AutoSize = true; customMonitorPanel.Dock = DockStyle.Top; customMonitorPanel.ColumnCount = 1; customMonitorPanel.Margin = new Padding(0, 0, 0, 8);
+            customMonitorPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            UiStyle.Combo(customMonitor); customMonitor.AccessibleName = "Custom hotkey DDC monitor"; customMonitorPanel.Controls.Add(UiStyle.Field("Monitor", customMonitor));
+            UiStyle.Combo(customMonitorControl); customMonitorControl.AccessibleName = "Custom hotkey monitor control"; customMonitorPanel.Controls.Add(UiStyle.Field("Control", customMonitorControl));
+            var steps = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false, Margin = new Padding(0) };
+            steps.Controls.Add(LabelText("Step (%)", 10, muted)); customMonitorStep.Width = 58; customMonitorStep.AccessibleName = "Custom hotkey monitor adjustment percent"; steps.Controls.Add(customMonitorStep);
+            customDetect.Text = "Detect monitors"; customDetect.AutoSize = true; customDetect.Margin = new Padding(12, 0, 0, 0); customDetect.Click += delegate { DetectCustomMonitors(); }; steps.Controls.Add(customDetect); customMonitorPanel.Controls.Add(steps);
+            customMonitorStatus.AutoSize = true; customMonitorStatus.Dock = DockStyle.Top; customMonitorStatus.ForeColor = muted; customMonitorStatus.Margin = new Padding(0, 8, 0, 4); customMonitorPanel.Controls.Add(customMonitorStatus);
+            customMonitor.SelectedIndexChanged += delegate { if (!loading) { bool old = loading; loading = true; LoadMonitorControls(customMonitor, customMonitorControl, customMonitorStatus, ""); loading = old; CustomEdited(); } };
+            customMonitorControl.SelectedIndexChanged += delegate { CustomEdited(); }; customMonitorStep.ValueChanged += delegate { CustomEdited(); };
         }
         void LoadMonitorChoices(string id, string controlId)
         {
-            monitor.Items.Clear(); monitor.Items.AddRange(detected);
+            LoadMonitorChoices(monitor, monitorControl, monitorStatus, id, controlId);
+        }
+        void LoadMonitorChoices(ComboBox monitorBox, ComboBox controlBox, Label statusLabel, string id, string controlId)
+        {
+            monitorBox.Items.Clear(); monitorBox.Items.AddRange(detected);
             var chosen = detected.FirstOrDefault(m => m.Id == id);
             if (chosen == null && !String.IsNullOrEmpty(id)) {
-                chosen = new DdcMonitor { Id = id, Name = "Saved monitor", Status = "Saved monitor is unavailable. Reconnect it and Detect monitors, or choose a connected monitor." }; monitor.Items.Add(chosen);
+                chosen = new DdcMonitor { Id = id, Name = "Saved monitor", Status = "Saved monitor is unavailable. Reconnect it and Detect monitors, or choose a connected monitor." }; monitorBox.Items.Add(chosen);
             }
             if (chosen == null && String.IsNullOrEmpty(id)) chosen = detected.FirstOrDefault(m => m.Codes.Length > 0);
-            if (chosen != null) monitor.SelectedItem = chosen;
-            LoadMonitorControls(controlId);
+            if (chosen != null) monitorBox.SelectedItem = chosen;
+            LoadMonitorControls(monitorBox, controlBox, statusLabel, controlId);
         }
         void LoadMonitorControls(string id)
         {
-            monitorControl.Items.Clear(); var device = monitor.SelectedItem as DdcMonitor;
-            if (device != null) monitorControl.Items.AddRange(DdcOperation.All.Where(o => device.Codes.Contains(o.Code)).ToArray());
-            var choice = monitorControl.Items.Cast<DdcOperation>().FirstOrDefault(o => o.Id == id);
+            LoadMonitorControls(monitor, monitorControl, monitorStatus, id);
+        }
+        void LoadMonitorControls(ComboBox monitorBox, ComboBox controlBox, Label statusLabel, string id)
+        {
+            controlBox.Items.Clear(); var device = monitorBox.SelectedItem as DdcMonitor;
+            controlBox.Items.AddRange(device == null ? DdcOperation.All : DdcOperation.All.Where(o => device.Codes.Contains(o.Code)).ToArray());
+            var choice = controlBox.Items.Cast<DdcOperation>().FirstOrDefault(o => o.Id == id);
             // Preserve existing unavailable mappings instead of silently changing their action.
-            if (choice == null && DdcOperation.Find(id) != null) { var original = DdcOperation.Find(id); choice = new DdcOperation { Id = id, Label = original.Label + " (unavailable)", Code = original.Code, Direction = original.Direction }; monitorControl.Items.Add(choice); }
-            if (choice != null) monitorControl.SelectedItem = choice; else if (monitorControl.Items.Count > 0) monitorControl.SelectedIndex = 0;
-            monitorStatus.Text = scanning ? "Detecting monitors..." : device == null ? "No supported monitor detected. Check DDC/CI in the monitor menu, then Detect monitors." : device.Status;
+            if (choice == null && DdcOperation.Find(id) != null) { var original = DdcOperation.Find(id); choice = new DdcOperation { Id = id, Label = original.Label + " (unavailable)", Code = original.Code, Direction = original.Direction, FixedValue = original.FixedValue }; controlBox.Items.Add(choice); }
+            if (choice != null) controlBox.SelectedItem = choice; else if (controlBox.Items.Count > 0) controlBox.SelectedIndex = 0;
+            statusLabel.Text = scanning ? "Detecting monitors..." : device == null ? "No monitor selected. Detect monitors to bind this action to a display." : device.Status;
         }
         async void DetectMonitors()
         {
@@ -515,6 +576,21 @@ namespace FunctionRowRemapper
                 if ((ActionKind)kind.SelectedIndex == ActionKind.Monitor && String.IsNullOrEmpty(m.MonitorId)) Edited();
             } catch (Exception ex) { if (!IsDisposed) monitorStatus.Text = "Detection failed: " + ex.Message; }
             finally { scanning = false; if (!IsDisposed) { detect.Enabled = true; RunConfigurationHealthCheck(); } }
+        }
+        async void DetectCustomMonitors()
+        {
+            if (scanning) return; scanning = true; customDetect.Enabled = false; customMonitorStatus.Text = "Detecting monitors...";
+            try {
+                var devices = await Task.Run(() => DdcService.Shared.Scan());
+                if (IsDisposed) return; detected = devices; scanning = false;
+                loading = true;
+                CustomHotkey hotkey = customSelected >= 0 && customSelected < draft.CustomHotkeys.Length ? draft.CustomHotkeys[customSelected] : null;
+                Mapping mapping = hotkey == null ? null : hotkey.Action;
+                LoadMonitorChoices(customMonitor, customMonitorControl, customMonitorStatus, mapping == null ? "" : mapping.MonitorId, mapping == null ? "" : mapping.MonitorControl);
+                loading = false;
+                if (mapping != null && String.IsNullOrEmpty(mapping.MonitorId) && customMonitor.SelectedItem is DdcMonitor) CustomEdited();
+            } catch (Exception ex) { if (!IsDisposed) customMonitorStatus.Text = "Detection failed: " + ex.Message; }
+            finally { scanning = false; if (!IsDisposed) { customDetect.Enabled = true; RunConfigurationHealthCheck(); } }
         }
         void MarkDirty() { dirty = true; Text = "KiWeave *"; SetFeedback("Unsaved changes. Save to apply them. The enable switch uses your saved mappings.", false); if (!isPreview) { draftTimer.Stop(); draftTimer.Start(); } }
         void SetFeedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Color.FromArgb(255, 151, 153) : muted; }
@@ -534,7 +610,7 @@ namespace FunctionRowRemapper
             // Disable immediately even if saving the preference fails.
             if (!value) engine.SetEnabled(false);
             Configuration next = saved.Copy(); next.Enabled = value;
-            try { CaptureHistory("enable setting"); PersistCurrent(next); saved = next; draft.Enabled = value; engine.SetEnabled(value); ApplyHotkeys(saved); SetFeedback(value ? "Remapping and custom hotkeys enabled using saved rules." : "Remapping and custom hotkeys are off.", false); }
+            try { CaptureHistory("enable setting"); PersistCurrent(next); saved = next; draft.Enabled = value; engine.SetEnabled(value); string[] hotkeyErrors = ApplyHotkeys(saved); string status = value ? "Remapping enabled using saved rules." : "Remapping and custom hotkeys are off."; if (hotkeyErrors.Length > 0) status += " Some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); SetFeedback(status, hotkeyErrors.Length > 0); StatusOverlay.ShowStyled("KiWeave", value ? "Shortcuts resumed" : "Shortcuts paused", "", value); }
             catch (Exception ex) { loading = true; enabled.Checked = engine.Enabled; loading = false; SetFeedback("Could not save enable setting: " + ex.Message, true); }
             UpdateStatus();
         }
@@ -543,7 +619,7 @@ namespace FunctionRowRemapper
             loading = true; enabled.Checked = false; loading = false; saved.Enabled = draft.Enabled = false;
             try { CaptureHistory("emergency bypass"); PersistCurrent(saved); SetFeedback("Emergency bypass activated. Remapping is off. Release any held function keys.", false); }
             catch (Exception ex) { SetFeedback("Remapping is off, but the preference could not be saved: " + ex.Message, true); }
-            UpdateStatus(); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(3000, "Remapping is off", "Emergency bypass activated.", ToolTipIcon.Info);
+            UpdateStatus(); StatusOverlay.ShowStyled("KiWeave", "Shortcuts paused", "", false); if (preferences.UseTray && notificationPreferences.Safety && notificationPreferences.AllowsWarning) tray.ShowBalloonTip(3000, "Remapping is off", "Emergency bypass activated.", ToolTipIcon.Info);
         }
         bool Save()
         {
@@ -558,13 +634,13 @@ namespace FunctionRowRemapper
                 ConfigStore.Validate(draft, true); draft.Enabled = engine != null && engine.Enabled;
                 if (dirty) CaptureHistory("mapping save"); PersistCurrent(draft); saved = draft.Copy();
                 persisted = true;
-                if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); PopulateCustomList();
+                if (engine != null) engine.Apply(saved); string[] hotkeyErrors = ApplyHotkeys(saved); PopulateCustomList();
                 dirty = false; Text = "KiWeave";
                 try { if (startup.Checked != Startup.Enabled || (startup.Checked && !Startup.IsCurrent)) Startup.Set(startup.Checked); }
                 catch (Exception ex) { dirty = true; SetFeedback("Mappings saved, but startup setting failed: " + ex.Message, true); return false; }
                 RecoveryStore.DeleteDraft();
                 try { RecoveryStore.SaveKnownGoodCurrent(); } catch (Exception ex) { AppLog.Record("KnownGoodRecovery", ex); }
-                AuditTrail.Record("configuration-save"); SetFeedback("Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."), false); return true;
+                AuditTrail.Record("configuration-save"); string status = "Saved. " + (saved.Enabled ? "Your mappings are active." : "Turn on Shortcuts enabled when you are ready."); if (hotkeyErrors.Length > 0) status += " Some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); SetFeedback(status, hotkeyErrors.Length > 0); return true;
             } catch (Exception ex) {
                 if (persisted) try { PersistCurrent(previous); saved = previous.Copy(); draft = previous.Copy(); if (engine != null) { engine.Apply(previous); ApplyHotkeys(previous); } dirty = false; } catch (Exception rollback) { AppLog.Record("ConfigurationRollback", rollback); }
                 SetFeedback(persisted ? "Activation failed; KiWeave rolled back to the previous saved configuration. " + ex.Message : "Could not save: " + ex.Message, true); return false;
@@ -579,13 +655,13 @@ namespace FunctionRowRemapper
         {
             try {
                 ConfigStore.Validate(draft, false);
-                using (var d = new SaveFileDialog { Filter = "JSON configuration|*.json", FileName = "function-row.json", DefaultExt = "json", AddExtension = true })
+                using (var d = new SaveFileDialog { Filter = "KiWeave configuration (*.kiweave)|*.kiweave", FileName = "KiWeave-config.kiweave", DefaultExt = "kiweave", AddExtension = true })
                     if (d.ShowDialog(this) == DialogResult.OK) { ConfigStore.Save(d.FileName, draft); AuditTrail.Record("configuration-export"); SetFeedback("Exported your draft mappings. Export does not activate changes or change Windows startup.", false); }
             } catch (Exception ex) { SetFeedback("Export failed: " + ex.Message, true); }
         }
         void Import(object sender, EventArgs e)
         {
-            using (var d = new OpenFileDialog { Filter = "JSON configuration|*.json", CheckFileExists = true }) {
+            using (var d = new OpenFileDialog { Filter = "KiWeave configurations (*.kiweave;*.json)|*.kiweave;*.json|KiWeave configuration (*.kiweave)|*.kiweave|Legacy JSON configuration (*.json)|*.json", CheckFileExists = true }) {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
                     string migration = ConfigStore.MigrationPreview(d.FileName);
@@ -667,8 +743,13 @@ namespace FunctionRowRemapper
             if (isPreview) return;
             Configuration configuration = draft.Copy(); ProfileCollection profileCopy = profiles.Copy(); DdcMonitor[] monitorCopy = detected == null ? new DdcMonitor[0] : detected.ToArray();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate {
-                ConfigurationHealthReport report = ConfigurationHealth.Scan(configuration, profileCopy, monitorCopy);
-                Ui(delegate { healthReport = report; if (report.HasWarnings && notificationPreferences.Health && notificationPreferences.AllowsWarning) SetFeedback("Configuration health: " + report.Summary, true); });
+                ConfigurationHealthReport report;
+                bool completed = ConfigurationHealth.TryScan(delegate { return ConfigurationHealth.Scan(configuration, profileCopy, monitorCopy); }, out report);
+                Ui(delegate {
+                    healthReport = report;
+                    if (!completed) SetFeedback("Configuration health check could not finish. Try again later.", true);
+                    else if (report.HasWarnings && notificationPreferences.Health && notificationPreferences.AllowsWarning) SetFeedback("Configuration health: " + report.Summary, true);
+                });
             });
         }
         void TestAction(Mapping mapping)
@@ -706,49 +787,75 @@ namespace FunctionRowRemapper
             } else text.AppendLine("This view does not run, launch, send, or contact anything.");
             MessageBox.Show(this, text.ToString(), "Action information", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        void ApplyHotkeys(Configuration config)
+        void ClearCustomHotkeyRegistrationWarning()
         {
-            if (!config.Enabled) {
-                foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id);
-                registeredHotkeys.Clear(); return;
-            }
-            var keep = new HashSet<int>();
-            for (int i = 0; i < config.CustomHotkeys.Length; i++) {
-                if (HotkeyChord.IsHardwareMediaShortcut(config.CustomHotkeys[i].Shortcut)) continue;
-                int id = 3000 + i; CustomHotkey old;
-                if (registeredHotkeys.TryGetValue(id, out old) && String.Equals(HotkeyChord.Normalize(old.Shortcut), HotkeyChord.Normalize(config.CustomHotkeys[i].Shortcut), StringComparison.OrdinalIgnoreCase)) {
-                    registeredHotkeys[id] = config.CustomHotkeys[i].Copy(); keep.Add(id);
+            if (String.IsNullOrEmpty(customHotkeyRegistrationWarning)) return;
+            string text = feedback.Text ?? "";
+            int index = text.IndexOf(customHotkeyRegistrationWarning, StringComparison.OrdinalIgnoreCase);
+            if (index >= 0)
+            {
+                text = text.Remove(index, customHotkeyRegistrationWarning.Length).Trim();
+                if (text.EndsWith("but", StringComparison.OrdinalIgnoreCase) || text.EndsWith("and", StringComparison.OrdinalIgnoreCase))
+                {
+                    int connectorStart = text.LastIndexOf(' ');
+                    text = (connectorStart < 0 ? "" : text.Substring(0, connectorStart)).TrimEnd(' ', ',', ';', ':', '.');
                 }
+                SetFeedback(String.IsNullOrWhiteSpace(text) ? "Custom hotkeys are registered." : text, false);
             }
-            foreach (int id in registeredHotkeys.Keys.ToArray()) if (!keep.Contains(id)) { Native.UnregisterHotKey(Handle, id); registeredHotkeys.Remove(id); }
+            customHotkeyRegistrationWarning = "";
+        }
+        string[] ApplyHotkeys(Configuration config)
+        {
+            ClearCustomHotkeyRegistrationWarning();
+            bool suspended = ShortcutSuspension.IsSuspended();
+            customHotkeysSuspendedForForeground = suspended;
+            string[] errors = HotkeyRegistration.Apply(config, Handle, registeredHotkeys, config != null && config.Enabled, suspended,
+                Native.RegisterHotKey, Native.UnregisterHotKey, System.Runtime.InteropServices.Marshal.GetLastWin32Error);
+            if (engine != null) engine.SetCustomChordPrecedence(HotkeyRegistration.ActiveModifierChordKeys(config, registeredHotkeys));
+            customHotkeyRegistrationNeedsRetry = errors.Length > 0;
+            nextCustomHotkeyRegistrationRetryTick = customHotkeyRegistrationNeedsRetry ? System.Diagnostics.Stopwatch.GetTimestamp() + System.Diagnostics.Stopwatch.Frequency : 0;
+            customHotkeyRegistrationWarning = errors.Length > 0 ? "Some custom hotkeys could not register: " + String.Join(" ", errors) : "";
+            return errors;
+        }
+        void RefreshHotkeysForForeground()
+        {
+            GameMode.RefreshEnabledState();
+            bool suspended = ShortcutSuspension.RefreshForegroundState();
+            if (!HotkeyRegistration.ShouldRefresh(customHotkeysSuspendedForForeground, suspended, customHotkeyRegistrationNeedsRetry,
+                System.Diagnostics.Stopwatch.GetTimestamp(), nextCustomHotkeyRegistrationRetryTick)) return;
             try {
-                for (int i = 0; i < config.CustomHotkeys.Length; i++) {
-                    if (HotkeyChord.IsHardwareMediaShortcut(config.CustomHotkeys[i].Shortcut)) continue;
-                    int id = 3000 + i; if (keep.Contains(id)) continue;
-                    HotkeyChord chord = HotkeyChord.Parse(config.CustomHotkeys[i].Shortcut);
-                    if (!Native.RegisterHotKey(Handle, id, (uint)(chord.Modifiers | HotkeyChord.NoRepeat), (uint)chord.Key)) {
-                        int error = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
-                        string shortcut = HotkeyChord.Normalize(config.CustomHotkeys[i].Shortcut);
-                        if (error == 1409) throw new ArgumentException("Could not register " + shortcut + ". Windows or another app already owns this shortcut. Choose a different combination or close the conflicting app.");
-                        throw new System.ComponentModel.Win32Exception(error, "Could not register " + shortcut + ". Windows rejected this shortcut.");
-                    }
-                    registeredHotkeys.Add(id, config.CustomHotkeys[i].Copy());
-                }
-            } catch {
-                foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id);
-                registeredHotkeys.Clear(); throw;
+                string[] errors = ApplyHotkeys(saved);
+                if (errors.Length > 0) { customHotkeyRetryFeedback = "Some custom hotkeys could not be restored: " + String.Join(" ", errors); customHotkeyRegistrationWarning = customHotkeyRetryFeedback; SetFeedback(customHotkeyRetryFeedback, true); }
+                else customHotkeyRetryFeedback = "";
             }
+            catch (Exception ex) { SetFeedback("Custom hotkeys could not be restored after application suspension changed: " + ex.Message, true); }
         }
         protected override void WndProc(ref Message m)
         {
             const int WM_HOTKEY = 0x0312;
+            if (rawConsumerInput != null && rawConsumerInput.Handle(ref m)) return;
+            const int WM_APPCOMMAND = 0x0319;
             if (m.Msg == WM_HOTKEY) {
                 CustomHotkey h;
-                if (registeredHotkeys.TryGetValue(m.WParam.ToInt32(), out h) && engine != null && engine.Enabled)
-                    System.Threading.ThreadPool.QueueUserWorkItem(delegate { try { customDispatcher.Execute(h.Action); } catch (Exception ex) { Ui(delegate { SetFeedback("Custom hotkey could not run: " + ex.Message, true); }); } });
+                if (registeredHotkeys.TryGetValue(m.WParam.ToInt32(), out h)) {
+                    if (engine == null || !engine.TriggerCustomHotkey(h.Shortcut))
+                        SetFeedback("The custom hotkey fired, but its action could not be queued because the runtime is paused, suspended, or busy.", true);
+                }
                 return;
             }
+            if (m.Msg == WM_APPCOMMAND) {
+                int command = (m.LParam.ToInt32() >> 16) & 0x7FFF;
+                if (command == 23 && engine != null && engine.Enabled && !ShortcutSuspension.IsSuspended() && (rawConsumerInput == null || !rawConsumerInput.IsActive)) {
+                    CustomHotkey eject = HotkeyChord.FindCustomHotkey(saved, "MediaEject");
+                    if (eject != null && eject.Action != null && eject.Action.Kind != ActionKind.PassThrough) { engine.TriggerCustomHotkey("MediaEject"); return; }
+                }
+            }
             base.WndProc(ref m);
+        }
+        void HandleConsumerInput(string shortcut)
+        {
+            if (ConsumerInputObserved != null) ConsumerInputObserved(shortcut);
+            if (engine != null) engine.TriggerCustomHotkey(shortcut);
         }
         void SetupTray()
         {
@@ -776,7 +883,8 @@ namespace FunctionRowRemapper
         }
         UserPreferences NewPreferencesFromUi()
         {
-            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value, SmoothScrolling = smoothScrolling.Checked, ToastStyle = toastStyleChoice.SelectedItem == null ? preferences.ToastStyle : toastStyleChoice.SelectedItem.ToString() };
+            string toastStyle = toastStyleChoice.SelectedItem == null ? preferences.ToastStyle : toastStyleChoice.SelectedItem.ToString(); if (toastStyle.StartsWith("KiWeave (", StringComparison.OrdinalIgnoreCase)) toastStyle = "KiWeave";
+            return new UserPreferences { UseTray = useTray.Checked, CheckUpdates = checkUpdates.Checked, AutomaticProfiles = automaticProfiles.Checked, NetworkAccess = networkAccess.Checked, Theme = UiStyle.ThemeName, CustomAccent = preferences.CustomAccent, HistoryRetention = (int)historyRetention.Value, SmoothScrolling = smoothScrolling.Checked, ToastStyle = toastStyle };
         }
         void ToggleBackgroundPreference(object sender, EventArgs e)
         {
@@ -804,7 +912,7 @@ namespace FunctionRowRemapper
             if (loading || isPreview || toastStyleChoice.SelectedItem == null) return;
             var next = NewPreferencesFromUi();
             try { UserPreferences.Save(UserPreferences.DefaultPath, next); preferences = next; StatusOverlay.Style = next.ToastStyle; SetFeedback("Toast style set to " + next.ToastStyle + ".", false); }
-            catch (Exception ex) { loading = true; toastStyleChoice.SelectedItem = preferences.ToastStyle; loading = false; SetFeedback("Toast style could not be saved: " + ex.Message, true); }
+            catch (Exception ex) { loading = true; toastStyleChoice.SelectedItem = preferences.ToastStyle == "KiWeave" ? PreReleaseToastLabel : "Compact flyout"; loading = false; SetFeedback("Toast style could not be saved: " + ex.Message, true); }
         }
         void ToggleFeatureFlag(object sender, EventArgs e)
         {
@@ -814,7 +922,7 @@ namespace FunctionRowRemapper
         }
         void ToggleGameMode(object sender, EventArgs e)
         {
-            if (loading || isPreview) return; try { GameMode.Set(gameMode.Checked); SetFeedback(gameMode.Checked ? "Game mode enabled. Fullscreen foreground windows receive normal keys." : "Game mode disabled.", false); } catch (Exception ex) { loading = true; gameMode.Checked = GameMode.Enabled; loading = false; SetFeedback("Game mode could not be saved: " + ex.Message, true); }
+            if (loading || isPreview) return; try { GameMode.Set(gameMode.Checked); SetFeedback(gameMode.Checked ? "Game mode enabled. Configured bindings stay active in fullscreen; other keys pass through normally." : "Game mode disabled.", false); } catch (Exception ex) { loading = true; gameMode.Checked = GameMode.Enabled; loading = false; SetFeedback("Game mode could not be saved: " + ex.Message, true); }
         }
         void ToggleNotificationPreference(object sender, EventArgs e)
         {
@@ -914,7 +1022,7 @@ namespace FunctionRowRemapper
             if (MessageBox.Show(this, "A full backup contains your mappings, action targets, arguments, URLs, profiles, and preferences. Keep it private if any action contains personal or secret information.\n\nCreate the backup?", "Back up KiWeave", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
             try {
                 BackupPrivacyPreset privacyPreset; using (var preset = new BackupPrivacyForm()) if (preset.ShowDialog(this) != DialogResult.OK) return; else privacyPreset = preset.Preset;
-                using (var d = new SaveFileDialog { Filter = "KiWeave backup|*.keyweave", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".keyweave", DefaultExt = "keyweave", AddExtension = true })
+                using (var d = new SaveFileDialog { Filter = "KiWeave backup (*.kiweave)|*.kiweave", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".kiweave", DefaultExt = "kiweave", AddExtension = true })
                     if (d.ShowDialog(this) == DialogResult.OK) {
                         string review = BackupPrivacy.Review(BackupBundle.Serialize(saved, profiles, preferences, Startup.Enabled), privacyPreset);
                         if (MessageBox.Show(this, "Privacy review\r\n\r\n" + review + "\r\n\r\nCreate this private backup?", "Review backup privacy", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
@@ -926,20 +1034,20 @@ namespace FunctionRowRemapper
         {
             if (dirty) { SetFeedback("Save or discard your edits before creating a full backup.", true); return; }
             if (MessageBox.Show(this, "Create an encrypted full backup protected to this Windows account? It cannot be opened by another account.", "Encrypted backup", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
-            try { using (var d = new SaveFileDialog { Filter = "Encrypted KiWeave backup|*.keyweave.enc", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".keyweave.enc", AddExtension = true }) if (d.ShowDialog(this) == DialogResult.OK) { BackupBundle.SaveEncrypted(d.FileName, saved, profiles, preferences, Startup.Enabled); AuditTrail.Record("encrypted-backup-export"); SetFeedback("Encrypted backup created for this Windows account.", false); } }
+            try { using (var d = new SaveFileDialog { Filter = "Encrypted KiWeave backup (*.kiweave.enc)|*.kiweave.enc", FileName = "KiWeave-" + DateTime.Now.ToString("yyyy-MM-dd") + ".kiweave.enc", DefaultExt = "kiweave.enc", AddExtension = true }) if (d.ShowDialog(this) == DialogResult.OK) { BackupBundle.SaveEncrypted(d.FileName, saved, profiles, preferences, Startup.Enabled); AuditTrail.Record("encrypted-backup-export"); SetFeedback("Encrypted backup created for this Windows account.", false); } }
             catch (Exception ex) { SetFeedback("Encrypted backup failed: " + ex.Message, true); }
         }
         void ImportBackup(object sender, EventArgs e)
         {
             if (readOnlyMode) { SetFeedback("Read-only mode is active. Unlock editing before restoring a backup.", true); return; }
             if (dirty) { SetFeedback("Save or discard your edits before restoring a backup.", true); return; }
-            using (var d = new OpenFileDialog { Filter = "KiWeave backups|*.keyweave;*.keyweave.enc|Plain KiWeave backup|*.keyweave|Encrypted KiWeave backup|*.keyweave.enc", CheckFileExists = true }) {
+            using (var d = new OpenFileDialog { Filter = "KiWeave backups (*.kiweave;*.kiweave.enc;legacy *.keyweave)|*.kiweave;*.kiweave.enc;*.keyweave;*.keyweave.enc|KiWeave backup (*.kiweave)|*.kiweave|Encrypted KiWeave backup (*.kiweave.enc)|*.kiweave.enc|Legacy KiWeave backup (*.keyweave)|*.keyweave;*.keyweave.enc", CheckFileExists = true }) {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try {
-                    KeyWeaveBackup backup = d.FileName.EndsWith(".keyweave.enc", StringComparison.OrdinalIgnoreCase) ? BackupBundle.LoadEncrypted(d.FileName) : BackupBundle.Load(d.FileName);
+                    KeyWeaveBackup backup = d.FileName.EndsWith(".enc", StringComparison.OrdinalIgnoreCase) ? BackupBundle.LoadEncrypted(d.FileName) : BackupBundle.Load(d.FileName);
                     string message = BackupBundle.Describe(backup) + "\n\nThis replaces the Default mappings, profiles, tray preference, and startup preference. PowerToys is not changed. KiWeave will create a local rollback copy first.\n\nContinue?";
                     if (MessageBox.Show(this, message, "Restore KiWeave backup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                    CaptureHistory("backup restore"); string rollback = BackupBundle.Restore(backup); ApplyRestoredBackup(backup); AuditTrail.Record("backup-restore"); SetFeedback("Backup restored. Rollback copy: " + rollback, false);
+                    CaptureHistory("backup restore"); string rollback = BackupBundle.Restore(backup); string[] hotkeyErrors = ApplyRestoredBackup(backup); AuditTrail.Record("backup-restore"); string status = "Backup restored. Rollback copy: " + rollback; if (hotkeyErrors.Length > 0) status += " Some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); SetFeedback(status, hotkeyErrors.Length > 0);
                 } catch (Exception ex) { SetFeedback("Restore failed; the current setup was kept or rolled back. " + ex.Message, true); }
             }
         }
@@ -950,13 +1058,13 @@ namespace FunctionRowRemapper
             try { ConfigurationHistory.CaptureCurrent(reason); }
             catch (Exception ex) { AppLog.Record("ConfigurationHistory", ex); }
         }
-        void ApplyRestoredBackup(KeyWeaveBackup backup)
+        string[] ApplyRestoredBackup(KeyWeaveBackup backup)
         {
             saved = backup.Configuration.Copy(); draft = saved.Copy(); profiles = backup.Profiles.Copy(); preferences = new UserPreferences { UseTray = backup.Preferences.UseTray, CheckUpdates = backup.Preferences.CheckUpdates, AutomaticProfiles = backup.Preferences.AutomaticProfiles, NetworkAccess = backup.Preferences.NetworkAccess, Theme = backup.Preferences.Theme, CustomAccent = backup.Preferences.CustomAccent, HistoryRetention = backup.Preferences.HistoryRetention, SmoothScrolling = backup.Preferences.SmoothScrolling }; UiStyle.ApplyTheme(preferences.Theme); UiStyle.ApplyAccent(preferences.CustomAccent); NetworkPolicy.Enabled = preferences.NetworkAccess; DesignScrollPanel.SmoothScrollingEnabled = preferences.SmoothScrolling; currentProfile = "Default"; automaticProfileActive = false; pinnedProfile = ""; automaticProfileProcess = ""; profileReason = "Restored backup selected the Default profile."; selectedLayer = -1; customSelected = -1;
-            if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
+            if (engine != null) engine.Apply(saved); string[] hotkeyErrors = ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
             if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
             loading = true; enabled.Checked = saved.Enabled; useTray.Checked = preferences.UseTray; checkUpdates.Checked = preferences.CheckUpdates; automaticProfiles.Checked = preferences.AutomaticProfiles; networkAccess.Checked = preferences.NetworkAccess; checkUpdates.Enabled = preferences.NetworkAccess; startup.Checked = backup.StartWithWindows; loading = false;
-            tray.Visible = preferences.UseTray; hideToTray.Enabled = preferences.UseTray; RefreshTrayProfiles(); dirty = false; Text = "KiWeave"; UpdateStatus();
+            tray.Visible = preferences.UseTray; hideToTray.Enabled = preferences.UseTray; RefreshTrayProfiles(); dirty = false; Text = "KiWeave"; UpdateStatus(); return hotkeyErrors;
         }
         void OpenHistory()
         {
@@ -967,7 +1075,7 @@ namespace FunctionRowRemapper
                 var entry = dialog.SelectedEntry;
                 string prompt = "Restore the selected local snapshot?\n\n" + entry + "\n\n" + ConfigurationHistory.Compare(entry.Backup, saved, profiles, preferences, Startup.Enabled) + "\n\nKiWeave will first preserve the current setup in history and create a rollback folder.";
                 if (MessageBox.Show(this, prompt, "Restore KiWeave history", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                try { CaptureHistory("history restore"); string rollback = BackupBundle.Restore(entry.Backup); ApplyRestoredBackup(entry.Backup); AuditTrail.Record("history-restore"); SetFeedback("History restored. Rollback copy: " + rollback, false); }
+                try { CaptureHistory("history restore"); string rollback = BackupBundle.Restore(entry.Backup); string[] hotkeyErrors = ApplyRestoredBackup(entry.Backup); AuditTrail.Record("history-restore"); string status = "History restored. Rollback copy: " + rollback; if (hotkeyErrors.Length > 0) status += " Some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); SetFeedback(status, hotkeyErrors.Length > 0); }
                 catch (Exception ex) { SetFeedback("History restore failed; the current setup was kept or rolled back. " + ex.Message, true); }
             }
         }
@@ -1018,23 +1126,44 @@ namespace FunctionRowRemapper
         bool ActivateProfile(string name, bool announce, bool automatic)
         {
             if (dirty) { if (announce) SetFeedback("Save or discard the current edits before switching profiles.", true); return false; }
+            Configuration previousSaved = saved.Copy(), previousDraft = draft.Copy();
+            string previousProfile = currentProfile, previousReason = profileReason, previousAutomaticProcess = automaticProfileProcess;
+            bool previousAutomatic = automaticProfileActive, previousDirty = dirty;
+            int previousSelected = selected, previousLayer = selectedLayer, previousCustomSelected = customSelected;
             try {
                 Configuration next;
                 if (String.Equals(name, "Default", StringComparison.OrdinalIgnoreCase)) next = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration();
                 else { var profile = profiles.Find(name); if (profile == null) throw new ArgumentException("Profile not found: " + name); Configuration defaultConfiguration = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration(); next = profiles.Resolve(profile.Name, defaultConfiguration); }
                 saved = next.Copy(); draft = next.Copy(); currentProfile = name; automaticProfileActive = automatic; selectedLayer = -1; customSelected = -1;
                 if (automatic) profileReason = (automaticProfileProcess.Length == 0 ? "Selected by an automatic app rule." : "Automatically matched " + automaticProfileProcess + ".") + " Session: " + SessionAwareness.CurrentDescription() + ".";
-                if (engine != null) engine.Apply(saved); ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
+                if (engine != null) engine.Apply(saved); string[] hotkeyErrors = ApplyHotkeys(saved); RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
                 if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(0); else SetCustomEditorState(false);
                 loading = true; enabled.Checked = saved.Enabled; loading = false; dirty = false; Text = "KiWeave"; UpdateStatus();
-                AuditTrail.Record("profile-activated"); if (announce) SetFeedback("Using profile " + name + ".", false);
+                AuditTrail.Record("profile-activated"); if (announce || hotkeyErrors.Length > 0) { string status = "Using profile " + name + "."; if (hotkeyErrors.Length > 0) status += " Some custom hotkeys could not register: " + String.Join(" ", hotkeyErrors); SetFeedback(status, hotkeyErrors.Length > 0); }
                 return true;
-            } catch (Exception ex) { if (announce) SetFeedback("Could not switch profile: " + ex.Message, true); return false; }
+            } catch (Exception ex) {
+                saved = previousSaved; draft = previousDraft; currentProfile = previousProfile; profileReason = previousReason;
+                automaticProfileProcess = previousAutomaticProcess; automaticProfileActive = previousAutomatic; dirty = previousDirty;
+                selected = previousSelected; selectedLayer = previousLayer; customSelected = previousCustomSelected;
+                string rollbackError = "";
+                try {
+                    loading = true; enabled.Checked = saved.Enabled; loading = false;
+                    if (engine != null) engine.Apply(saved);
+                    string[] hotkeyErrors = ApplyHotkeys(saved);
+                    if (hotkeyErrors.Length > 0) rollbackError = " Some prior custom hotkeys could not be restored: " + String.Join(" ", hotkeyErrors);
+                    RefreshLayerView(); PopulateList(); PopulateCustomList(); LoadEditor(selected);
+                    if (draft.CustomHotkeys.Length > 0) LoadCustomEditor(customSelected >= 0 && customSelected < draft.CustomHotkeys.Length ? customSelected : 0); else SetCustomEditorState(false);
+                    Text = "KiWeave"; UpdateStatus();
+                } catch (Exception rollback) { loading = false; rollbackError = " Profile rollback was incomplete: " + rollback.Message; }
+                if (announce) SetFeedback("Could not switch profile: " + ex.Message + rollbackError, true);
+                return false;
+            }
         }
 
         void CheckAutomaticProfile()
         {
-            if (isPreview || !preferences.AutomaticProfiles || pinnedProfile.Length > 0 || Visible || dirty || engine == null || profiles.Profiles.Length == 0) return;
+            if (isPreview || !AutomaticProfilePolicy.CanSwitch(preferences.AutomaticProfiles, pinnedProfile.Length > 0, Visible, dirty, engine != null) || profiles.Profiles.Length == 0) return;
+            if (!String.IsNullOrEmpty(ProfileScheduleStore.ActiveProfile(DateTime.Now))) return;
             string process = Native.ForegroundProcessName();
             var match = profiles.ForApplication(process);
             var layoutMatch = KeyboardLayoutProfiles.Match(profiles);
@@ -1090,7 +1219,7 @@ namespace FunctionRowRemapper
         void OpenLiveKeyTester()
         {
             if (engine == null) { SetFeedback("The live key tester needs the keyboard hook, which is not available right now.", true); return; }
-            using (var dialog = new LiveKeyTesterForm(engine, () => currentProfile)) dialog.ShowDialog(this);
+            using (var dialog = new LiveKeyTesterForm(engine, () => currentProfile, handler => ConsumerInputObserved += handler, handler => ConsumerInputObserved -= handler)) dialog.ShowDialog(this);
         }
         void OpenConflictCenter()
         {
@@ -1135,6 +1264,12 @@ namespace FunctionRowRemapper
             try { if (!RecoveryStore.TryLoadDraft(out recovery, out profile)) return; }
             catch (Exception ex) { AppLog.Record("DraftRecoveryRead", ex); return; }
             Configuration defaults; try { defaults = File.Exists(ConfigStore.DefaultPath) ? ConfigStore.Load(ConfigStore.DefaultPath) : new Configuration(); } catch { defaults = new Configuration(); }
+            if (RecoveryStore.MatchesCurrent(recovery, defaults, profiles, preferences, Startup.Enabled)) {
+                // A previous clean state can leave a recovery file behind after an interrupted
+                // shutdown. It is not unsaved work, so remove only that redundant draft.
+                RecoveryStore.DeleteDraft();
+                return;
+            }
             using (var dialog = new DraftRecoveryForm(recovery, profile, defaults, profiles, preferences, Startup.Enabled)) {
                 dialog.ShowDialog(this);
                 if (dialog.Choice == DraftRecoveryChoice.Discard) { RecoveryStore.DeleteDraft(); SetFeedback("Recovery draft discarded. Saved mappings were unchanged.", false); return; }
@@ -1212,6 +1347,7 @@ namespace FunctionRowRemapper
             string report = "KiWeave diagnostics\r\n" +
                 "Version: " + UpdateChecker.CurrentVersion + "\r\n" +
                 "Keyboard hook: " + (engine != null && engine.Installed ? "ready" : "unavailable") + "\r\n" +
+                "Detected keyboards (read-only):\r\n" + KeyboardDeviceInventory.Describe() + "\r\n" +
                 "Shortcuts: " + (engine != null && engine.Enabled ? "enabled" : "paused") + "\r\n" +
                 "Active profile: " + (currentProfile == "Default" ? "Default" : "Custom profile active") + "\r\n" +
                 "Saved profiles: " + profiles.Profiles.Length + "\r\n" +
@@ -1252,15 +1388,16 @@ namespace FunctionRowRemapper
         }
         void OnClosing(object sender, FormClosingEventArgs e)
         {
-            if (streamDeckBridge != null) { streamDeckBridge.Dispose(); streamDeckBridge = null; }
             if (e.CloseReason == CloseReason.UserClosing && preferences.UseTray && !exitRequested) { e.Cancel = true; Hide(); return; }
             if (e.CloseReason == CloseReason.UserClosing && dirty) {
                 DialogResult r = MessageBox.Show(this, "Save your edited mappings before exiting?", "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) { e.Cancel = true; exitRequested = false; return; }
                 if (r == DialogResult.No) RecoveryStore.DeleteDraft();
             }
-            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); statusTimer.Stop(); scheduleTimer.Stop(); tray.Visible = false; tray.Dispose(); if (midiTriggerService != null) midiTriggerService.Dispose(); if (controllerTriggerService != null) controllerTriggerService.Dispose(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
+            FirstPartyExtensionCatalog.EnabledChanged -= FirstPartyExtensionStateChanged;
+            if (streamDeckBridge != null) { streamDeckBridge.Dispose(); streamDeckBridge = null; }
+            foreach (int id in registeredHotkeys.Keys.ToArray()) Native.UnregisterHotKey(Handle, id); registeredHotkeys.Clear(); if (rawConsumerInput != null) rawConsumerInput.Dispose(); statusTimer.Stop(); scheduleTimer.Stop(); customHotkeySuspensionTimer.Stop(); if (foregroundChangeMonitor != null) { foregroundChangeMonitor.Dispose(); foregroundChangeMonitor = null; } tray.Visible = false; tray.Dispose(); StopHardwareTriggers(); if (engine != null) engine.Dispose(); DiscordIntegration.Disconnect();
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (midiTriggerService != null) midiTriggerService.Dispose(); if (controllerTriggerService != null) controllerTriggerService.Dispose(); if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); scheduleTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { FirstPartyExtensionCatalog.EnabledChanged -= FirstPartyExtensionStateChanged; if (rawConsumerInput != null) rawConsumerInput.Dispose(); if (foregroundChangeMonitor != null) { foregroundChangeMonitor.Dispose(); foregroundChangeMonitor = null; } StopHardwareTriggers(); if (engine != null) engine.Dispose(); if (updateNotice != null) updateNotice.Dispose(); tray.Dispose(); tips.Dispose(); statusTimer.Dispose(); scheduleTimer.Dispose(); customHotkeySuspensionTimer.Dispose(); draftTimer.Dispose(); updateTimer.Dispose(); if (list.SmallImageList != null) list.SmallImageList.Dispose(); if (customList.SmallImageList != null) customList.SmallImageList.Dispose(); } base.Dispose(disposing); }
     }
 }

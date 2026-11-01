@@ -65,6 +65,7 @@ namespace FunctionRowRemapper
             int index = inheritance.Items.Cast<object>().Select(x => x.ToString()).ToList().FindIndex(x => String.Equals(x, selected, StringComparison.OrdinalIgnoreCase));
             inheritance.SelectedIndex = Math.Max(0, index);
             layoutId.Text = p == null ? "" : KeyboardLayoutProfiles.ForProfile(p.Name); inheritanceTree.Text = p == null ? "" : "Inheritance: " + profiles.InheritanceTree(p.Name); feedback.Text = p == null ? "Choose a profile." : String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile." : "Inherits from " + p.InheritFrom + " with " + p.OverrideKeys.Length + " intentional override" + (p.OverrideKeys.Length == 1 ? "." : "s.");
+            if (!String.IsNullOrWhiteSpace(KeyboardLayoutProfiles.LoadWarning)) feedback.Text += " " + KeyboardLayoutProfiles.LoadWarning;
         }
         void AddCurrent()
         {
@@ -82,23 +83,44 @@ namespace FunctionRowRemapper
             var p = list.SelectedItem as KeyWeaveProfile; if (p == null) return;
             var dependent = profiles.Profiles.FirstOrDefault(x => String.Equals(x.InheritFrom, p.Name, StringComparison.OrdinalIgnoreCase));
             if (dependent != null) { feedback.Text = "Cannot remove this profile while " + dependent.Name + " inherits from it."; return; }
-            profiles.Profiles = profiles.Profiles.Where(x => !ReferenceEquals(x, p)).ToArray(); RefreshList(); if (list.Items.Count > 0) list.SelectedIndex = 0;
-            try { CaptureHistory("profile remove"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); feedback.Text = "Profile removed."; } catch (Exception ex) { feedback.Text = ex.Message; }
+            var next = profiles.Copy(); next.Profiles = next.Profiles.Where(x => !String.Equals(x.Name, p.Name, StringComparison.OrdinalIgnoreCase)).ToArray();
+            try { CaptureHistory("profile remove"); ProfileStore.Save(ProfileStore.DefaultPath, next); profiles.Profiles = next.Profiles; RefreshList(); if (list.Items.Count > 0) list.SelectedIndex = 0; feedback.Text = "Profile removed."; }
+            catch (Exception ex) { feedback.Text = "Profile was not removed: " + ex.Message; }
         }
         bool SaveDetails()
         {
-            var p = list.SelectedItem as KeyWeaveProfile; if (p == null) { feedback.Text = "Choose a profile first."; return false; }
-            string oldName = p.Name; string[] oldApps = p.Applications; string oldBase = p.InheritFrom; string oldAccent = p.Accent; string oldIcon = p.Icon; string[] oldOverrides = p.OverrideKeys.ToArray(); Configuration oldConfiguration = p.Configuration.Copy();
+            var selected = list.SelectedItem as KeyWeaveProfile; if (selected == null) { feedback.Text = "Choose a profile first."; return false; }
+            string oldName = selected.Name;
             Configuration effective;
-            try { effective = profiles.Resolve(p.Name, defaultConfiguration); } catch (Exception ex) { feedback.Text = ex.Message; return false; }
+            try { effective = profiles.Resolve(oldName, defaultConfiguration); } catch (Exception ex) { feedback.Text = ex.Message; return false; }
+            var next = profiles.Copy(); var p = next.Find(oldName);
+            if (p == null) { feedback.Text = "That profile is no longer available."; return false; }
             p.Name = name.Text.Trim(); p.Accent = accent.Text.Trim(); p.Icon = icon.Text.Trim(); p.Applications = applications.Lines.Select(ProfileStore.NormalizeProcess).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             string selectedBase = inheritance.SelectedItem == null ? "" : inheritance.SelectedItem.ToString(); p.InheritFrom = selectedBase == "None (independent)" ? "" : selectedBase;
-            foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, oldName, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = p.Name;
-            try { ProfileStore.SetEffectiveConfiguration(profiles, p, effective, defaultConfiguration); ProfileStore.Validate(profiles, false); KeyboardLayoutProfiles.Set(p.Name, layoutId.Text); CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(p, profiles); RefreshList(); list.SelectedItem = p; feedback.Text = String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides."; return true; }
-            catch (Exception ex) {
-                foreach (var item in profiles.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, p.Name, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = oldName;
-                p.Name = oldName; p.Applications = oldApps; p.InheritFrom = oldBase; p.Accent = oldAccent; p.Icon = oldIcon; p.OverrideKeys = oldOverrides; p.Configuration = oldConfiguration; feedback.Text = ex.Message; return false;
+            foreach (var item in next.Profiles.Where(x => !ReferenceEquals(x, p) && String.Equals(x.InheritFrom, oldName, StringComparison.OrdinalIgnoreCase))) item.InheritFrom = p.Name;
+            try
+            {
+                ProfileStore.SetEffectiveConfiguration(next, p, effective, defaultConfiguration); ProfileStore.Validate(next, false);
+                string oldLayout = KeyboardLayoutProfiles.ForProfile(oldName); bool layoutChanged = false;
+                try
+                {
+                    bool layoutAssignmentChanged = !String.Equals(oldName, p.Name, StringComparison.OrdinalIgnoreCase) || !String.Equals(oldLayout, layoutId.Text.Trim(), StringComparison.OrdinalIgnoreCase);
+                    if (layoutAssignmentChanged) { KeyboardLayoutProfiles.Rename(oldName, p.Name, layoutId.Text); layoutChanged = true; }
+                    CaptureHistory("profile save"); ProfileStore.Save(ProfileStore.DefaultPath, next);
+                }
+                catch (Exception saveError)
+                {
+                    if (layoutChanged) try { KeyboardLayoutProfiles.Rename(p.Name, oldName, oldLayout); }
+                    catch (Exception rollbackError) { throw new InvalidOperationException(saveError.Message + " The keyboard-layout assignment also could not be rolled back: " + rollbackError.Message, saveError); }
+                    throw;
+                }
+                profiles.Profiles = next.Profiles;
+                string snapshotWarning = ""; try { ProfileSnapshots.Save(p, profiles); } catch (Exception snapshotError) { snapshotWarning = " Profile saved, but its rollback snapshot could not be created: " + snapshotError.Message; }
+                RefreshList(); list.SelectedItem = profiles.Find(p.Name);
+                feedback.Text = (String.IsNullOrWhiteSpace(p.InheritFrom) ? "Independent profile details saved." : "Inheritance saved with " + p.OverrideKeys.Length + " intentional overrides.") + snapshotWarning;
+                return true;
             }
+            catch (Exception ex) { feedback.Text = "Profile details were not saved: " + ex.Message; return false; }
         }
         void UseSelected()
         {
@@ -109,9 +131,14 @@ namespace FunctionRowRemapper
         {
             var source = list.SelectedItem as KeyWeaveProfile; if (source == null) { feedback.Text = "Choose a profile first."; return; }
             int number = 2; string candidate = source.Name + " copy"; while (profiles.Find(candidate) != null) candidate = source.Name + " copy " + number++;
-            var copy = source.Copy(); copy.Name = candidate; copy.Applications = new string[0]; profiles.Profiles = profiles.Profiles.Concat(new[] { copy }).ToArray();
-            try { CaptureHistory("profile duplicate"); ProfileStore.Save(ProfileStore.DefaultPath, profiles); ProfileSnapshots.Save(copy, profiles); RefreshList(); list.SelectedItem = copy; feedback.Text = "Profile duplicated without automatic app assignments."; }
-            catch (Exception ex) { profiles.Profiles = profiles.Profiles.Where(x => !ReferenceEquals(x, copy)).ToArray(); RefreshList(); feedback.Text = ex.Message; }
+            var next = profiles.Copy(); var copy = source.Copy(); copy.Name = candidate; copy.Applications = new string[0]; next.Profiles = next.Profiles.Concat(new[] { copy }).ToArray();
+            try
+            {
+                CaptureHistory("profile duplicate"); ProfileStore.Save(ProfileStore.DefaultPath, next); profiles.Profiles = next.Profiles;
+                string snapshotWarning = ""; try { ProfileSnapshots.Save(copy, profiles); } catch (Exception snapshotError) { snapshotWarning = " Profile saved, but its rollback snapshot could not be created: " + snapshotError.Message; }
+                RefreshList(); list.SelectedItem = profiles.Find(copy.Name); feedback.Text = "Profile duplicated without automatic app assignments." + snapshotWarning;
+            }
+            catch (Exception ex) { feedback.Text = "Profile was not duplicated: " + ex.Message; }
         }
         static void CaptureHistory(string reason)
         {

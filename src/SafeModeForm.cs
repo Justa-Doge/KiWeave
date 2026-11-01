@@ -95,7 +95,7 @@ namespace FunctionRowRemapper
 
         void RestoreBackup(object sender, EventArgs e)
         {
-            using (var dialog = new OpenFileDialog { Filter = "KiWeave backup|*.keyweave|All files|*.*" }) {
+            using (var dialog = new OpenFileDialog { Filter = "KiWeave backup (*.kiweave;legacy *.keyweave)|*.kiweave;*.keyweave|All files|*.*" }) {
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
                 try {
                     var backup = BackupBundle.Load(dialog.FileName);
@@ -120,9 +120,10 @@ namespace FunctionRowRemapper
 
         void RestoreKnownGood(object sender, EventArgs e)
         {
-            if (!File.Exists(RecoveryStore.KnownGoodPath)) { MessageBox.Show(this, "No known-good recovery copy exists yet. KiWeave creates one after a mapping save is validated and applied successfully.", "Known-good recovery", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            string knownGoodPath = File.Exists(RecoveryStore.KnownGoodPath) ? RecoveryStore.KnownGoodPath : RecoveryStore.LegacyKnownGoodPath;
+            if (!File.Exists(knownGoodPath)) { MessageBox.Show(this, "No known-good recovery copy exists yet. KiWeave creates one after a mapping save is validated and applied successfully.", "Known-good recovery", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             try {
-                var backup = BackupBundle.Load(RecoveryStore.KnownGoodPath);
+                var backup = BackupBundle.Load(knownGoodPath);
                 string prompt = BackupBundle.Describe(backup) + "\n\nThis is the last setup KiWeave saved and applied successfully. Restore it without activating mappings? A rollback folder is created first.";
                 if (MessageBox.Show(this, prompt, "Restore known-good setup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 PreserveReadableState("safe mode known good restore"); string rollback = BackupBundle.Restore(backup); ReloadState();
@@ -135,7 +136,7 @@ namespace FunctionRowRemapper
         {
             if (!state.FullyReadable) return;
             if (MessageBox.Show(this, "A full backup contains private mappings, targets, arguments, URLs, profiles, and preferences. Create it without loading integrations?", "Safe Mode backup", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
-            using (var dialog = new SaveFileDialog { Filter = "KiWeave backup|*.keyweave", FileName = "KiWeave-safe-mode-backup.keyweave", DefaultExt = "keyweave", AddExtension = true }) if (dialog.ShowDialog(this) == DialogResult.OK) try { BackupBundle.Save(dialog.FileName, state.Configuration, state.Profiles, state.Preferences, state.Startup, false); MessageBox.Show(this, "Private backup created.", "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch (Exception ex) { MessageBox.Show(this, "Backup failed: " + ex.Message, "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            using (var dialog = new SaveFileDialog { Filter = "KiWeave backup (*.kiweave)|*.kiweave", FileName = "KiWeave-safe-mode-backup.kiweave", DefaultExt = "kiweave", AddExtension = true }) if (dialog.ShowDialog(this) == DialogResult.OK) try { BackupBundle.Save(dialog.FileName, state.Configuration, state.Profiles, state.Preferences, state.Startup, false); MessageBox.Show(this, "Private backup created.", "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch (Exception ex) { MessageBox.Show(this, "Backup failed: " + ex.Message, "Safe Mode", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         void ShowDiagnostics(object sender, EventArgs e) { using (var dialog = new DiagnosticsForm(Diagnostics(), true)) dialog.ShowDialog(this); }
         void ShowPrivacy(object sender, EventArgs e) { using (var dialog = new PrivacyCenterForm(false, Diagnostics())) dialog.ShowDialog(this); }

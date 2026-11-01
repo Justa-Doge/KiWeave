@@ -66,6 +66,6 @@ namespace FunctionRowRemapper
         {
             try { var shortcuts = PowerToysIntegration.Load(); string drift = PowerToysDrift.Observe(shortcuts); return (shortcuts.Count == 0 ? "Not detected or no shortcuts" : shortcuts.Count + " shortcuts detected") + " · " + drift; } catch { return "Unavailable"; }
         }
-        static bool ProcessExists(string name) { try { return Process.GetProcessesByName(name).Length > 0; } catch { return false; } }
+        static bool ProcessExists(string name) { return ProcessProbe.AnyRunning(name); }
     }
 }

@@ -16,7 +16,7 @@ namespace FunctionRowRemapper
         public string CustomAccent = "";
         public int HistoryRetention = 20;
         public bool SmoothScrolling = false;
-        public string ToastStyle = "KiWeave";
+        public string ToastStyle = "Compact flyout";
         public static string DefaultPath { get { return Path.Combine(Path.GetDirectoryName(ConfigStore.DefaultPath), "preferences.json"); } }
         public static UserPreferences Parse(string json)
         {
@@ -54,7 +54,7 @@ namespace FunctionRowRemapper
                 throw new ArgumentException("Invalid preferences. Expected version 6, 7, or 8 settings.");
             if (!(d["theme"] is string) || Array.IndexOf(new[] { "KiWeave Dark", "Midnight Blue", "Plum", "Glass", "High contrast" }, (string)d["theme"]) < 0) throw new ArgumentException("Unknown KiWeave theme.");
             if (!(d["customAccent"] is string) || ((string)d["customAccent"]).Length > 7 || ((string)d["customAccent"]).Length != 0 && !System.Text.RegularExpressions.Regex.IsMatch((string)d["customAccent"], "\\A#[0-9a-fA-F]{6}\\z")) throw new ArgumentException("Invalid custom accent color.");
-            string toastStyle = version == 8 ? (string)d["toastStyle"] : "KiWeave";
+            string toastStyle = version == 8 ? (string)d["toastStyle"] : "Compact flyout";
             if (String.Equals(toastStyle, "Windows 11", StringComparison.OrdinalIgnoreCase)) toastStyle = "Compact flyout";
             if (Array.IndexOf(new[] { "KiWeave", "Compact flyout" }, toastStyle) < 0) throw new ArgumentException("Unknown toast style.");
             return new UserPreferences { UseTray = (bool)d["useTray"], CheckUpdates = (bool)d["checkUpdates"], AutomaticProfiles = (bool)d["automaticProfiles"], NetworkAccess = (bool)d["networkAccess"], Theme = (string)d["theme"], CustomAccent = (string)d["customAccent"], HistoryRetention = (int)d["historyRetention"], SmoothScrolling = version >= 7 && (bool)d["smoothScrolling"], ToastStyle = toastStyle };
@@ -63,7 +63,7 @@ namespace FunctionRowRemapper
         {
             if (preferences == null) throw new ArgumentNullException("preferences");
             if (preferences.HistoryRetention < 5 || preferences.HistoryRetention > 100) throw new ArgumentException("History retention must be between 5 and 100 snapshots.");
-            if (Array.IndexOf(new[] { "KiWeave", "Compact flyout" }, preferences.ToastStyle ?? "KiWeave") < 0) throw new ArgumentException("Unknown toast style.");
+            if (Array.IndexOf(new[] { "KiWeave", "Compact flyout" }, preferences.ToastStyle ?? "Compact flyout") < 0) throw new ArgumentException("Unknown toast style.");
             return "{\r\n  \"version\": 8,\r\n  \"useTray\": " + (preferences.UseTray ? "true" : "false") +
                 ",\r\n  \"checkUpdates\": " + (preferences.CheckUpdates ? "true" : "false") +
                 ",\r\n  \"automaticProfiles\": " + (preferences.AutomaticProfiles ? "true" : "false") +
@@ -72,13 +72,12 @@ namespace FunctionRowRemapper
                 ",\r\n  \"customAccent\": \"" + (preferences.CustomAccent ?? "") + "\"" +
                 ",\r\n  \"historyRetention\": " + preferences.HistoryRetention +
                 ",\r\n  \"smoothScrolling\": " + (preferences.SmoothScrolling ? "true" : "false") +
-                ",\r\n  \"toastStyle\": \"" + (preferences.ToastStyle ?? "KiWeave") + "\"\r\n}\r\n";
+                ",\r\n  \"toastStyle\": \"" + (preferences.ToastStyle ?? "Compact flyout") + "\"\r\n}\r\n";
         }
         public static UserPreferences Load(string path)
         {
             if (!File.Exists(path)) return new UserPreferences();
-            if (new FileInfo(path).Length > 1024) throw new ArgumentException("Preferences file is too large.");
-            return Parse(File.ReadAllText(path, Encoding.UTF8));
+            return Parse(AtomicFile.ReadAllTextBounded(path, 1024, Encoding.UTF8));
         }
         public static void Save(string path, UserPreferences preferences)
         {
