@@ -368,6 +368,12 @@ if ($actionLibraryWindow -notmatch 'WindowStyle\s*=\s*WindowStyle\.SingleBorderW
     $actionLibraryWindow -match 'EnableCaptionCloseFallback|WindowStyle\.None|WindowChrome') {
     throw 'WPF action library must retain the previous shell native title bar, standard system controls, and Escape-to-close behavior.'
 }
+$appSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\App.xaml.cs') -Raw
+if ($appSource -notmatch 'startupWindow\.Opacity\s*=\s*0' -or
+    $appSource -notmatch 'startupWindow\.ContentRendered\s*\+=' -or
+    $appSource -notmatch 'startupWindow\.Opacity\s*=\s*1') {
+    throw 'WPF startup must hide the native host until the first composed frame to prevent a black launch surface.'
+}
 Write-Output 'PASS WPF action library uses the previous shell native title bar and standard system controls'
 Write-Output 'PASS WPF update-checker launches return before migration and user-language loading'
 Write-Output 'PASS WPF update-checker signals its internal-error response without misreporting a timeout'
@@ -402,3 +408,4 @@ Write-Output 'PASS WPF profile switches preserve the selected function key and r
 Write-Output 'PASS WPF profile-manager rename keeps a valid profile pin and activation updates it'
 Write-Output 'PASS WPF profile-manager manual activation clears automatic state without changing refresh semantics'
 Write-Output 'PASS low-level keyboard callback uses cached policy and performs no disk or foreground-process refresh'
+Write-Output 'PASS WPF startup hides the native host until the first composed frame'
