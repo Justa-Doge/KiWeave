@@ -50,16 +50,20 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $repo = $env:GITHUB_REPOSITORY
           $tag = $env:RELEASE_TAG
-          $json = gh api "repos/$repo/releases?per_page=100"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not list Beta 5 releases.' }
-          $releases = ConvertFrom-Json -InputObject $json
-          # Drafts can expose an internal untagged tag name. Match the exact
-          # tag/title or the unique, fully uploaded Beta 5 asset set.
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
-          $matching = @($releases | Where-Object {
-            $assets = @($_.assets | ForEach-Object name)
-            $_.draft -and ((($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) -or (($assets.Count -eq 3) -and @($expected | Where-Object { $_ -notin $assets }).Count -eq 0))
-          })
+          # Read the draft directly by tag first; this is reliable for drafts
+          # even when the collection endpoint returns a stale/partial view.
+          $json = gh api "repos/$repo/releases/tags/$tag" 2>$null
+          if ($LASTEXITCODE -eq 0) { $matching = @((ConvertFrom-Json -InputObject $json)) }
+          else {
+            $json = gh api "repos/$repo/releases?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not list Beta 5 releases.' }
+            $releases = ConvertFrom-Json -InputObject $json
+            $matching = @($releases | Where-Object {
+              $assets = @($_.assets | ForEach-Object name)
+              $_.draft -and ((($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) -or (($assets.Count -eq 3) -and @($expected | Where-Object { $_ -notin $assets }).Count -eq 0))
+            })
+          }
           if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw "Publishing requires one existing draft release for $tag." }
           $draft = $matching[0]
           $actual = @($draft.assets | ForEach-Object name)
@@ -100,14 +104,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $repo = $env:GITHUB_REPOSITORY
           $tag = $env:RELEASE_TAG
-          $json = gh api "repos/$repo/releases?per_page=100"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not re-list Beta 5 releases.' }
-          $releases = ConvertFrom-Json -InputObject $json
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
-          $matching = @($releases | Where-Object {
-            $assets = @($_.assets | ForEach-Object name)
-            $_.draft -and ((($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) -or (($assets.Count -eq 3) -and @($expected | Where-Object { $_ -notin $assets }).Count -eq 0))
-          })
+          $json = gh api "repos/$repo/releases/tags/$tag" 2>$null
+          if ($LASTEXITCODE -eq 0) { $matching = @((ConvertFrom-Json -InputObject $json)) }
+          else {
+            $json = gh api "repos/$repo/releases?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not re-list Beta 5 releases.' }
+            $releases = ConvertFrom-Json -InputObject $json
+            $matching = @($releases | Where-Object {
+              $assets = @($_.assets | ForEach-Object name)
+              $_.draft -and ((($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) -or (($assets.Count -eq 3) -and @($expected | Where-Object { $_ -notin $assets }).Count -eq 0))
+            })
+          }
           if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw 'The Beta 5 release is no longer a single draft; refusing to publish.' }
           $draft = $matching[0]
           $actual = @($draft.assets | ForEach-Object name)
