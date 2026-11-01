@@ -2,7 +2,7 @@
 
 ## Beta 5 highlights
 
-- WPF desktop interface with keyboard-first editing, updated action picker, and smooth scrolling synchronized to the display refresh rate.
+- WPF desktop interface with keyboard-first editing, updated action picker, and smooth scrolling synchronized to the display refresh rate and compositor cadence (the display's refresh cadence).
 - Remap F1–F12 and custom hotkeys with profiles, modifier layers, sequences, and conditional actions.
 - Expanded monitor controls, including DDC/CI backlight on/off, brightness, contrast, and monitor volume; media actions, Discord controls, and media-session toasts with app or album artwork.
 - .kiweave configuration files, local backups and history, tray controls, and integrations for Discord, Spotify, OBS, PowerToys, and supported media sessions.
@@ -94,7 +94,7 @@ Run **bin/KiWeave.exe**, or use the installed **KiWeave** entry in Windows Searc
 
 When both **Allow network access** and update checks are enabled in Settings, KiWeave quietly checks public, stable `vX.Y.Z` releases through GitHub's HTTPS API at launch. **Check for updates** runs the same check on demand. If a release is newer than the installed version, it shows a Windows notification linking to that release. It never downloads or installs an update, needs no Git installation or GitHub account, and uses an eight-second limit. Alpha and beta GitHub prereleases are ignored by the stable update checker. If the repository is private, GitHub is unavailable, or the PC is offline, the launch check is skipped without delaying startup. A release needs a matching version bump in `src/UpdateChecker.cs` and a published GitHub release. Ordinary commits and tags alone do not trigger notifications.
 
-DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions, plus separate backlight-minimum/maximum and monitor-standby/wake actions on compatible displays. Backlight minimum means 0% brightness and does not power off the display; maximum does not restore a previous level. Standby/wake uses the monitor power-mode control and is distinct from brightness. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.
+DDC/CI supports detected monitor brightness, contrast, and hardware-volume actions, plus separate backlight-minimum/maximum and monitor-standby/wake actions on compatible displays. Backlight minimum writes 0% brightness and does not power off the display; maximum does not restore a previous level. These monitor standby/wake actions use the monitor power-mode control and are distinct from brightness. See [DDC-CI.md](DDC-CI.md) for setup, compatibility, and verification.
 
 ## Run it
 
@@ -196,9 +196,13 @@ Download the **KiWeave Setup** installer or portable ZIP from [Releases](https:/
 
 Beta 5 uses the WPF desktop build distributed as release binaries. Its source stays out of this repository. The release workflow verifies the exact uploaded installer, portable archive, and checksums; it does not rebuild the app. Publishing is a separate manual action after the draft package is reviewed.
 
+To prepare a Beta 5 release:
+
+Run **Verify and publish KiWeave Beta 5** manually, build the private WPF package locally, and upload those three files to a draft release. The workflow verifies them without rebuilding or exposing the private WPF source. Pushing a tag alone does not publish Beta 5.
+
 ### Expanded action library
 
-The searchable library now contains 458 unique actions across categories including Windows and window management, audio devices, Discord, Spotify, OBS Studio, PowerToys, text editing, File Explorer, Chrome, VS Code, taskbar, Settings pages, folders, monitor controls, and Windows tools. Filter by category or search by name, category, context, shortcut, or target. The sequence builder shares the same catalog. Existing saved hotkeys are unchanged.
+The searchable library now contains 458 unique actions across 18 categories (458 entries across 18 categories) including Windows and window management, audio devices, Discord, Spotify, OBS Studio, PowerToys, text editing, File Explorer, Chrome, VS Code, taskbar, Settings pages, folders, monitor controls, and Windows tools. **Expanded action library (2026-10-23).** Filter by category or search by name, category, context, shortcut, or target. The sequence builder shares the same catalog. Existing saved hotkeys are unchanged.
 
 App-specific shortcuts require that app be focused and use its default key bindings. Settings pages depend on Windows version and hardware; presets open pages rather than automatically changing settings. Tools are included only when their executable exists. Catalog definitions live in the previous public source tree.
 
