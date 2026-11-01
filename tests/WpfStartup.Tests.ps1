@@ -149,6 +149,12 @@ if ($runtimeErrorSubscribeAt -lt 0 -or $runtimeApplyAt -le $runtimeErrorSubscrib
 $profileManager = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\ProfileManagerWindow.cs') -Raw
 $mainForm = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\MainForm.cs') -Raw
 $inputEngine = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\Engine.cs') -Raw
+if ($profileManager -notmatch 'If more than one profile claims the same app, the profile listed first wins' -or
+    $profileManager -notmatch 'void MoveSelected\(int delta\)' -or
+    $profileManager -notmatch 'Profile priority saved' -or
+    $profileManager -notmatch 'ProfileStore\.Save\(ProfileStore\.DefaultPath, new ProfileCollection \{ Profiles = reordered \}\)') {
+    throw 'WPF profile management must expose and persist deterministic priority when multiple profiles claim the same application.'
+}
 $hookStart = $inputEngine.IndexOf('IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)', [StringComparison]::Ordinal)
 $hookEnd = $inputEngine.IndexOf('void NotifyEmergencyDisabled()', $hookStart, [StringComparison]::Ordinal)
 if ($hookStart -lt 0 -or $hookEnd -le $hookStart) { throw 'The low-level keyboard hook callback could not be located.' }
