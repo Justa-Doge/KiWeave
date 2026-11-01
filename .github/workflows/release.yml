@@ -53,7 +53,10 @@ jobs:
           $json = gh api "repos/$repo/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not list Beta 5 releases.' }
           $releases = ConvertFrom-Json -InputObject $json
-          $matching = @($releases | Where-Object { $_.tag_name -ceq $tag })
+          # GitHub keeps a draft's internal tag_name as an untagged slug until
+          # publication, even when the draft UI shows the existing tag. Match
+          # the exact tag or the uniquely titled Beta 5 draft.
+          $matching = @($releases | Where-Object { $_.draft -and (($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) })
           if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw "Publishing requires one existing draft release for $tag." }
           $draft = $matching[0]
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
@@ -98,7 +101,7 @@ jobs:
           $json = gh api "repos/$repo/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not re-list Beta 5 releases.' }
           $releases = ConvertFrom-Json -InputObject $json
-          $matching = @($releases | Where-Object { $_.tag_name -ceq $tag })
+          $matching = @($releases | Where-Object { $_.draft -and (($_.tag_name -ceq $tag) -or ($_.name -ceq "KiWeave $tag")) })
           if ($matching.Count -ne 1 -or -not $matching[0].draft) { throw 'The Beta 5 release is no longer a single draft; refusing to publish.' }
           $draft = $matching[0]
           $expected = @("KiWeave-Setup-beta5-$env:BUILD_LABEL.exe", "KiWeave-Portable-beta5-$env:BUILD_LABEL.zip", 'SHA256SUMS.txt')
