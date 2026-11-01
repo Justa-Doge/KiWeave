@@ -42,6 +42,21 @@ if ($automaticProfileCheck -notmatch 'Native\.TryForegroundProcessName\(out stri
 $discordWindow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\DiscordConnectionWindow.cs') -Raw
 $extensionDetailsWindow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\FirstPartyExtensionsWindow.cs') -Raw
 $mainWindowXaml = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\MainWindow.xaml') -Raw
+$accessibilityControls = @(
+    'AutomationProperties.Name="Minimize window"',
+    'AutomationProperties.Name="Maximize or restore window"',
+    'AutomationProperties.Name="Close KiWeave window"',
+    'AutomationProperties.Name="Function keys"',
+    'AutomationProperties.Name="Custom hotkeys"',
+    'AutomationProperties.Name="Extensions"',
+    'AutomationProperties.Name="Integration health"',
+    'AutomationProperties.Name="Settings"'
+)
+if (@($accessibilityControls | Where-Object { $mainWindowXaml.IndexOf($_, [StringComparison]::Ordinal) -lt 0 }).Count -gt 0 -or
+    $mainWindowXaml -notmatch 'MinWidth="960" MinHeight="640"' -or
+    $mainWindowXaml -notmatch 'VerticalScrollBarVisibility="Auto"') {
+    throw 'WPF main-window navigation and title-bar controls must remain screen-reader named, keyboard reachable, and usable at the supported minimum size.'
+}
 $streamDeckBridge = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\wpf-rewrite\WpfStreamDeckBridge.cs') -Raw
 $discordIntegration = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\DiscordIntegration.cs') -Raw
 $systemActions = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\SystemActions.cs') -Raw
