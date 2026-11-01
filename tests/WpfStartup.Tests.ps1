@@ -155,6 +155,10 @@ if ($profileManager -notmatch 'If more than one profile claims the same app, the
     $profileManager -notmatch 'ProfileStore\.Save\(ProfileStore\.DefaultPath, new ProfileCollection \{ Profiles = reordered \}\)') {
     throw 'WPF profile management must expose and persist deterministic priority when multiple profiles claim the same application.'
 }
+if ($mainWindow -notmatch 'StatusOverlay\.ShowStyled\("KiWeave", configuration\.Enabled \? "Shortcuts resumed" : "Shortcuts paused"' -or
+    $mainWindow -notmatch 'CurrentSetupStatus\.Text = "Emergency pause engaged\. Shortcuts are paused until re-enabled\.";\s*StatusOverlay\.ShowStyled\("KiWeave", "Shortcuts paused"') {
+    throw 'WPF shortcut enable/resume and emergency-pause actions must provide replacement-safe status toasts.'
+}
 $hookStart = $inputEngine.IndexOf('IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)', [StringComparison]::Ordinal)
 $hookEnd = $inputEngine.IndexOf('void NotifyEmergencyDisabled()', $hookStart, [StringComparison]::Ordinal)
 if ($hookStart -lt 0 -or $hookEnd -le $hookStart) { throw 'The low-level keyboard hook callback could not be located.' }
